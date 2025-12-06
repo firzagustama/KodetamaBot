@@ -22,7 +22,19 @@
     "types": [
       "vite/client",
       "node"
-    ]
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@kodetama/shared": [
+        "../../packages/shared/src/index.ts"
+      ],
+      "@kodetama/shared/types": [
+        "../../packages/shared/src/types.ts"
+      ],
+      "@kodetama/shared/utils": [
+        "../../packages/shared/src/utils.ts"
+      ]
+    }
   },
   "include": [
     "src"

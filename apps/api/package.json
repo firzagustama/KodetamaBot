@@ -6,7 +6,7 @@
     "scripts": {
         "dev": "dotenv -e ../../.env -- tsx watch src/index.ts",
         "start": "node dist/index.js",
-        "build": "tsc",
+        "build": "tsc -p tsconfig.build.json",
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
