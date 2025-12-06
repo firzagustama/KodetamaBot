@@ -13,6 +13,7 @@
         "build": "tsc",
         "generate": "dotenv -e ../../.env -- drizzle-kit generate",
         "migrate": "dotenv -e ../../.env -- drizzle-kit migrate",
+        "migrate:prod": "node dist/migrate.js",
         "push": "dotenv -e ../../.env -- drizzle-kit push",
         "studio": "dotenv -e ../../.env -- drizzle-kit studio",
         "typecheck": "tsc --noEmit"
