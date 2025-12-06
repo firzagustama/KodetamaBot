@@ -1,0 +1,32 @@
+{
+  "name": "kodetama-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @kodetama/bot dev && pnpm --filter @kodetama/api dev && pnpm --filter @kodetama/web dev",
+    "dev:bot": "pnpm --filter @kodetama/bot dev",
+    "dev:api": "pnpm --filter @kodetama/api dev",
+    "dev:web": "pnpm --filter @kodetama/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "db:generate": "pnpm --filter @kodetama/db generate",
+    "db:migrate": "pnpm --filter @kodetama/db migrate",
+    "db:push": "pnpm --filter @kodetama/db push",
+    "docker:build": "docker compose -f docker/docker-compose.yml build --no-cache api",
+    "docker:up": "docker compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f docker/docker-compose.yml down"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "dotenv-cli": "^7.4.2",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}

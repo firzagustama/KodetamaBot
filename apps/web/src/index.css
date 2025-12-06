@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --tg-theme-bg-color: #ffffff;
+  --tg-theme-text-color: #000000;
+  --tg-theme-button-color: #0ea5e9;
+  --tg-theme-button-text-color: #ffffff;
+}
+
+body {
+  font-family: "Inter", system-ui, sans-serif;
+  background-color: var(--tg-theme-bg-color, #f8fafc);
+  color: var(--tg-theme-text-color, #0f172a);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 2px;
+}
+
+/* Card glass effect */
+.glass-card {
+  @apply bg-white/80 backdrop-blur-sm border border-white/20 shadow-lg;
+}
+
+/* Budget progress bar */
+.progress-bar {
+  @apply h-2 rounded-full bg-slate-200 overflow-hidden;
+}
+
+.progress-fill {
+  @apply h-full rounded-full transition-all duration-300;
+}
