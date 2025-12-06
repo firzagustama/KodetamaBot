@@ -47,4 +47,5 @@ COPY --from=builder /app/packages/shared/node_modules ./packages/shared/node_mod
 COPY --from=builder /app/packages/ai/node_modules ./packages/ai/node_modules
 COPY --from=builder /app/package.json ./
 
+EXPOSE 3000
 CMD ["node", "apps/bot/dist/index.js"]

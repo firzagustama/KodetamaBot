@@ -440,9 +440,30 @@ async function main() {
         if (!WEBHOOK_URL) {
             throw new Error("WEBHOOK_URL is required for webhook mode");
         }
-        await bot.api.setWebhook(WEBHOOK_URL);
-        logger.info(`Webhook set to ${WEBHOOK_URL}`);
-        // Note: You'll need to set up a server to handle webhook requests
+
+        // Start webhook server
+        const { createServer } = await import("http");
+        const { webhookCallback } = await import("grammy");
+
+        const server = createServer(webhookCallback(bot, "http"));
+        const PORT = parseInt(process.env.BOT_PORT ?? "3000");
+
+        server.listen(PORT, async () => {
+            logger.info(`Bot webhook server listening on port ${PORT}`);
+
+            // Set webhook after server is ready
+            await bot.api.setWebhook(WEBHOOK_URL);
+            logger.info(`Webhook set to ${WEBHOOK_URL}`);
+        });
+
+        // Graceful shutdown
+        const stop = () => {
+            logger.info("Stopping bot...");
+            server.close();
+            process.exit(0);
+        };
+        process.once("SIGINT", stop);
+        process.once("SIGTERM", stop);
     } else {
         // Polling mode for development
         await bot.api.deleteWebhook();
