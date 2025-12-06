@@ -432,6 +432,23 @@ async function setBotCommands() {
         { command: "export", description: "Export ke Google Sheets" },
         { command: "cancel", description: "Batalkan percakapan" },
     ]);
+
+    // Set Menu Button to Web App if URL is configured
+    if (process.env.WEB_APP_URL) {
+        try {
+            await bot.api.setChatMenuButton({
+                menu_button: {
+                    type: "web_app",
+                    text: "📊 Dashboard",
+                    web_app: { url: process.env.WEB_APP_URL },
+                },
+            });
+            logger.info("Bot menu button set to Web App");
+        } catch (error) {
+            logger.error("Failed to set bot menu button:", error);
+        }
+    }
+
     logger.info("Bot commands menu set");
 }
 
