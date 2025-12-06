@@ -33,6 +33,9 @@
       ],
       "@kodetama/shared/utils": [
         "../../packages/shared/src/utils.ts"
+      ],
+      "@kodetama/db/schema": [
+        "../../packages/db/src/schema.ts"
       ]
     }
   },
