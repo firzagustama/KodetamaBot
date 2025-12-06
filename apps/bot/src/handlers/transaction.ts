@@ -75,7 +75,7 @@ async function saveAndConfirmTransaction(
         `📂 Kategori: ${parsed.category}\n` +
         `${bucketEmoji[parsed.bucket] ?? "📦"} Bucket: ${parsed.bucket}\n` +
         `_Ketik /undo untuk membatalkan_\n\n` +
-        `${(parsed as any).message}`,
+        `${parsed.description}`,
         { parse_mode: "Markdown" }
     );
 }
@@ -111,8 +111,8 @@ export async function handleTransaction(ctx: BotContext): Promise<void> {
             usage,
         });
 
-        if ((parsed as any).type === "other") {
-            await ctx.reply((parsed as any).message);
+        if (parsed.type === "other") {
+            await ctx.reply(parsed.description);
             return;
         }
 

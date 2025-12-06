@@ -561,7 +561,7 @@ async function setBotCommands() {
             await bot.api.setChatMenuButton({
                 menu_button: {
                     type: "web_app",
-                    text: "📊 Dashboard",
+                    text: "Dashboard",
                     web_app: { url: process.env.WEB_APP_URL },
                 },
             });

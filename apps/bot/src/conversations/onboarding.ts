@@ -304,7 +304,7 @@ export async function onboardingConversation(
         // Create keyboard with Dashboard button
         const finalKeyboard = new InlineKeyboard();
         if (process.env.WEB_APP_URL) {
-            finalKeyboard.webApp("Open", process.env.WEB_APP_URL);
+            finalKeyboard.webApp("Dashboard", process.env.WEB_APP_URL);
         }
 
         await ctx.reply(
