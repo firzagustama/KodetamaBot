@@ -7,7 +7,7 @@ import {
     BUDGET_SPLIT_USER_PROMPT,
     MONTHLY_SUMMARY_SYSTEM_PROMPT,
     MONTHLY_SUMMARY_USER_PROMPT,
-} from "./prompts";
+} from "./prompts/index.js";
 
 // =============================================================================
 // TYPES

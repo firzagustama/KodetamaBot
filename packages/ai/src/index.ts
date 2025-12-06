@@ -1,2 +1,2 @@
-export * from "./orchestrator";
-export * from "./prompts";
+export * from "./orchestrator.js";
+export * from "./prompts/index.js";
