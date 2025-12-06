@@ -1,6 +1,6 @@
 import { db } from "@kodetama/db";
-import { transactions, aiUsage } from "@kodetama/db/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { transactions, categories, aiUsage } from "@kodetama/db/schema";
+import { eq, and, desc, sql, ilike } from "drizzle-orm";
 import type { TxType } from "@kodetama/shared";
 
 export interface SaveTransactionData {
@@ -10,18 +10,78 @@ export interface SaveTransactionData {
     amount: number;
     description?: string;
     category?: string;
+    categoryId?: string;
     bucket?: string;
     rawMessage?: string;
     aiConfidence?: number;
 }
 
 /**
+ * Find or create a category and return its ID
+ */
+async function findOrCreateCategory(
+    userId: string | null = null,
+    groupId: string | null = null,
+    categoryName: string,
+    bucket?: string
+): Promise<string> {
+    // First try to find existing category (case-insensitive)
+    const conditions = [ilike(categories.name, categoryName)];
+
+    if (userId) {
+        conditions.push(eq(categories.userId, userId));
+    } else if (groupId) {
+        conditions.push(eq(categories.groupId, groupId));
+    }
+
+    const whereClause = and(...conditions);
+
+    const existing = await db.query.categories.findFirst({
+        where: whereClause,
+    });
+
+    if (existing) {
+        return existing.id;
+    }
+
+    // Create new category
+    const [newCat] = await db.insert(categories).values({
+        userId,
+        groupId,
+        name: categoryName,
+        bucket: bucket || "needs", // default bucket
+        isDefault: false,
+    }).returning({ id: categories.id });
+
+    return newCat.id;
+}
+
+/**
  * Save a new transaction
  */
 export async function saveTransaction(data: SaveTransactionData): Promise<string> {
+    if (data.type === "other") return "";
+
+    let categoryId: string | undefined;
+
+    // Handle category linking
+    if (data.categoryId) {
+        // Direct categoryId provided
+        categoryId = data.categoryId;
+    } else if (data.category) {
+        // Category name provided - find or create it
+        try {
+            categoryId = await findOrCreateCategory(data.userId, null, data.category, data.bucket);
+        } catch (error) {
+            console.warn("Failed to find/create category:", error);
+            // Continue without categoryId
+        }
+    }
+
     const [tx] = await db.insert(transactions).values({
         userId: data.userId,
         periodId: data.periodId,
+        categoryId: categoryId,
         type: data.type,
         amount: data.amount.toString(),
         description: data.description,

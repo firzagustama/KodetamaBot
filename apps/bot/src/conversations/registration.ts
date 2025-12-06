@@ -29,9 +29,9 @@ export async function registrationConversation(
         const existing = await getPendingRegistration(user.id);
         if (existing) {
             await ctx.reply(
-                "⏳ *Registrasi Pending*\n\n" +
-                "Kamu sudah memiliki registrasi yang menunggu approval.\n" +
-                "Silakan tunggu konfirmasi dari admin.",
+                "*Registrasi pending.*\n\n" +
+                "Kamu sudah punya registrasi yang nunggu approval admin.\n" +
+                "Tunggu konfirmasi.",
                 { parse_mode: "Markdown" }
             );
             return;
@@ -43,34 +43,34 @@ export async function registrationConversation(
 
     // Welcome message
     await ctx.reply(
-        "🎉 *Selamat datang di Kodetama Bot!*\n\n" +
-        "Saya adalah asisten keuangan pribadi yang akan membantu kamu mengelola keuangan dengan metode *Zero-Based Budgeting (ZBB)*.\n\n" +
-        "Pertama, pilih tier yang sesuai dengan kebutuhanmu:",
+        "*Ya udah, selamat datang.*\n\n" +
+        "Gue asisten keuangan biasa. Bantu atur duit kamu.\n\n" +
+        "Pilih tier yang cocok:",
         { parse_mode: "Markdown" }
     );
 
     // Tier selection keyboard
     const tierKeyboard = new InlineKeyboard()
-        .text("📊 Standard - Gratis", "tier_standard")
+        .text("Standard - Gratis", "tier_standard")
         .row()
-        .text("⭐ Pro - Premium", "tier_pro")
+        .text("Pro - Premium", "tier_pro")
         .row()
-        .text("👨‍👩‍👧‍👦 Family - Grup", "tier_family");
+        .text("Family - Grup", "tier_family");
 
     await ctx.reply(
-        "*Pilihan Tier:*\n\n" +
-        "📊 *Standard* (Gratis)\n" +
+        "Tier apa?:\n\n" +
+        "*Standard* (Gratis)\n" +
         "• Catat transaksi via chat\n" +
         "• Export ke Google Sheets\n" +
         "• Analitik dasar\n" +
-        "• Klasifikasi AI\n\n" +
-        "⭐ *Pro* (Premium)\n" +
+        "• Klasifikasi smart\n\n" +
+        "*Pro* (Premium)\n" +
         "• Semua fitur Standard\n" +
         "• Upload invoice → Google Drive\n" +
         "• Voice note → transaksi\n" +
         "• Auto-kategorisasi\n" +
-        "• Ringkasan ZBB bulanan AI\n\n" +
-        "👨‍👩‍👧‍👦 *Family* (Grup)\n" +
+        "• Ringkasan bulanan smart\n\n" +
+        "*Family* (Grup)\n" +
         "• Setara fitur Pro\n" +
         "• Untuk grup Telegram\n" +
         "• Anggota grup bisa catat pengeluaran\n" +
@@ -82,7 +82,7 @@ export async function registrationConversation(
     const tierResponse = await conversation.waitForCallbackQuery(/^tier_/);
     const selectedTier = tierResponse.callbackQuery.data.replace("tier_", "") as Tier;
 
-    await tierResponse.answerCallbackQuery(`Tier ${selectedTier} dipilih!`);
+    await tierResponse.answerCallbackQuery(`Tier ${selectedTier} dipilih.`);
 
     // Store registration data in session
     conversation.session.registrationData = {

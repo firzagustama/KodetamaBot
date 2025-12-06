@@ -7,7 +7,7 @@ import { z } from "zod";
 export const TIERS = ["standard", "pro", "family"] as const;
 export type Tier = (typeof TIERS)[number];
 
-export const TX_TYPES = ["income", "expense", "transfer", "adjustment"] as const;
+export const TX_TYPES = ["income", "expense", "transfer", "adjustment", "other"] as const;
 export type TxType = (typeof TX_TYPES)[number];
 
 export const REGISTRATION_STATUS = ["pending", "approved", "rejected"] as const;
@@ -76,6 +76,7 @@ export type Transaction = z.infer<typeof TransactionSchema>;
 
 export const ParsedTransactionSchema = z.object({
     type: z.enum(TX_TYPES),
+    message: z.string(),
     amount: z.number().positive(),
     category: z.string(),
     bucket: z.string(),

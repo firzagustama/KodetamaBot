@@ -122,6 +122,7 @@ export async function onboardingConversation(
         // ==========================================================================
 
         // Initialize AI
+        console.log("Initializing AI orchestrator...");
         const ai = new AIOrchestrator({
             apiKey: process.env.OPENROUTER_API_KEY ?? "",
             model: process.env.OPENROUTER_MODEL ?? "openai/gpt-4-turbo",
@@ -149,11 +150,12 @@ export async function onboardingConversation(
                 .text("✏️ Atur Manual", "ai_reject");
 
             await ctx.reply(
-                `🤖 *Rekomendasi AI*\n\n` +
-                `Berdasarkan penghasilanmu, AI menyarankan:\n\n` +
-                `🏠 *Kebutuhan (${aiResult.needsPercentage}%)*: ${formatRupiah(aiResult.needsAmount)}\n` +
-                `🎮 *Keinginan (${aiResult.wantsPercentage}%)*: ${formatRupiah(aiResult.wantsAmount)}\n` +
-                `💵 *Tabungan (${aiResult.savingsPercentage}%)*: ${formatRupiah(aiResult.savingsAmount)}\n\n` +
+                `🤖 *Memberikan rekomendasi...*\n\n` +
+                `Berdasarkan penghasilanmu, menyarankan:\n\n` +
+                `🏠 *Needs (${aiResult.needsPercentage}%)*: ${formatRupiah(aiResult.needsAmount)}\n` +
+                `🎮 *Wants (${aiResult.wantsPercentage}%)*: ${formatRupiah(aiResult.wantsAmount)}\n` +
+                `💵 *Savings (${aiResult.savingsPercentage}%)*: ${formatRupiah(aiResult.savingsAmount)}\n\n` +
+                `Suggestion:\n- ${aiResult.suggestions.join("\n- ")}\n\n` +
                 `Apakah kamu ingin menggunakan rekomendasi ini?`,
                 { parse_mode: "Markdown", reply_markup: aiKeyboard }
             );
@@ -180,9 +182,9 @@ export async function onboardingConversation(
             await ctx.reply(
                 `👍 Penghasilan: *${formatRupiah(estimatedIncome)}*\n\n` +
                 "Kita alokasikan ke 3 bucket:\n\n" +
-                "🏠 *Kebutuhan (Needs)* - 50%\n" +
-                "🎮 *Keinginan (Wants)* - 30%\n" +
-                "💵 *Tabungan (Savings)* - 20%\n\n" +
+                "🏠 *Needs* - 50%\n" +
+                "🎮 *Wants* - 30%\n" +
+                "💵 *Savings* - 20%\n\n" +
                 "Mau pakai *aturan 50/30/20* atau atur sendiri?",
                 { parse_mode: "Markdown", reply_markup: splitKeyboard }
             );
@@ -213,8 +215,8 @@ export async function onboardingConversation(
                 }
 
                 await ctx.reply(
-                    `✅ Kebutuhan: ${needsPercent}%\n\n` +
-                    "Masukkan persentase untuk *Keinginan (Wants)*:",
+                    `✅ Needs: ${needsPercent}%\n\n` +
+                    "Masukkan persentase untuk *Wants*:",
                     { parse_mode: "Markdown" }
                 );
 
@@ -234,8 +236,8 @@ export async function onboardingConversation(
                 // Calculate savings
                 savingsPercent = 100 - needsPercent - wantsPercent;
                 await ctx.reply(
-                    `✅ Keinginan: ${wantsPercent}%\n` +
-                    `✅ Tabungan: ${savingsPercent}% (sisa otomatis)`
+                    `✅ Wants: ${wantsPercent}%\n` +
+                    `✅ Savings: ${savingsPercent}% (sisa otomatis)`
                 );
             }
         }
@@ -302,7 +304,7 @@ export async function onboardingConversation(
         // Create keyboard with Dashboard button
         const finalKeyboard = new InlineKeyboard();
         if (process.env.WEB_APP_URL) {
-            finalKeyboard.webApp("📊 Buka Dashboard", process.env.WEB_APP_URL);
+            finalKeyboard.webApp("Open", process.env.WEB_APP_URL);
         }
 
         await ctx.reply(
@@ -311,9 +313,9 @@ export async function onboardingConversation(
             `🗓 *Tgl Gajian:* ${incomeDateText}\n\n` +
             `💰 *Penghasilan:* ${formatRupiah(estimatedIncome)}\n\n` +
             "*Alokasi Budget:*\n" +
-            `🏠 Kebutuhan (${needsPercent}%): ${formatRupiah(allocation.needs)}\n` +
-            `🎮 Keinginan (${wantsPercent}%): ${formatRupiah(allocation.wants)}\n` +
-            `💵 Tabungan (${savingsPercent}%): ${formatRupiah(allocation.savings)}\n\n` +
+            `🏠 Needs (${needsPercent}%): ${formatRupiah(allocation.needs)}\n` +
+            `🎮 Wants (${wantsPercent}%): ${formatRupiah(allocation.wants)}\n` +
+            `💵 Savings (${savingsPercent}%): ${formatRupiah(allocation.savings)}\n\n` +
             "━━━━━━━━━━━━━━━━━━━━━\n\n" +
             "✨ *Sekarang kamu bisa mulai mencatat transaksi!*\n\n" +
             "Contoh:\n" +

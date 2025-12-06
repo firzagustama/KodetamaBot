@@ -28,11 +28,19 @@ export interface OnboardingData {
     useAiRecommendation?: boolean;
 }
 
+export interface PendingTransactionData {
+    parsed: any; // Parsed AI result
+    usage: any; // AI usage data
+    userId: string; // User ID
+    rawMessage: string; // Original message
+}
+
 export interface SessionData {
     step: string;
     registrationData: RegistrationData | null;
     onboardingData: OnboardingData | null;
     lastTransactionId: string | null;
+    pendingTransaction: PendingTransactionData | null;
 }
 
 // =============================================================================

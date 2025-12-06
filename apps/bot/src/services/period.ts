@@ -4,6 +4,14 @@ import { eq, and } from "drizzle-orm";
 import { formatPeriodName, getMonthlyPeriodDates, getCustomPeriodDates } from "@kodetama/shared";
 
 /**
+ * Get current periodId for user
+ */
+export async function resolvePeriodId(userId: string) {
+    const currentPeriod = await getCurrentPeriod(userId);
+    return currentPeriod?.id;
+}
+
+/**
  * Get current period for user
  */
 export async function getCurrentPeriod(userId: string) {
@@ -66,7 +74,6 @@ export async function ensurePeriodExists(
  */
 export async function getUserPeriods(userId: string) {
     return await db.query.datePeriods.findMany({
-        where: eq(datePeriods.userId, userId),
-        orderBy: (periods, { desc }) => desc(periods.startDate),
+        where: and(eq(datePeriods.userId, userId), eq(datePeriods.isCurrent, true))
     });
 }

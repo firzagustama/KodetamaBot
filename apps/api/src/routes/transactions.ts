@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { db } from "@kodetama/db";
 import { transactions, budgets, datePeriods } from "@kodetama/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and } from "drizzle-orm";
 
 import { authenticate } from "../middleware/auth.js";
 
@@ -10,10 +10,10 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
     // Helper function to resolve periodId (handles "default")
     async function resolvePeriodId(userId: string, periodId?: string): Promise<string | null> {
         if (!periodId) return null;
-
         if (periodId === "default") {
             const currentPeriod = await db.query.datePeriods.findFirst({
-                where: eq(datePeriods.userId, userId),
+                where: and(eq(datePeriods.userId, userId), eq(datePeriods.isCurrent, true)),
+
             });
             return currentPeriod?.id ?? null;
         }

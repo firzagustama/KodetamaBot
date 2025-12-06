@@ -18,7 +18,10 @@ import {
     getLastTransaction,
     deleteTransaction,
     getPeriodTotals,
+    resolvePeriodId,
     getCurrentPeriod,
+    saveTransaction,
+    trackAiUsage,
 } from "./services/index.js";
 
 // =============================================================================
@@ -52,6 +55,7 @@ bot.use(
             registrationData: null,
             onboardingData: null,
             lastTransactionId: null,
+            pendingTransaction: null,
         }),
     })
 );
@@ -63,6 +67,71 @@ bot.use(hydrate());
 bot.use(conversations());
 bot.use(createConversation(registrationConversation));
 bot.use(createConversation(onboardingConversation));
+
+/**
+ * Save transaction to DB and send confirmation message
+ */
+async function saveAndConfirmTransaction(
+    ctx: BotContext,
+    parsed: any,
+    usage: any,
+    userId: string,
+    rawMessage: string
+): Promise<void> {
+    // Ensure period exists and get period ID
+    const periodId = await resolvePeriodId(userId);
+    if (!periodId) {
+        await ctx.reply("Sepertinya kamu belum mengatur budget. Mari kita setup dulu!");
+        await ctx.conversation.enter("onboardingConversation");
+        return;
+    }
+
+    // Save transaction to database
+    const transactionId = await saveTransaction({
+        userId,
+        periodId,
+        type: parsed.type,
+        amount: parsed.amount,
+        description: parsed.description,
+        category: parsed.category,
+        bucket: parsed.bucket,
+        rawMessage,
+        aiConfidence: parsed.confidence,
+    });
+
+    // Store last transaction ID in session for undo
+    ctx.session.lastTransactionId = transactionId;
+
+    // Track AI usage
+    if (usage) {
+        await trackAiUsage({
+            userId,
+            model: usage.model ?? "unknown",
+            operation: "parse_transaction",
+            inputTokens: usage.inputTokens ?? 0,
+            outputTokens: usage.outputTokens ?? 0,
+        });
+    }
+
+    // Build confirmation message
+    const bucketEmoji: Record<string, string> = {
+        needs: "🏠",
+        wants: "🎮",
+        savings: "💵",
+    };
+
+    await ctx.reply(
+        `*Transaksi Tercatat!*\n\n` +
+        `📝 *${parsed.description}*
+` +
+        `💰 Jumlah: ${formatRupiah(parsed.amount)}\n` +
+        `📂 Kategori: ${parsed.category}\n` +
+        `${bucketEmoji[parsed.bucket] ?? "📦"} Bucket: ${parsed.bucket}\n` +
+        `_Ketik /undo untuk membatalkan_\n\n` +
+        `${parsed.message}`,
+        { parse_mode: "Markdown" }
+    );
+}
 
 // =============================================================================
 // COMMAND HANDLERS
@@ -86,7 +155,7 @@ bot.command("start", async (ctx) => {
         // Check if user has completed onboarding (has active period)
         const account = await getUserByTelegramId(user.id);
         if (account) {
-            const currentPeriod = await getCurrentPeriod(account.userId);
+            const currentPeriod = await resolvePeriodId(account.userId);
             if (!currentPeriod) {
                 await ctx.reply("Sepertinya kamu belum mengatur budget. Mari kita setup dulu!");
                 await ctx.conversation.enter("onboardingConversation");
@@ -197,15 +266,15 @@ bot.command("budget", async (ctx) => {
         await ctx.reply(
             `💰 *Budget ${period.name}*\n\n` +
             `📊 *Estimasi Pendapatan:* ${formatRupiah(summary.budget.estimatedIncome)}\n\n` +
-            `*🏠 Kebutuhan (${summary.budget.needsPercent}%)*\n` +
+            `*🏠 Needs (${summary.budget.needsPercent}%)*\n` +
             `${progressBar(summary.percentage.needs)}\n` +
             `${formatRupiah(summary.spent.needs)} / ${formatRupiah(summary.budget.needs)}\n` +
             `Sisa: ${formatRupiah(summary.remaining.needs)}\n\n` +
-            `*🎮 Keinginan (${summary.budget.wantsPercent}%)*\n` +
+            `*🎮 Wants (${summary.budget.wantsPercent}%)*\n` +
             `${progressBar(summary.percentage.wants)}\n` +
             `${formatRupiah(summary.spent.wants)} / ${formatRupiah(summary.budget.wants)}\n` +
             `Sisa: ${formatRupiah(summary.remaining.wants)}\n\n` +
-            `*💵 Tabungan (${summary.budget.savingsPercent}%)*\n` +
+            `*💵 Savings (${summary.budget.savingsPercent}%)*\n` +
             `${progressBar(summary.percentage.savings)}\n` +
             `${formatRupiah(summary.spent.savings)} / ${formatRupiah(summary.budget.savings)}\n` +
             `Sisa: ${formatRupiah(summary.remaining.savings)}`,
@@ -330,6 +399,7 @@ bot.command("cancel", async (ctx) => {
     ctx.session.step = "idle";
     ctx.session.registrationData = null;
     ctx.session.onboardingData = null;
+    ctx.session.pendingTransaction = null;
 
     await ctx.reply(
         "❌ Percakapan dibatalkan.\n\n" +
@@ -354,6 +424,58 @@ bot.on("callback_query:data", async (ctx) => {
     if (data.startsWith("confirm_amount_")) {
         // TODO: Handle amount confirmation
         await ctx.answerCallbackQuery("Konfirmasi diterima!");
+        return;
+    }
+
+    // Transaction confirmation callbacks
+    if (data === "confirm_transaction") {
+        const { pendingTransaction } = ctx.session;
+
+        if (!pendingTransaction) {
+            await ctx.answerCallbackQuery("Tidak ada konfirmasi yang sedang berlangsung.");
+            return;
+        }
+
+        try {
+            await saveAndConfirmTransaction(
+                ctx,
+                pendingTransaction.parsed,
+                pendingTransaction.usage,
+                pendingTransaction.userId,
+                pendingTransaction.rawMessage
+            );
+
+            ctx.session.pendingTransaction = null;
+            await ctx.answerCallbackQuery("✅ Transaksi dikonfirmasi!");
+        } catch (error) {
+            logger.error("Error saving confirmed transaction:", error);
+            await ctx.answerCallbackQuery("❌ Terjadi kesalahan saat menyimpan transaksi.");
+        }
+
+        return;
+    }
+
+    if (data === "reject_transaction") {
+        const { pendingTransaction } = ctx.session;
+
+        if (!pendingTransaction) {
+            await ctx.answerCallbackQuery("Tidak ada konfirmasi yang sedang berlangsung.");
+            return;
+        }
+
+        ctx.session.pendingTransaction = null;
+
+        try {
+            await ctx.editMessageText(
+                `${ctx.callbackQuery.message?.text ?? "Konfirmasi Transaksi"}\n\n❌ *Transaksi Dibatalkan*\n\nSilakan ulangi dengan pesan yang lebih jelas.`,
+                { parse_mode: "Markdown" }
+            );
+            await ctx.answerCallbackQuery("Transaksi dibatalkan.");
+        } catch (editError) {
+            logger.error("Error editing rejected transaction message:", editError);
+            await ctx.answerCallbackQuery("Transaksi dibatalkan.");
+        }
+
         return;
     }
 

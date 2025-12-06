@@ -189,7 +189,7 @@ export const useStore = create<State>((set, get) => ({
             const periodId = budget?.period?.id;
             const url = periodId
                 ? `${API_URL}/transactions/summary?periodId=${periodId}`
-                : `${API_URL}/transactions/summary`;
+                : `${API_URL}/transactions/summary?periodId=default`;
 
             const res = await authFetch(url, token);
 

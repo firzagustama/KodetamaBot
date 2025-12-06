@@ -30,8 +30,8 @@ export async function handleGroupMessage(ctx: BotContext): Promise<void> {
 
     if (!cleanedMessage) {
         await ctx.reply(
-            "👋 Halo! Untuk mencatat transaksi, mention saya lalu ketik transaksinya.\n\n" +
-            `Contoh: @${botUsername} makan siang 50rb`,
+            "*Tch.* Mau catat transaksi? Mention gue dulu.\n\n" +
+            `Contoh: @${botUsername} makan siang 50rb 💪`,
             { reply_to_message_id: ctx.message?.message_id }
         );
         return;
@@ -46,8 +46,8 @@ export async function handleGroupMessage(ctx: BotContext): Promise<void> {
     });
 
     await ctx.reply(
-        "📝 Fitur group (Family tier) akan segera hadir!\n\n" +
-        "Untuk saat ini, silakan chat langsung ke bot secara private.",
+        "*Tch.* Fitur keluarga lagi dibangun.\n\n" +
+        "Sementara chat gue langsung di private ya lo. 💥",
         { reply_to_message_id: ctx.message?.message_id }
     );
 }

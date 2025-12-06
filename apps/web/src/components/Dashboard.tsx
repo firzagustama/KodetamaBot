@@ -36,21 +36,21 @@ export default function Dashboard() {
             <div className="grid grid-cols-3 gap-3">
                 <BudgetCard
                     icon="🏠"
-                    label="Kebutuhan"
+                    label="Needs"
                     allocated={byBucket.needs.allocated}
                     spent={byBucket.needs.spent}
                     color="emerald"
                 />
                 <BudgetCard
                     icon="🎮"
-                    label="Keinginan"
+                    label="Wants"
                     allocated={byBucket.wants.allocated}
                     spent={byBucket.wants.spent}
                     color="amber"
                 />
                 <BudgetCard
                     icon="💵"
-                    label="Tabungan"
+                    label="Savings"
                     allocated={byBucket.savings.allocated}
                     spent={byBucket.savings.spent}
                     color="sky"
@@ -68,7 +68,7 @@ export default function Dashboard() {
                     color="bg-emerald-500"
                 />
                 <BucketProgress
-                    label="Keinginan"
+                    label="Wants"
                     spent={byBucket.wants.spent}
                     allocated={byBucket.wants.allocated}
                     color="bg-amber-500"

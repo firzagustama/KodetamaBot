@@ -66,7 +66,7 @@ export default function BudgetManager() {
 
                 <AllocationSlider
                     icon="🏠"
-                    label="Kebutuhan"
+                    label="Needs"
                     value={needs}
                     onChange={setNeeds}
                     amount={income * (needs / 100)}
@@ -77,7 +77,7 @@ export default function BudgetManager() {
 
                 <AllocationSlider
                     icon="🎮"
-                    label="Keinginan"
+                    label="Wants"
                     value={wants}
                     onChange={setWants}
                     amount={income * (wants / 100)}
@@ -88,7 +88,7 @@ export default function BudgetManager() {
 
                 <AllocationSlider
                     icon="💵"
-                    label="Tabungan"
+                    label="Savings"
                     value={savings}
                     onChange={() => { }}
                     amount={income * (savings / 100)}
@@ -110,11 +110,11 @@ export default function BudgetManager() {
             {/* ZBB Tips */}
             <div className="bg-gradient-to-r from-primary-50 to-sky-50 rounded-2xl p-4 border border-primary-100">
                 <h4 className="font-medium text-primary-700 flex items-center gap-2">
-                    💡 Tips ZBB
+                    💡 Tips
                 </h4>
                 <p className="text-sm text-slate-600 mt-2">
-                    Dengan Zero-Based Budgeting, setiap rupiah punya tujuan.
-                    Alokasikan 50% untuk kebutuhan, 30% untuk keinginan, dan 20% untuk tabungan.
+                    Dengar! Setiap rupiah harus punya tujuan.
+                    Alokasikan 50% untuk needs, 30% untuk wants, dan 20% untuk savings.
                 </p>
             </div>
         </div>
