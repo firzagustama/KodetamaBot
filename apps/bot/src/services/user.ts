@@ -137,3 +137,13 @@ export async function approveRegistration(
 
     return userId;
 }
+
+/**
+ * Reject registration
+ */
+export async function rejectRegistration(
+    telegramId: number,
+    adminTelegramId: number
+): Promise<void> {
+    await updateRegistrationStatus(telegramId, "rejected", adminTelegramId);
+}

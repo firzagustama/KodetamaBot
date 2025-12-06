@@ -1,13 +1,15 @@
 import type { Conversation } from "@grammyjs/conversations";
 import { InlineKeyboard } from "grammy";
-import type { BotContext } from "../types";
+import type { BotContext } from "../types.js";
+import { AIOrchestrator } from "@kodetama/ai";
 import {
     parseIndonesianAmount,
     formatRupiah,
     calculateBudgetAllocation,
     getIndonesianMonth,
 } from "@kodetama/shared";
-import { logger } from "../utils/logger";
+
+import { logger } from "../utils/logger.js";
 
 /**
  * ZBB Onboarding conversation flow
@@ -176,12 +178,35 @@ export async function onboardingConversation(
     // ==========================================================================
     // STEP 4: Summary
     // ==========================================================================
-    const allocation = calculateBudgetAllocation(
-        estimatedIncome,
-        needsPercent,
-        wantsPercent,
-        savingsPercent
-    );
+    // Initialize AI
+    const ai = new AIOrchestrator({
+        apiKey: process.env.OPENROUTER_API_KEY ?? "",
+        model: process.env.AI_MODEL ?? "openai/gpt-4-turbo",
+    });
+
+    let allocation;
+    try {
+        const { result } = await ai.generateBudgetSplit(estimatedIncome);
+        allocation = {
+            needs: result.needsAmount,
+            wants: result.wantsAmount,
+            savings: result.savingsAmount,
+        };
+        // Update percentages based on AI suggestion if needed, 
+        // but here we just use the calculated amounts for display
+        // or we could use the percentages returned by AI
+        needsPercent = result.needsPercentage;
+        wantsPercent = result.wantsPercentage;
+        savingsPercent = result.savingsPercentage;
+    } catch (error) {
+        logger.error("AI budget split failed, falling back to manual calculation", error);
+        allocation = calculateBudgetAllocation(
+            estimatedIncome,
+            needsPercent,
+            wantsPercent,
+            savingsPercent
+        );
+    }
 
     const periodName = `${getIndonesianMonth(parseInt(month))} ${year}`;
 

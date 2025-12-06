@@ -1,9 +1,9 @@
-import type { BotContext } from "../types";
-import { logger } from "../utils/logger";
+import type { BotContext } from "../types.js";
+import { logger } from "../utils/logger.js";
 import {
     approveRegistration,
     updateRegistrationStatus,
-} from "../services";
+} from "../services/index.js";
 
 /**
  * Handle admin approval/rejection callbacks

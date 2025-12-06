@@ -3,7 +3,7 @@ import { db } from "@kodetama/db";
 import { budgets, datePeriods } from "@kodetama/db/schema";
 import { eq, and } from "drizzle-orm";
 
-import { authenticate } from "../middleware/auth";
+import { authenticate } from "../middleware/auth.js";
 
 export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
 

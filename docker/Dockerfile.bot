@@ -40,6 +40,7 @@ COPY --from=builder /app/packages/ai/dist ./packages/ai/dist
 COPY --from=builder /app/packages/ai/package.json ./packages/ai/
 COPY --from=builder /app/apps/bot/dist ./apps/bot/dist
 COPY --from=builder /app/apps/bot/package.json ./apps/bot/
+COPY --from=builder /app/apps/bot/node_modules ./apps/bot/node_modules
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
 

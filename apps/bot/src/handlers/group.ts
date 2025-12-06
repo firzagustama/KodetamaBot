@@ -1,5 +1,5 @@
-import type { BotContext } from "../types";
-import { logger } from "../utils/logger";
+import type { BotContext } from "../types.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * Handle messages in group chats (Family tier)

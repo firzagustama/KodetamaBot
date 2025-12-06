@@ -3,7 +3,7 @@ import { db } from "@kodetama/db";
 import { transactions, budgets } from "@kodetama/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 
-import { authenticate } from "../middleware/auth";
+import { authenticate } from "../middleware/auth.js";
 
 export async function transactionRoutes(fastify: FastifyInstance): Promise<void> {
 

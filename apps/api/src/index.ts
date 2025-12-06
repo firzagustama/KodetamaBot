@@ -3,11 +3,11 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import rateLimit from "@fastify/rate-limit";
-import { authRoutes } from "./routes/auth";
-import { userRoutes } from "./routes/users";
-import { budgetRoutes } from "./routes/budgets";
-import { transactionRoutes } from "./routes/transactions";
-import { googleRoutes } from "./routes/google";
+import { authRoutes } from "./routes/auth.js";
+import { userRoutes } from "./routes/users.js";
+import { budgetRoutes } from "./routes/budgets.js";
+import { transactionRoutes } from "./routes/transactions.js";
+import { googleRoutes } from "./routes/google.js";
 
 // =============================================================================
 // CONFIGURATION

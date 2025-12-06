@@ -1,14 +1,14 @@
 import { InlineKeyboard } from "grammy";
-import type { BotContext } from "../types";
+import type { BotContext } from "../types.js";
 import { AIOrchestrator } from "@kodetama/ai";
 import { formatRupiah } from "@kodetama/shared";
-import { logger } from "../utils/logger";
+import { logger } from "../utils/logger.js";
 import {
     getUserByTelegramId,
-    ensurePeriodExists,
     saveTransaction,
+    ensurePeriodExists,
     trackAiUsage,
-} from "../services";
+} from "../services/index.js";
 
 const ai = new AIOrchestrator({
     apiKey: process.env.OPENROUTER_API_KEY ?? "",

@@ -3,13 +3,13 @@ import { Bot, session, GrammyError, HttpError, InlineKeyboard } from "grammy";
 import { conversations, createConversation } from "@grammyjs/conversations";
 import { hydrate } from "@grammyjs/hydrate";
 import { run, sequentialize } from "@grammyjs/runner";
-import type { BotContext, SessionData } from "./types";
-import { registrationConversation } from "./conversations/registration";
-import { onboardingConversation } from "./conversations/onboarding";
-import { handleTransaction } from "./handlers/transaction";
-import { handleGroupMessage } from "./handlers/group";
-import { handleAdminCallback } from "./handlers/admin";
-import { logger } from "./utils/logger";
+import type { BotContext, SessionData } from "./types.js";
+import { registrationConversation } from "./conversations/registration.js";
+import { onboardingConversation } from "./conversations/onboarding.js";
+import { handleTransaction } from "./handlers/transaction.js";
+import { handleGroupMessage } from "./handlers/group.js";
+import { handleAdminCallback } from "./handlers/admin.js";
+import { logger } from "./utils/logger.js";
 import { formatRupiah } from "@kodetama/shared";
 import {
     isUserRegistered,
@@ -19,7 +19,7 @@ import {
     deleteTransaction,
     getPeriodTotals,
     getCurrentPeriod,
-} from "./services";
+} from "./services/index.js";
 
 // =============================================================================
 // CONFIGURATION

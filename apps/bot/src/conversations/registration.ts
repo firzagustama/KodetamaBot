@@ -1,9 +1,9 @@
 import type { Conversation } from "@grammyjs/conversations";
 import { InlineKeyboard } from "grammy";
-import type { BotContext } from "../types";
+import type { BotContext } from "../types.js";
 import type { Tier } from "@kodetama/shared";
-import { logger } from "../utils/logger";
-import { savePendingRegistration, getPendingRegistration } from "../services";
+import { logger } from "../utils/logger.js";
+import { savePendingRegistration, getPendingRegistration } from "../services/index.js";
 
 const ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID;
 
