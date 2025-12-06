@@ -1,7 +1,7 @@
 import { db } from "@kodetama/db";
 import { datePeriods } from "@kodetama/db/schema";
 import { eq, and } from "drizzle-orm";
-import { formatPeriodName, getMonthlyPeriodDates } from "@kodetama/shared";
+import { formatPeriodName, getMonthlyPeriodDates, getCustomPeriodDates } from "@kodetama/shared";
 
 /**
  * Get current period for user
@@ -18,11 +18,19 @@ export async function getCurrentPeriod(userId: string) {
 /**
  * Get or create period for a specific month
  */
-export async function ensurePeriodExists(userId: string, date: Date = new Date()): Promise<string> {
+export async function ensurePeriodExists(
+    userId: string,
+    date: Date = new Date(),
+    incomeDate: number = 1
+): Promise<string> {
     const year = date.getFullYear();
     const month = date.getMonth();
     const periodName = formatPeriodName(date);
-    const { start, end } = getMonthlyPeriodDates(year, month);
+
+    // Use custom period dates if income date is not 1
+    const { start, end } = incomeDate === 1
+        ? getMonthlyPeriodDates(year, month)
+        : getCustomPeriodDates(year, month, incomeDate);
 
     // Check if period exists
     const existing = await db.query.datePeriods.findFirst({

@@ -103,6 +103,25 @@ export function getMonthlyPeriodDates(year: number, month: number): { start: Dat
 }
 
 /**
+ * Get start and end dates for a custom period (e.g. starting on 25th)
+ */
+export function getCustomPeriodDates(year: number, month: number, incomeDate: number): { start: Date; end: Date } {
+    // If income date is 1, it's a standard month
+    if (incomeDate === 1) {
+        return getMonthlyPeriodDates(year, month);
+    }
+
+    // Start date is in the specified month
+    const start = new Date(year, month, incomeDate);
+
+    // End date is the day before income date in the NEXT month
+    // e.g. Start Jan 25 -> End Feb 24
+    const end = new Date(year, month + 1, incomeDate - 1, 23, 59, 59, 999);
+
+    return { start, end };
+}
+
+/**
  * Calculate budget allocation amounts from percentages
  */
 export function calculateBudgetAllocation(

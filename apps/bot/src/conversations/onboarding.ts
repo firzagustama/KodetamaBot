@@ -14,6 +14,7 @@ import {
     getUserByTelegramId,
     ensurePeriodExists,
     upsertBudget,
+    updateUserIncomeSettings,
 } from "../services/index.js";
 
 /**
@@ -66,157 +67,237 @@ export async function onboardingConversation(
 
         conversation.session.onboardingData.estimatedIncome = estimatedIncome;
 
+        conversation.session.onboardingData.estimatedIncome = estimatedIncome;
+
         // ==========================================================================
-        // STEP 2: Ask Budget Split
+        // STEP 2: Ask Income Date
         // ==========================================================================
-        const splitKeyboard = new InlineKeyboard()
-            .text("✅ Pakai 50/30/20", "split_default")
+        const incomeDateKeyboard = new InlineKeyboard()
+            .text("📅 Tanggal 1", "date_1")
+            .text("📅 Tanggal 25", "date_25")
             .row()
-            .text("✏️ Atur Manual", "split_custom");
+            .text("📅 Akhir Bulan", "date_last")
+            .text("❓ Tidak Tentu", "date_uncertain");
 
         await ctx.reply(
-            `👍 Penghasilan: *${formatRupiah(estimatedIncome)}*\n\n` +
-            "Selanjutnya, kita alokasikan ke 3 bucket:\n\n" +
-            "🏠 *Kebutuhan (Needs)* - 50%\n" +
-            "  Makanan, transport, tagihan, sewa\n\n" +
-            "🎮 *Keinginan (Wants)* - 30%\n" +
-            "  Hiburan, makan di luar, hobi\n\n" +
-            "💵 *Tabungan (Savings)* - 20%\n" +
-            "  Dana darurat, investasi, cicilan\n\n" +
-            "Mau pakai *aturan 50/30/20* atau atur sendiri?",
-            { parse_mode: "Markdown", reply_markup: splitKeyboard }
+            "📅 *Kapan biasanya kamu terima penghasilan?*\n\n" +
+            "Ini membantu saya mengatur periode budget kamu.\n" +
+            "Misal: gajian tgl 25, maka periode budgetmu tgl 25 - 24 bulan depan.",
+            { parse_mode: "Markdown", reply_markup: incomeDateKeyboard }
         );
 
-        const splitResponse = await conversation.waitForCallbackQuery(/^split_/);
-        const splitChoice = splitResponse.callbackQuery.data;
-        await splitResponse.answerCallbackQuery();
+        const dateResponse = await conversation.waitForCallbackQuery(/^date_/);
+        const dateChoice = dateResponse.callbackQuery.data;
+        await dateResponse.answerCallbackQuery();
+
+        let incomeDate = 1;
+        let isIncomeUncertain = false;
+
+        if (dateChoice === "date_1") {
+            incomeDate = 1;
+        } else if (dateChoice === "date_25") {
+            incomeDate = 25;
+        } else if (dateChoice === "date_last") {
+            // Treat end of month as starting on 1st of next month for simplicity in period logic,
+            // or we could handle it differently. For now let's map "Akhir Bulan" to 28th or similar?
+            // Actually, "Akhir Bulan" usually means they want to budget from 1st of next month?
+            // Let's stick to 1st for simplicity if they choose "Akhir Bulan" implying they budget for the full next month.
+            // Or maybe 25th is common.
+            // Let's ask for specific date if they want custom, but for buttons let's stick to common ones.
+            // If "Akhir Bulan", let's assume 1st.
+            incomeDate = 1;
+        } else if (dateChoice === "date_uncertain") {
+            isIncomeUncertain = true;
+            incomeDate = 1; // Default
+        }
+
+        conversation.session.onboardingData.incomeDate = incomeDate;
+        conversation.session.onboardingData.isIncomeUncertain = isIncomeUncertain;
+
+        // ==========================================================================
+        // STEP 3: AI Recommendation & Budget Split
+        // ==========================================================================
+        // ==========================================================================
+        // STEP 3: AI Recommendation & Budget Split
+        // ==========================================================================
+
+        // Initialize AI
+        const ai = new AIOrchestrator({
+            apiKey: process.env.OPENROUTER_API_KEY ?? "",
+            model: process.env.OPENROUTER_MODEL ?? "openai/gpt-4-turbo",
+        });
+
+        await ctx.reply("🤖 *Sedang menghitung rekomendasi budget untukmu...*", { parse_mode: "Markdown" });
+
+        let aiResult = null;
+        try {
+            const { result } = await ai.generateBudgetSplit(estimatedIncome);
+            aiResult = result;
+        } catch (error) {
+            logger.error("AI budget split failed", error);
+        }
 
         let needsPercent = 50;
         let wantsPercent = 30;
         let savingsPercent = 20;
+        let useAiRecommendation = false;
 
-        if (splitChoice === "split_custom") {
-            // Custom split flow
+        if (aiResult) {
+            const aiKeyboard = new InlineKeyboard()
+                .text("✅ Pakai Rekomendasi", "ai_accept")
+                .row()
+                .text("✏️ Atur Manual", "ai_reject");
+
             await ctx.reply(
-                "📝 *Atur Alokasi Manual*\n\n" +
-                "Masukkan persentase untuk *Kebutuhan (Needs)*:\n" +
-                "Contoh: `60` untuk 60%",
-                { parse_mode: "Markdown" }
+                `🤖 *Rekomendasi AI*\n\n` +
+                `Berdasarkan penghasilanmu, AI menyarankan:\n\n` +
+                `🏠 *Kebutuhan (${aiResult.needsPercentage}%)*: ${formatRupiah(aiResult.needsAmount)}\n` +
+                `🎮 *Keinginan (${aiResult.wantsPercentage}%)*: ${formatRupiah(aiResult.wantsAmount)}\n` +
+                `💵 *Tabungan (${aiResult.savingsPercentage}%)*: ${formatRupiah(aiResult.savingsAmount)}\n\n` +
+                `Apakah kamu ingin menggunakan rekomendasi ini?`,
+                { parse_mode: "Markdown", reply_markup: aiKeyboard }
             );
 
-            // Needs percentage
-            let validNeeds = false;
-            while (!validNeeds) {
-                const needsResponse = await conversation.waitFor("message:text");
-                needsPercent = parseInt(needsResponse.message.text);
-                if (isNaN(needsPercent) || needsPercent < 0 || needsPercent > 100) {
-                    await ctx.reply("Masukkan angka antara 0-100:");
-                } else {
-                    validNeeds = true;
-                }
+            const aiResponse = await conversation.waitForCallbackQuery(/^ai_/);
+            const aiChoice = aiResponse.callbackQuery.data;
+            await aiResponse.answerCallbackQuery();
+
+            if (aiChoice === "ai_accept") {
+                useAiRecommendation = true;
+                needsPercent = aiResult.needsPercentage;
+                wantsPercent = aiResult.wantsPercentage;
+                savingsPercent = aiResult.savingsPercentage;
             }
+        }
+
+        // If AI failed or user rejected, ask for manual split
+        if (!useAiRecommendation) {
+            const splitKeyboard = new InlineKeyboard()
+                .text("✅ Pakai 50/30/20", "split_default")
+                .row()
+                .text("✏️ Atur Manual", "split_custom");
 
             await ctx.reply(
-                `✅ Kebutuhan: ${needsPercent}%\n\n` +
-                "Masukkan persentase untuk *Keinginan (Wants)*:",
-                { parse_mode: "Markdown" }
+                `👍 Penghasilan: *${formatRupiah(estimatedIncome)}*\n\n` +
+                "Kita alokasikan ke 3 bucket:\n\n" +
+                "🏠 *Kebutuhan (Needs)* - 50%\n" +
+                "🎮 *Keinginan (Wants)* - 30%\n" +
+                "💵 *Tabungan (Savings)* - 20%\n\n" +
+                "Mau pakai *aturan 50/30/20* atau atur sendiri?",
+                { parse_mode: "Markdown", reply_markup: splitKeyboard }
             );
 
-            // Wants percentage
-            let validWants = false;
-            while (!validWants) {
-                const wantsResponse = await conversation.waitFor("message:text");
-                wantsPercent = parseInt(wantsResponse.message.text);
-                const remaining = 100 - needsPercent;
-                if (isNaN(wantsPercent) || wantsPercent < 0 || wantsPercent > remaining) {
-                    await ctx.reply(`Masukkan angka antara 0-${remaining}:`);
-                } else {
-                    validWants = true;
+            const splitResponse = await conversation.waitForCallbackQuery(/^split_/);
+            const splitChoice = splitResponse.callbackQuery.data;
+            await splitResponse.answerCallbackQuery();
+
+            if (splitChoice === "split_custom") {
+                // Custom split flow
+                await ctx.reply(
+                    "📝 *Atur Alokasi Manual*\n\n" +
+                    "Masukkan persentase untuk *Kebutuhan (Needs)*:\n" +
+                    "Contoh: `60` untuk 60%",
+                    { parse_mode: "Markdown" }
+                );
+
+                // Needs percentage
+                let validNeeds = false;
+                while (!validNeeds) {
+                    const needsResponse = await conversation.waitFor("message:text");
+                    needsPercent = parseInt(needsResponse.message.text);
+                    if (isNaN(needsPercent) || needsPercent < 0 || needsPercent > 100) {
+                        await ctx.reply("Masukkan angka antara 0-100:");
+                    } else {
+                        validNeeds = true;
+                    }
                 }
-            }
 
-            // Calculate savings
-            savingsPercent = 100 - needsPercent - wantsPercent;
-            await ctx.reply(
-                `✅ Keinginan: ${wantsPercent}%\n` +
-                `✅ Tabungan: ${savingsPercent}% (sisa otomatis)`
-            );
+                await ctx.reply(
+                    `✅ Kebutuhan: ${needsPercent}%\n\n` +
+                    "Masukkan persentase untuk *Keinginan (Wants)*:",
+                    { parse_mode: "Markdown" }
+                );
+
+                // Wants percentage
+                let validWants = false;
+                while (!validWants) {
+                    const wantsResponse = await conversation.waitFor("message:text");
+                    wantsPercent = parseInt(wantsResponse.message.text);
+                    const remaining = 100 - needsPercent;
+                    if (isNaN(wantsPercent) || wantsPercent < 0 || wantsPercent > remaining) {
+                        await ctx.reply(`Masukkan angka antara 0-${remaining}:`);
+                    } else {
+                        validWants = true;
+                    }
+                }
+
+                // Calculate savings
+                savingsPercent = 100 - needsPercent - wantsPercent;
+                await ctx.reply(
+                    `✅ Keinginan: ${wantsPercent}%\n` +
+                    `✅ Tabungan: ${savingsPercent}% (sisa otomatis)`
+                );
+            }
         }
 
         conversation.session.onboardingData.needsPercentage = needsPercent;
         conversation.session.onboardingData.wantsPercentage = wantsPercent;
         conversation.session.onboardingData.savingsPercentage = savingsPercent;
+        conversation.session.onboardingData.useAiRecommendation = useAiRecommendation;
 
         // ==========================================================================
-        // STEP 3: Ask Date Period
+        // STEP 4: Determine Period (Automatic)
         // ==========================================================================
         const now = new Date();
+        const currentDay = now.getDate();
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
-        const nextMonth = (currentMonth + 1) % 12;
-        const nextYear = nextMonth === 0 ? currentYear + 1 : currentYear;
 
-        const periodKeyboard = new InlineKeyboard()
-            .text(
-                `📅 ${getIndonesianMonth(currentMonth)} ${currentYear}`,
-                `period_${currentMonth}_${currentYear}`
-            )
-            .row()
-            .text(
-                `📅 ${getIndonesianMonth(nextMonth)} ${nextYear}`,
-                `period_${nextMonth}_${nextYear}`
-            );
+        // Determine period start based on income date
+        // If income date is 25, and today is 10th, then we are in the period that started last month 25th.
+        // If income date is 25, and today is 26th, then we are in the period that started this month 25th.
+        // If income date is 1 (or uncertain), and today is 10th, we are in period starting 1st of this month.
 
-        await ctx.reply(
-            "📆 *Periode Budget*\n\n" +
-            "Untuk periode transaksi ini, mulai dari bulan apa?\n" +
-            "Budget akan reset setiap periode baru.",
-            { parse_mode: "Markdown", reply_markup: periodKeyboard }
-        );
+        let periodMonth = currentMonth;
+        let periodYear = currentYear;
 
-        const periodResponse = await conversation.waitForCallbackQuery(/^period_/);
-        const [, month, year] = periodResponse.callbackQuery.data.split("_");
-        await periodResponse.answerCallbackQuery();
+        // Use incomeDate from session (default to 1 if not set/uncertain)
+        const incomeDateForCalc = conversation.session.onboardingData.incomeDate ?? 1;
 
-        conversation.session.onboardingData.periodMonth = parseInt(month);
-        conversation.session.onboardingData.periodYear = parseInt(year);
+        if (currentDay < incomeDateForCalc) {
+            // We are before the income date in current month, so period started last month
+            periodMonth = currentMonth - 1;
+            if (periodMonth < 0) {
+                periodMonth = 11;
+                periodYear = currentYear - 1;
+            }
+        }
+
+        conversation.session.onboardingData.periodMonth = periodMonth;
+        conversation.session.onboardingData.periodYear = periodYear;
 
         // ==========================================================================
         // STEP 4: Summary
         // ==========================================================================
-        // Initialize AI
-        const ai = new AIOrchestrator({
-            apiKey: process.env.OPENROUTER_API_KEY ?? "",
-            model: process.env.AI_MODEL ?? "openai/gpt-4-turbo",
-        });
 
-        let allocation;
-        try {
-            const { result } = await ai.generateBudgetSplit(estimatedIncome);
-            allocation = {
-                needs: result.needsAmount,
-                wants: result.wantsAmount,
-                savings: result.savingsAmount,
-            };
-            // Update percentages based on AI suggestion if needed, 
-            // but here we just use the calculated amounts for display
-            // or we could use the percentages returned by AI
-            needsPercent = result.needsPercentage;
-            wantsPercent = result.wantsPercentage;
-            savingsPercent = result.savingsPercentage;
-        } catch (error) {
-            logger.error("AI budget split failed, falling back to manual calculation", error);
-            allocation = calculateBudgetAllocation(
-                estimatedIncome,
-                needsPercent,
-                wantsPercent,
-                savingsPercent
-            );
-        }
+        // Calculate final allocation based on user's choice
+        const finalNeedsPercent = conversation.session.onboardingData.needsPercentage!;
+        const finalWantsPercent = conversation.session.onboardingData.wantsPercentage!;
+        const finalSavingsPercent = conversation.session.onboardingData.savingsPercentage!;
+
+        const allocation = calculateBudgetAllocation(
+            estimatedIncome,
+            finalNeedsPercent,
+            finalWantsPercent,
+            finalSavingsPercent
+        );
 
 
 
-        const periodName = `${getIndonesianMonth(parseInt(month))} ${year}`;
+        const periodName = `${getIndonesianMonth(periodMonth)} ${periodYear}`;
+        const finalIncomeDate = conversation.session.onboardingData.incomeDate ?? 1;
+        const finalIsIncomeUncertain = conversation.session.onboardingData.isIncomeUncertain ?? false;
+        const incomeDateText = finalIsIncomeUncertain ? "Tidak Tentu" : `Tanggal ${finalIncomeDate}`;
 
         // Create keyboard with Dashboard button
         const finalKeyboard = new InlineKeyboard();
@@ -226,7 +307,8 @@ export async function onboardingConversation(
 
         await ctx.reply(
             "🎊 *Setup Selesai!*\n\n" +
-            `📅 *Periode:* ${periodName}\n\n` +
+            `📅 *Periode:* ${periodName}\n` +
+            `🗓 *Tgl Gajian:* ${incomeDateText}\n\n` +
             `💰 *Penghasilan:* ${formatRupiah(estimatedIncome)}\n\n` +
             "*Alokasi Budget:*\n" +
             `🏠 Kebutuhan (${needsPercent}%): ${formatRupiah(allocation.needs)}\n` +
@@ -246,6 +328,9 @@ export async function onboardingConversation(
         try {
             const account = await getUserByTelegramId(user.id);
             if (account) {
+                // Update income settings
+                await updateUserIncomeSettings(account.userId, finalIncomeDate, finalIsIncomeUncertain);
+
                 // Create period date
                 const periodDate = new Date(
                     conversation.session.onboardingData.periodYear!,
@@ -253,8 +338,8 @@ export async function onboardingConversation(
                     1
                 );
 
-                // Ensure period exists
-                const periodId = await ensurePeriodExists(account.userId, periodDate);
+                // Ensure period exists (pass incomeDate)
+                const periodId = await ensurePeriodExists(account.userId, periodDate, finalIncomeDate);
 
                 // Create budget
                 await upsertBudget({
@@ -267,6 +352,8 @@ export async function onboardingConversation(
 
                 logger.info(`Onboarding completed for user ${user.id}`, {
                     income: estimatedIncome,
+                    incomeDate: finalIncomeDate,
+                    isIncomeUncertain: finalIsIncomeUncertain,
                     needs: needsPercent,
                     wants: wantsPercent,
                     savings: savingsPercent,

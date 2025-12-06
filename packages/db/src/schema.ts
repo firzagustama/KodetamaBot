@@ -30,6 +30,8 @@ export const users = pgTable("users", {
     id: uuid("id").primaryKey().defaultRandom(),
     tier: tierEnum("tier").notNull().default("standard"),
     isActive: boolean("is_active").notNull().default(true),
+    incomeDate: integer("income_date").default(1),
+    isIncomeUncertain: boolean("is_income_uncertain").default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

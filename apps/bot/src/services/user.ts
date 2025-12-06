@@ -147,3 +147,20 @@ export async function rejectRegistration(
 ): Promise<void> {
     await updateRegistrationStatus(telegramId, "rejected", adminTelegramId);
 }
+
+/**
+ * Update user income settings
+ */
+export async function updateUserIncomeSettings(
+    userId: string,
+    incomeDate: number,
+    isIncomeUncertain: boolean
+) {
+    await db.update(users)
+        .set({
+            incomeDate,
+            isIncomeUncertain,
+            updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+}

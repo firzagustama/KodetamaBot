@@ -12,12 +12,15 @@
     },
     "scripts": {
         "build": "tsc",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run"
     },
     "dependencies": {
+        "redis": "^5.10.0",
         "zod": "^3.23.0"
     },
     "devDependencies": {
-        "typescript": "^5.3.0"
+        "typescript": "^5.3.0",
+        "vitest": "^4.0.15"
     }
 }

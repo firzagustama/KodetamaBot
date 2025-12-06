@@ -1,11 +1,25 @@
 import type { FastifyInstance } from "fastify";
 import { db } from "@kodetama/db";
-import { transactions, budgets } from "@kodetama/db/schema";
+import { transactions, budgets, datePeriods } from "@kodetama/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 
 import { authenticate } from "../middleware/auth.js";
 
 export async function transactionRoutes(fastify: FastifyInstance): Promise<void> {
+
+    // Helper function to resolve periodId (handles "default")
+    async function resolvePeriodId(userId: string, periodId?: string): Promise<string | null> {
+        if (!periodId) return null;
+
+        if (periodId === "default") {
+            const currentPeriod = await db.query.datePeriods.findFirst({
+                where: eq(datePeriods.userId, userId),
+            });
+            return currentPeriod?.id ?? null;
+        }
+
+        return periodId;
+    }
 
     /**
      * GET /transactions
@@ -21,7 +35,10 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
         preHandler: authenticate,
     }, async (request) => {
         const userId = (request.user as { id: string }).id;
-        const { periodId, page = "1", pageSize = "20" } = request.query;
+        const { periodId: rawPeriodId, page = "1", pageSize = "20" } = request.query;
+
+        // Resolve periodId (handles "default")
+        const periodId = await resolvePeriodId(userId, rawPeriodId);
         const pageNum = parseInt(page);
         const pageSizeNum = parseInt(pageSize);
         const offset = (pageNum - 1) * pageSizeNum;
@@ -139,7 +156,11 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
     }>("/summary", {
         preHandler: authenticate,
     }, async (request) => {
-        const { periodId } = request.query;
+        const userId = (request.user as { id: string }).id;
+        const { periodId: rawPeriodId } = request.query;
+
+        // Resolve periodId (handles "default")
+        const periodId = await resolvePeriodId(userId, rawPeriodId);
 
         // Return empty data if no periodId
         if (!periodId) {

@@ -23,6 +23,9 @@ export interface OnboardingData {
     savingsPercentage?: number;
     periodMonth?: number;
     periodYear?: number;
+    incomeDate?: number;
+    isIncomeUncertain?: boolean;
+    useAiRecommendation?: boolean;
 }
 
 export interface SessionData {
