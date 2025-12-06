@@ -440,9 +440,46 @@ async function main() {
         if (!WEBHOOK_URL) {
             throw new Error("WEBHOOK_URL is required for webhook mode");
         }
-        await bot.api.setWebhook(WEBHOOK_URL);
-        logger.info(`Webhook set to ${WEBHOOK_URL}`);
-        // Note: You'll need to set up a server to handle webhook requests
+
+        // Start webhook server
+        const { createServer } = await import("http");
+        const { webhookCallback } = await import("grammy");
+
+        const server = createServer(webhookCallback(bot, "http"));
+        const PORT = parseInt(process.env.BOT_PORT ?? "3000");
+
+        server.on("error", (err) => {
+            logger.error("Bot webhook server error:", err);
+        });
+
+        server.listen(PORT, "0.0.0.0", async () => {
+            logger.info(`Bot webhook server listening on port ${PORT}`);
+
+            try {
+                // Set webhook after server is ready
+                await bot.api.setWebhook(WEBHOOK_URL);
+                logger.info(`Webhook set to ${WEBHOOK_URL}`);
+            } catch (err) {
+                logger.error("Failed to set webhook:", err);
+            }
+        });
+
+        // Graceful shutdown
+        const stop = (signal: string) => {
+            logger.info(`Stopping bot (received ${signal})...`);
+            server.close();
+            process.exit(0);
+        };
+        process.once("SIGINT", () => stop("SIGINT"));
+        process.once("SIGTERM", () => stop("SIGTERM"));
+
+        // Global error handlers
+        process.on("uncaughtException", (err) => {
+            logger.error("Uncaught Exception:", err);
+        });
+        process.on("unhandledRejection", (reason) => {
+            logger.error("Unhandled Rejection:", reason);
+        });
     } else {
         // Polling mode for development
         await bot.api.deleteWebhook();
