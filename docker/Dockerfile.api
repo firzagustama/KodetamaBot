@@ -20,6 +20,7 @@ COPY --from=deps /app/packages/ai/node_modules ./packages/ai/node_modules
 COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY . .
 # Build packages in order
+RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @kodetama/shared build && \
     pnpm --filter @kodetama/db build && \
     pnpm --filter @kodetama/ai build && \
