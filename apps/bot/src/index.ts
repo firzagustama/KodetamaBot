@@ -83,6 +83,17 @@ bot.command("start", async (ctx) => {
     if (!isRegistered) {
         await ctx.conversation.enter("registrationConversation");
     } else {
+        // Check if user has completed onboarding (has active period)
+        const account = await getUserByTelegramId(user.id);
+        if (account) {
+            const currentPeriod = await getCurrentPeriod(account.userId);
+            if (!currentPeriod) {
+                await ctx.reply("Sepertinya kamu belum mengatur budget. Mari kita setup dulu!");
+                await ctx.conversation.enter("onboardingConversation");
+                return;
+            }
+        }
+
         // Build keyboard with Mini App if URL is configured
         const keyboard = new InlineKeyboard();
         let hasWebApp = false;

@@ -27,8 +27,32 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
 
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            bot:
+              - 'apps/bot/**'
+              - 'packages/**'
+              - 'docker/Dockerfile.bot'
+            api:
+              - 'apps/api/**'
+              - 'packages/**'
+              - 'docker/Dockerfile.api'
+            web:
+              - 'apps/web/**'
+              - 'packages/**'
+              - 'docker/Dockerfile.web'
+
   build-and-push:
-    needs: lint-and-typecheck
+    needs: [lint-and-typecheck, changes]
+    if: ${{ needs.changes.outputs.services != '[]' && needs.changes.outputs.services != '' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -36,7 +60,7 @@ jobs:
       
     strategy:
       matrix:
-        service: [bot, api, web]
+        service: ${{ fromJSON(needs.changes.outputs.services) }}
         
     steps:
       - uses: actions/checkout@v4
