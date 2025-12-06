@@ -43,11 +43,12 @@ await fastify.register(rateLimit, {
 });
 
 // Routes
-await fastify.register(authRoutes, { prefix: "/auth" });
-await fastify.register(userRoutes, { prefix: "/users" });
-await fastify.register(budgetRoutes, { prefix: "/budgets" });
-await fastify.register(transactionRoutes, { prefix: "/transactions" });
-await fastify.register(googleRoutes, { prefix: "/google" });
+// Routes
+await fastify.register(authRoutes, { prefix: "/api/auth" });
+await fastify.register(userRoutes, { prefix: "/api/users" });
+await fastify.register(budgetRoutes, { prefix: "/api/budgets" });
+await fastify.register(transactionRoutes, { prefix: "/api/transactions" });
+await fastify.register(googleRoutes, { prefix: "/api/google" });
 
 // Health check
 fastify.get("/health", async () => {

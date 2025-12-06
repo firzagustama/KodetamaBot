@@ -38,11 +38,9 @@ services:
 
   # Telegram Bot
   bot:
-    image: ghcr.io/firzagustama/kodetamabot-api:latest
-    container_name: kodetama_api
+    image: ghcr.io/firzagustama/kodetamabot-bot:latest
+    container_name: kodetama_bot
     restart: unless-stopped
-    # Run migrations before starting the server
-    command: sh -c "pnpm --filter @kodetama/db migrate:prod && node apps/api/dist/index.js"
     env_file:
       - .env
     depends_on:
@@ -63,7 +61,7 @@ services:
     container_name: kodetama_api
     restart: unless-stopped
     # Run migrations before starting the server
-    command: sh -c "pnpm --filter @kodetama/db migrate:prod && node apps/api/dist/index.js"
+    command: sh -c "node packages/db/dist/migrate.js && node apps/api/dist/index.js"
     env_file:
       - .env
     depends_on:
