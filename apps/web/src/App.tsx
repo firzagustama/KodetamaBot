@@ -1,3 +1,4 @@
+import { useAuth } from "./hooks/useAuth";
 import { useTelegram } from "./hooks/useTelegram";
 import { useStore } from "./stores/useStore";
 import Dashboard from "./components/Dashboard";
@@ -10,21 +11,72 @@ type Tab = "dashboard" | "budget" | "transactions" | "google";
 
 function App() {
     const { user, ready, expand } = useTelegram();
-    const { fetchBudget, fetchTransactions } = useStore();
+    const { token, authenticated, loading: authLoading, error: authError } = useAuth();
+
+    // Use selectors to avoid re-renders on unrelated store changes
+    const setToken = useStore((state) => state.setToken);
+    const fetchBudget = useStore((state) => state.fetchBudget);
+    const fetchTransactions = useStore((state) => state.fetchTransactions);
+
     const [activeTab, setActiveTab] = useState<Tab>("dashboard");
 
+    // Set token in store when authenticated
     useEffect(() => {
-        if (ready) {
-            expand();
-            fetchBudget();
-            fetchTransactions();
+        if (token) {
+            setToken(token);
         }
-    }, [ready]);
+    }, [token, setToken]);
 
-    if (!ready) {
+    // Expand and fetch data when authenticated
+    useEffect(() => {
+        if (ready && authenticated) {
+            expand();
+            fetchBudget().then(() => {
+                // Fetch transactions after budget so we have periodId
+                fetchTransactions();
+            });
+        }
+        // Only run when ready/authenticated state changes, not when fetch functions change
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ready, authenticated]);
+
+    // Loading state
+    if (!ready || authLoading) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
+            <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-4">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+                <p className="text-slate-500 text-sm">Memuat...</p>
+            </div>
+        );
+    }
+
+    // Error state
+    if (authError) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-4 text-center">
+                <div className="text-4xl">🔒</div>
+                <h2 className="text-lg font-semibold text-slate-800">Autentikasi Diperlukan</h2>
+                <p className="text-slate-500 text-sm max-w-xs">
+                    {authError === "No Telegram WebApp detected. Open this app from Telegram."
+                        ? "Buka aplikasi ini dari Telegram untuk menggunakan fitur dashboard."
+                        : authError}
+                </p>
+                <p className="text-xs text-slate-400 mt-4">
+                    Ketik /start di bot untuk membuka dashboard.
+                </p>
+            </div>
+        );
+    }
+
+    // Not authenticated
+    if (!authenticated) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-4 text-center">
+                <div className="text-4xl">🤖</div>
+                <h2 className="text-lg font-semibold text-slate-800">Kodetama Bot</h2>
+                <p className="text-slate-500 text-sm">
+                    Silakan buka aplikasi ini dari Telegram.
+                </p>
             </div>
         );
     }
@@ -102,8 +154,8 @@ function NavButton({
         <button
             onClick={onClick}
             className={`flex flex-col items-center p-2 rounded-lg transition-colors ${active
-                    ? "text-primary-500 bg-primary-50"
-                    : "text-slate-500 hover:text-primary-500"
+                ? "text-primary-500 bg-primary-50"
+                : "text-slate-500 hover:text-primary-500"
                 }`}
         >
             <span className="text-xl">{icon}</span>
@@ -113,3 +165,4 @@ function NavButton({
 }
 
 export default App;
+

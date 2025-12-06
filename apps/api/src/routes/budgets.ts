@@ -3,33 +3,18 @@ import { db } from "@kodetama/db";
 import { budgets, datePeriods } from "@kodetama/db/schema";
 import { eq, and } from "drizzle-orm";
 
+import { authenticate } from "../middleware/auth";
+
 export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
+
     /**
      * GET /budgets/current
      * Get current period budget for authenticated user
      */
-    fastify.get("/current", async (request, reply) => {
-        // Get user from JWT (simplified - assumes middleware sets this)
-        const userId = (request.user as { id?: string })?.id;
-
-        if (!userId) {
-            // Return sample data for now if no auth
-            return {
-                id: "sample-id",
-                estimatedIncome: "8000000",
-                needsAmount: "4000000",
-                wantsAmount: "2400000",
-                savingsAmount: "1600000",
-                needsPercentage: 50,
-                wantsPercentage: 30,
-                savingsPercentage: 20,
-                period: {
-                    name: "Desember 2025",
-                    startDate: "2025-12-01",
-                    endDate: "2025-12-31",
-                },
-            };
-        }
+    fastify.get("/current", {
+        preHandler: authenticate,
+    }, async (request) => {
+        const userId = (request.user as { id: string }).id;
 
         // Find current period for user
         const currentPeriod = await db.query.datePeriods.findFirst({
@@ -40,7 +25,28 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
         });
 
         if (!currentPeriod) {
-            return reply.status(404).send({ error: "No active period found" });
+            // Return default empty budget if no active period found
+            const now = new Date();
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            const monthName = now.toLocaleString('id-ID', { month: 'long', year: 'numeric' });
+
+            return {
+                id: "default",
+                estimatedIncome: "0",
+                needsAmount: "0",
+                wantsAmount: "0",
+                savingsAmount: "0",
+                needsPercentage: 50,
+                wantsPercentage: 30,
+                savingsPercentage: 20,
+                period: {
+                    id: "default",
+                    name: monthName,
+                    startDate: startOfMonth.toISOString(),
+                    endDate: endOfMonth.toISOString(),
+                },
+            };
         }
 
         const budget = await db.query.budgets.findFirst({
@@ -48,7 +54,23 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
         });
 
         if (!budget) {
-            return reply.status(404).send({ error: "No budget found for current period" });
+            // Return default empty budget if period exists but no budget
+            return {
+                id: "default",
+                estimatedIncome: "0",
+                needsAmount: "0",
+                wantsAmount: "0",
+                savingsAmount: "0",
+                needsPercentage: 50,
+                wantsPercentage: 30,
+                savingsPercentage: 20,
+                period: {
+                    id: currentPeriod.id,
+                    name: currentPeriod.name,
+                    startDate: currentPeriod.startDate.toISOString(),
+                    endDate: currentPeriod.endDate.toISOString(),
+                },
+            };
         }
 
         return {

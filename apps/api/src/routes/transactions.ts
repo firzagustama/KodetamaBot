@@ -3,7 +3,10 @@ import { db } from "@kodetama/db";
 import { transactions, budgets } from "@kodetama/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 
+import { authenticate } from "../middleware/auth";
+
 export async function transactionRoutes(fastify: FastifyInstance): Promise<void> {
+
     /**
      * GET /transactions
      * List transactions for current period
@@ -14,36 +17,20 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
             page?: string;
             pageSize?: string;
         };
-    }>("/", async (request) => {
+    }>("/", {
+        preHandler: authenticate,
+    }, async (request) => {
+        const userId = (request.user as { id: string }).id;
         const { periodId, page = "1", pageSize = "20" } = request.query;
         const pageNum = parseInt(page);
         const pageSizeNum = parseInt(pageSize);
         const offset = (pageNum - 1) * pageSizeNum;
 
-        // If no periodId provided, return sample data
+        // If no periodId provided, return empty list
         if (!periodId) {
             return {
-                items: [
-                    {
-                        id: "tx-1",
-                        type: "expense",
-                        amount: "20000",
-                        category: "Makanan",
-                        bucket: "needs",
-                        description: "Makan siang",
-                        transactionDate: new Date().toISOString(),
-                    },
-                    {
-                        id: "tx-2",
-                        type: "income",
-                        amount: "8000000",
-                        category: "Gaji",
-                        bucket: "needs",
-                        description: "Gaji bulanan",
-                        transactionDate: new Date().toISOString(),
-                    },
-                ],
-                total: 2,
+                items: [],
+                total: 0,
                 page: pageNum,
                 pageSize: pageSizeNum,
                 hasMore: false,
@@ -149,25 +136,23 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
      */
     fastify.get<{
         Querystring: { periodId?: string };
-    }>("/summary", async (request) => {
+    }>("/summary", {
+        preHandler: authenticate,
+    }, async (request) => {
         const { periodId } = request.query;
 
-        // Return sample data if no periodId
+        // Return empty data if no periodId
         if (!periodId) {
             return {
-                totalIncome: 8000000,
-                totalExpenses: 3500000,
-                totalSavings: 1600000,
+                totalIncome: 0,
+                totalExpenses: 0,
+                totalSavings: 0,
                 byBucket: {
-                    needs: { allocated: 4000000, spent: 2500000, remaining: 1500000 },
-                    wants: { allocated: 2400000, spent: 1000000, remaining: 1400000 },
-                    savings: { allocated: 1600000, spent: 0, remaining: 1600000 },
+                    needs: { allocated: 0, spent: 0, remaining: 0 },
+                    wants: { allocated: 0, spent: 0, remaining: 0 },
+                    savings: { allocated: 0, spent: 0, remaining: 0 },
                 },
-                topCategories: [
-                    { name: "Makanan", amount: 1500000, percentage: 42.8 },
-                    { name: "Transportasi", amount: 800000, percentage: 22.8 },
-                    { name: "Hiburan", amount: 500000, percentage: 14.3 },
-                ],
+                topCategories: [],
             };
         }
 

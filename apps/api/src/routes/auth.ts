@@ -141,6 +141,80 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     });
 
     /**
+     * POST /auth/dev
+     * Development only: Authenticate with just a telegram ID
+     */
+    fastify.post<{
+        Body: { telegramId: number };
+    }>("/dev", async (request, reply) => {
+        // Only allow in development
+        if (process.env.NODE_ENV === "production") {
+            return reply.status(404).send({ error: "Not found" });
+        }
+
+        const { telegramId } = request.body;
+
+        if (!telegramId) {
+            return reply.status(400).send({ error: "telegramId is required" });
+        }
+
+        // Look up user by telegram ID
+        let telegramAccount = await db.query.telegramAccounts.findFirst({
+            where: eq(telegramAccounts.telegramId, telegramId),
+        });
+
+        let userId: string;
+
+        if (!telegramAccount) {
+            // Create new user and telegram account
+            const newUser = await db
+                .insert(users)
+                .values({
+                    tier: "standard",
+                    isActive: true,
+                })
+                .returning();
+
+            userId = newUser[0].id;
+
+            await db.insert(telegramAccounts).values({
+                userId,
+                telegramId,
+                username: "dev_user",
+                firstName: "Dev User",
+                lastName: null,
+            });
+        } else {
+            userId = telegramAccount.userId;
+        }
+
+        // Get full user record
+        const user = await db.query.users.findFirst({
+            where: eq(users.id, userId),
+        });
+
+        const token = fastify.jwt.sign(
+            { id: userId, telegramId },
+            { expiresIn: "7d" }
+        );
+
+        return {
+            token,
+            user: {
+                id: user?.id,
+                tier: user?.tier,
+                isActive: user?.isActive,
+                telegram: {
+                    id: telegramId,
+                    username: telegramAccount?.username ?? "dev_user",
+                    firstName: telegramAccount?.firstName ?? "Dev User",
+                    lastName: telegramAccount?.lastName,
+                },
+            },
+        };
+    });
+
+    /**
      * GET /auth/me
      * Get current authenticated user
      */

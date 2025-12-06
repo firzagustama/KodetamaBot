@@ -10,6 +10,7 @@ interface Budget {
     wantsPercentage: number;
     savingsPercentage: number;
     period: {
+        id: string;
         name: string;
         startDate: string;
         endDate: string;
@@ -48,6 +49,10 @@ interface GoogleFolder {
 }
 
 interface State {
+    // Auth
+    token: string | null;
+
+    // Data
     budget: Budget | null;
     transactions: Transaction[];
     summary: Summary | null;
@@ -57,16 +62,42 @@ interface State {
     error: string | null;
 
     // Actions
+    setToken: (token: string | null) => void;
     fetchBudget: () => Promise<void>;
     fetchTransactions: () => Promise<void>;
     fetchSummary: () => Promise<void>;
     fetchGoogleData: () => Promise<void>;
     updateBudget: (data: Partial<Budget>) => Promise<void>;
+    reset: () => void;
 }
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
+/**
+ * Helper to make authenticated API requests
+ */
+async function authFetch(
+    url: string,
+    token: string | null,
+    options: RequestInit = {}
+): Promise<Response> {
+    const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...(options.headers as Record<string, string>),
+    };
+
+    if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    return fetch(url, {
+        ...options,
+        headers,
+    });
+}
+
 export const useStore = create<State>((set, get) => ({
+    token: null,
     budget: null,
     transactions: [],
     summary: null,
@@ -75,10 +106,27 @@ export const useStore = create<State>((set, get) => ({
     loading: false,
     error: null,
 
+    setToken: (token) => set({ token }),
+
     fetchBudget: async () => {
-        set({ loading: true });
+        const { token } = get();
+        set({ loading: true, error: null });
+
         try {
-            const res = await fetch(`${API_URL}/budgets/current`);
+            const res = await authFetch(`${API_URL}/budgets/current`, token);
+
+            if (!res.ok) {
+                if (res.status === 401) {
+                    throw new Error("Unauthorized");
+                }
+                if (res.status === 404) {
+                    // No budget yet - this is okay
+                    set({ budget: null, loading: false });
+                    return;
+                }
+                throw new Error("Failed to fetch budget");
+            }
+
             const data = await res.json();
             set({
                 budget: {
@@ -91,67 +139,125 @@ export const useStore = create<State>((set, get) => ({
                 loading: false,
             });
         } catch (err) {
-            set({ error: "Failed to fetch budget", loading: false });
+            set({
+                error: err instanceof Error ? err.message : "Failed to fetch budget",
+                loading: false,
+            });
         }
     },
 
     fetchTransactions: async () => {
-        set({ loading: true });
+        const { token, budget } = get();
+        set({ loading: true, error: null });
+
         try {
-            const res = await fetch(`${API_URL}/transactions`);
+            // Need periodId from budget to fetch transactions
+            const periodId = budget?.period?.id;
+            const url = periodId
+                ? `${API_URL}/transactions?periodId=${periodId}`
+                : `${API_URL}/transactions`;
+
+            const res = await authFetch(url, token);
+
+            if (!res.ok) {
+                if (res.status === 401) {
+                    throw new Error("Unauthorized");
+                }
+                throw new Error("Failed to fetch transactions");
+            }
+
             const data = await res.json();
             set({
-                transactions: data.items.map((t: any) => ({
+                transactions: (data.items ?? []).map((t: Record<string, unknown>) => ({
                     ...t,
-                    amount: parseFloat(t.amount),
+                    amount: parseFloat(t.amount as string),
                 })),
                 loading: false,
             });
         } catch (err) {
-            set({ error: "Failed to fetch transactions", loading: false });
+            set({
+                error: err instanceof Error ? err.message : "Failed to fetch transactions",
+                loading: false,
+            });
         }
     },
 
     fetchSummary: async () => {
+        const { token, budget } = get();
+
         try {
-            const res = await fetch(`${API_URL}/transactions/summary`);
+            const periodId = budget?.period?.id;
+            const url = periodId
+                ? `${API_URL}/transactions/summary?periodId=${periodId}`
+                : `${API_URL}/transactions/summary`;
+
+            const res = await authFetch(url, token);
+
+            if (!res.ok) {
+                throw new Error("Failed to fetch summary");
+            }
+
             const data = await res.json();
             set({ summary: data });
         } catch (err) {
-            set({ error: "Failed to fetch summary" });
+            set({ error: err instanceof Error ? err.message : "Failed to fetch summary" });
         }
     },
 
     fetchGoogleData: async () => {
+        const { token } = get();
+
         try {
             const [sheetRes, folderRes] = await Promise.all([
-                fetch(`${API_URL}/google/sheets/current`),
-                fetch(`${API_URL}/google/drive/folder`),
+                authFetch(`${API_URL}/google/sheets/current`, token),
+                authFetch(`${API_URL}/google/drive/folder`, token),
             ]);
-            const sheetData = await sheetRes.json();
-            const folderData = await folderRes.json();
-            set({
-                googleSheet: sheetData,
-                googleFolder: folderData,
-            });
-        } catch (err) {
+
+            if (sheetRes.ok) {
+                const sheetData = await sheetRes.json();
+                set({ googleSheet: sheetData });
+            }
+
+            if (folderRes.ok) {
+                const folderData = await folderRes.json();
+                set({ googleFolder: folderData });
+            }
+        } catch {
             // Google not connected yet, ignore
         }
     },
 
     updateBudget: async (data) => {
-        const { budget } = get();
+        const { budget, token } = get();
         if (!budget) return;
 
         try {
-            await fetch(`${API_URL}/budgets/${budget.id}`, {
+            const res = await authFetch(`${API_URL}/budgets/${budget.period.id}`, token, {
                 method: "PUT",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(data),
             });
+
+            if (!res.ok) {
+                throw new Error("Failed to update budget");
+            }
+
             set({ budget: { ...budget, ...data } });
         } catch (err) {
-            set({ error: "Failed to update budget" });
+            set({ error: err instanceof Error ? err.message : "Failed to update budget" });
         }
     },
+
+    reset: () => {
+        set({
+            token: null,
+            budget: null,
+            transactions: [],
+            summary: null,
+            googleSheet: null,
+            googleFolder: null,
+            loading: false,
+            error: null,
+        });
+    },
 }));
+

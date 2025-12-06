@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 declare global {
     interface Window {
@@ -81,20 +81,20 @@ export function useTelegram() {
         }
     }, []);
 
-    const expand = () => webApp?.expand();
-    const close = () => webApp?.close();
+    const expand = useCallback(() => webApp?.expand(), [webApp]);
+    const close = useCallback(() => webApp?.close(), [webApp]);
 
-    const showMainButton = (text: string, onClick: () => void) => {
+    const showMainButton = useCallback((text: string, onClick: () => void) => {
         if (webApp?.MainButton) {
             webApp.MainButton.text = text;
             webApp.MainButton.onClick(onClick);
             webApp.MainButton.show();
         }
-    };
+    }, [webApp]);
 
-    const hideMainButton = () => {
+    const hideMainButton = useCallback(() => {
         webApp?.MainButton.hide();
-    };
+    }, [webApp]);
 
     return {
         webApp,
