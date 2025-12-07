@@ -171,7 +171,7 @@ bot.command("start", async (ctx) => {
             try {
                 // Basic validation to prevent obvious crashes
                 new URL(WEB_APP_URL);
-                keyboard.webApp("📊 Buka Dashboard", WEB_APP_URL);
+                keyboard.webApp("Dashboard", WEB_APP_URL);
                 hasWebApp = true;
             } catch (e) {
                 logger.warn(`Invalid WEB_APP_URL: ${WEB_APP_URL}`);
