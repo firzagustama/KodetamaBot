@@ -15,8 +15,18 @@ interface TelegramUser {
     language_code?: string;
 }
 
+interface TelegramWidgetData {
+    id: number;
+    first_name: string;
+    last_name?: string;
+    username?: string;
+    photo_url?: string;
+    auth_date: number;
+    hash: string;
+}
+
 /**
- * Validate Telegram WebApp initData
+ * Validate Telegram WebApp initData (for Mini App)
  */
 function validateTelegramWebAppData(initData: string): { valid: boolean; user?: TelegramUser } {
     try {
@@ -55,10 +65,117 @@ function validateTelegramWebAppData(initData: string): { valid: boolean; user?: 
     }
 }
 
+/**
+ * Verify Telegram Login Widget authentication
+ * Based on: https://core.telegram.org/widgets/login#checking-authorization
+ */
+function verifyTelegramWidget(data: TelegramWidgetData): boolean {
+    const { hash, ...userData } = data;
+
+    // Create data-check-string
+    const dataCheckString = Object.keys(userData)
+        .sort()
+        .map((key) => `${key}=${userData[key as keyof typeof userData]}`)
+        .join("\n");
+
+    // Create secret key from bot token
+    const secretKey = crypto.createHash("sha256").update(BOT_TOKEN).digest();
+
+    // Create hash
+    const hmac = crypto.createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
+
+    // Compare hashes
+    return hmac === hash;
+}
+
+/**
+ * Check if auth data is not too old (24 hours default)
+ */
+function isAuthDataFresh(authDate: number, maxAgeSeconds: number = 86400): boolean {
+    const now = Math.floor(Date.now() / 1000);
+    return now - authDate < maxAgeSeconds;
+}
+
+/**
+ * Find or create user in database
+ */
+async function findOrCreateUser(telegramUser: {
+    id: number;
+    first_name: string;
+    last_name?: string;
+    username?: string;
+}): Promise<{ userId: string; isNewUser: boolean }> {
+    // Look up user by telegram ID
+    let telegramAccount = await db.query.telegramAccounts.findFirst({
+        where: eq(telegramAccounts.telegramId, telegramUser.id),
+    });
+
+    let userId: string;
+    let isNewUser = false;
+
+    if (!telegramAccount) {
+        logger.info("Creating new user account", {
+            telegramUserId: telegramUser.id,
+            username: telegramUser.username
+        });
+
+        const newUser = await db
+            .insert(users)
+            .values({
+                tier: "standard",
+                isActive: true,
+            })
+            .returning();
+
+        userId = newUser[0].id;
+        isNewUser = true;
+
+        await db.insert(telegramAccounts).values({
+            userId,
+            telegramId: telegramUser.id,
+            username: telegramUser.username ?? null,
+            firstName: telegramUser.first_name,
+            lastName: telegramUser.last_name ?? null,
+        });
+
+        logger.info("New user created successfully", {
+            userId,
+            telegramUserId: telegramUser.id
+        });
+    } else {
+        userId = telegramAccount.userId;
+
+        logger.info("Existing user login", {
+            userId,
+            telegramUserId: telegramUser.id,
+            username: telegramUser.username
+        });
+
+        // Update telegram account info
+        await db
+            .update(telegramAccounts)
+            .set({
+                username: telegramUser.username ?? null,
+                firstName: telegramUser.first_name,
+                lastName: telegramUser.last_name ?? null,
+            })
+            .where(eq(telegramAccounts.telegramId, telegramUser.id))
+            .catch((err) => {
+                logger.error("Failed to update telegram account", {
+                    userId,
+                    telegramUserId: telegramUser.id,
+                    error: err instanceof Error ? err.message : 'Unknown error'
+                });
+            });
+    }
+
+    return { userId, isNewUser };
+}
+
 export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     /**
      * POST /auth/telegram
-     * Validate Telegram WebApp initData and return JWT
+     * Validate Telegram WebApp initData (Mini App) and return JWT
      */
     fastify.post<{
         Body: { initData: string };
@@ -67,7 +184,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
         const clientIP = request.ip || 'unknown';
         const userAgent = request.headers['user-agent'] || 'unknown';
 
-        logger.info("Telegram auth attempt", { ip: clientIP, userAgent, initData });
+        logger.info("Telegram Mini App auth attempt", { ip: clientIP, userAgent });
 
         if (!initData) {
             logger.warn("Telegram auth failed: missing initData", { ip: clientIP });
@@ -92,92 +209,19 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
             username: telegramUser.username
         });
 
-        // Look up user by telegram ID
-        let telegramAccount = await db.query.telegramAccounts.findFirst({
-            where: eq(telegramAccounts.telegramId, telegramUser.id),
-        });
-
-        let userId: string;
-        let isNewUser = false;
-
-        if (!telegramAccount) {
-            // Create new user and telegram account
-            logger.info("Creating new user account", {
-                telegramUserId: telegramUser.id,
-                username: telegramUser.username
-            });
-
-            try {
-                const newUser = await db
-                    .insert(users)
-                    .values({
-                        tier: "standard",
-                        isActive: true,
-                    })
-                    .returning();
-
-                userId = newUser[0].id;
-                isNewUser = true;
-
-                await db.insert(telegramAccounts).values({
-                    userId,
-                    telegramId: telegramUser.id,
-                    username: telegramUser.username ?? null,
-                    firstName: telegramUser.first_name,
-                    lastName: telegramUser.last_name ?? null,
-                });
-
-                logger.info("New user created successfully", {
-                    userId,
-                    telegramUserId: telegramUser.id
-                });
-            } catch (err) {
-                logger.error("Failed to create new user", {
-                    telegramUserId: telegramUser.id,
-                    error: err instanceof Error ? err.message : 'Unknown error'
-                });
-                return reply.status(500).send({ error: "Failed to create user account" });
-            }
-        } else {
-            userId = telegramAccount.userId;
-
-            // Update telegram account info
-            logger.info("Existing user login", {
-                userId,
-                telegramUserId: telegramUser.id,
-                username: telegramUser.username
-            });
-
-            try {
-                await db
-                    .update(telegramAccounts)
-                    .set({
-                        username: telegramUser.username ?? null,
-                        firstName: telegramUser.first_name,
-                        lastName: telegramUser.last_name ?? null,
-                    })
-                    .where(eq(telegramAccounts.telegramId, telegramUser.id));
-            } catch (err) {
-                logger.error("Failed to update telegram account", {
-                    userId,
-                    telegramUserId: telegramUser.id,
-                    error: err instanceof Error ? err.message : 'Unknown error'
-                });
-                // Continue anyway as this is not critical
-            }
-        }
-
-        // Get full user record
-        const user = await db.query.users.findFirst({
-            where: eq(users.id, userId),
-        });
-
-        if (!user) {
-            logger.error("User record not found after authentication", { userId, telegramUserId: telegramUser.id });
-            return reply.status(500).send({ error: "User account not found" });
-        }
-
         try {
+            const { userId, isNewUser } = await findOrCreateUser(telegramUser);
+
+            // Get full user record
+            const user = await db.query.users.findFirst({
+                where: eq(users.id, userId),
+            });
+
+            if (!user) {
+                logger.error("User record not found after authentication", { userId, telegramUserId: telegramUser.id });
+                return reply.status(500).send({ error: "User account not found" });
+            }
+
             const token = fastify.jwt.sign(
                 { id: userId, telegramId: telegramUser.id },
                 { expiresIn: "7d" }
@@ -204,87 +248,124 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
                 },
             };
         } catch (err) {
-            logger.error("Failed to generate JWT token", {
-                userId,
+            logger.error("Failed to authenticate user", {
                 telegramUserId: telegramUser.id,
                 error: err instanceof Error ? err.message : 'Unknown error'
             });
-            return reply.status(500).send({ error: "Failed to generate authentication token" });
+            return reply.status(500).send({ error: "Failed to authenticate user" });
         }
     });
 
     /**
-     * POST /auth/dev
-     * Development only: Authenticate with just a telegram ID
+     * POST /auth/telegram-widget
+     * Authenticate user via Telegram Login Widget (Website)
      */
     fastify.post<{
-        Body: { telegramId: number };
-    }>("/dev", async (request, reply) => {
-        // Only allow in development
-        if (process.env.NODE_ENV === "production") {
-            return reply.status(404).send({ error: "Not found" });
-        }
+        Body: TelegramWidgetData;
+    }>("/telegram-widget", async (request, reply) => {
+        const authData = request.body;
+        const clientIP = request.ip || 'unknown';
+        const userAgent = request.headers['user-agent'] || 'unknown';
 
-        const { telegramId } = request.body;
-
-        if (!telegramId) {
-            return reply.status(400).send({ error: "telegramId is required" });
-        }
-
-        // Look up user by telegram ID
-        let telegramAccount = await db.query.telegramAccounts.findFirst({
-            where: eq(telegramAccounts.telegramId, telegramId),
+        logger.info("Telegram Widget auth attempt", {
+            ip: clientIP,
+            userAgent,
+            telegramUserId: authData.id
         });
 
-        let userId: string;
-
-        if (!telegramAccount) {
-            // Create new user and telegram account
-            const newUser = await db
-                .insert(users)
-                .values({
-                    tier: "standard",
-                    isActive: true,
-                })
-                .returning();
-
-            userId = newUser[0].id;
-
-            await db.insert(telegramAccounts).values({
-                userId,
-                telegramId,
-                username: "dev_user",
-                firstName: "Dev User",
-                lastName: null,
+        // Validate required fields
+        if (!authData.id || !authData.first_name || !authData.auth_date || !authData.hash) {
+            logger.warn("Widget auth failed: missing required fields", { ip: clientIP });
+            return reply.status(400).send({
+                error: "Missing required fields",
             });
-        } else {
-            userId = telegramAccount.userId;
         }
 
-        // Get full user record
-        const user = await db.query.users.findFirst({
-            where: eq(users.id, userId),
+        // Verify the authentication
+        const isValid = verifyTelegramWidget(authData);
+        if (!isValid) {
+            logger.warn("Widget auth failed: invalid hash", {
+                ip: clientIP,
+                telegramUserId: authData.id
+            });
+            return reply.status(401).send({
+                error: "Invalid authentication data",
+            });
+        }
+
+        // Check if auth data is fresh (not older than 24 hours)
+        if (!isAuthDataFresh(authData.auth_date)) {
+            logger.warn("Widget auth failed: auth data too old", {
+                ip: clientIP,
+                telegramUserId: authData.id,
+                authDate: authData.auth_date
+            });
+            return reply.status(401).send({
+                error: "Authentication data is too old",
+            });
+        }
+
+        logger.info("Widget auth validation successful", {
+            ip: clientIP,
+            telegramUserId: authData.id,
+            username: authData.username
         });
 
-        const token = fastify.jwt.sign(
-            { id: userId, telegramId },
-            { expiresIn: "7d" }
-        );
+        try {
+            const { userId, isNewUser } = await findOrCreateUser({
+                id: authData.id,
+                first_name: authData.first_name,
+                last_name: authData.last_name,
+                username: authData.username,
+            });
 
-        return {
-            token,
-            user: {
-                id: user?.id,
-                tier: user?.tier,
-                isActive: user?.isActive,
-                telegram: {
-                    id: telegramId,
-                    username: telegramAccount?.username ?? "dev_user",
-                    firstName: telegramAccount?.firstName ?? "Dev User",
-                    lastName: telegramAccount?.lastName,
+            // Get full user record
+            const user = await db.query.users.findFirst({
+                where: eq(users.id, userId),
+            });
+
+            if (!user) {
+                logger.error("User record not found after widget authentication", {
+                    userId,
+                    telegramUserId: authData.id
+                });
+                return reply.status(500).send({ error: "User account not found" });
+            }
+
+            const token = fastify.jwt.sign(
+                { id: userId, telegramId: authData.id },
+                { expiresIn: "30d" } // Longer expiry for widget login
+            );
+
+            logger.info("Widget JWT token generated successfully", {
+                userId,
+                telegramUserId: authData.id,
+                isNewUser
+            });
+
+            return {
+                success: true,
+                token,
+                user: {
+                    id: user.id,
+                    tier: user.tier,
+                    isActive: user.isActive,
+                    telegram: {
+                        id: authData.id,
+                        username: authData.username,
+                        firstName: authData.first_name,
+                        lastName: authData.last_name,
+                        photoUrl: authData.photo_url,
+                    },
                 },
-            },
-        };
+            };
+        } catch (err) {
+            logger.error("Failed to authenticate widget user", {
+                telegramUserId: authData.id,
+                error: err instanceof Error ? err.message : 'Unknown error'
+            });
+            return reply.status(500).send({ error: "Failed to authenticate user" });
+        }
     });
 
     /**

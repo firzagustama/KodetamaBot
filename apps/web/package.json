@@ -12,8 +12,7 @@
     "dependencies": {
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
-        "zustand": "^4.5.0",
-        "@kodetama/shared": "workspace:*"
+        "zustand": "^4.5.0"
     },
     "devDependencies": {
         "@types/react": "^18.2.0",
@@ -21,6 +20,7 @@
         "@vitejs/plugin-basic-ssl": "^1.1.0",
         "@vitejs/plugin-react": "^4.2.0",
         "autoprefixer": "^10.4.17",
+        "daisyui": "^5.5.8",
         "postcss": "^8.4.33",
         "tailwindcss": "^3.4.1",
         "typescript": "^5.3.0",

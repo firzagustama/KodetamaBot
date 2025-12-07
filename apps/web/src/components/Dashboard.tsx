@@ -27,8 +27,8 @@ export default function Dashboard() {
         <div className="space-y-4">
             {/* Income Card */}
             <div className="glass-card rounded-2xl p-4">
-                <p className="text-sm text-slate-500">Penghasilan Bulan Ini</p>
-                <p className="text-2xl font-bold text-primary-600">
+                <p className="text-sm text-base-content/70">Penghasilan Bulan Ini</p>
+                <p className="text-2xl font-bold text-primary">
                     {formatRupiah(budget.estimatedIncome)}
                 </p>
             </div>
@@ -60,38 +60,38 @@ export default function Dashboard() {
 
             {/* Spending Progress */}
             <div className="glass-card rounded-2xl p-4 space-y-4">
-                <h3 className="font-semibold">Progress Pengeluaran</h3>
+                <h3 className="font-semibold text-base-content">Progress Pengeluaran</h3>
 
                 <BucketProgress
                     label="Kebutuhan"
                     spent={byBucket.needs.spent}
                     allocated={byBucket.needs.allocated}
-                    color="bg-emerald-500"
+                    color="bg-accent"
                 />
                 <BucketProgress
                     label="Wants"
                     spent={byBucket.wants.spent}
                     allocated={byBucket.wants.allocated}
-                    color="bg-amber-500"
+                    color="bg-warning"
                 />
                 <BucketProgress
                     label="Tabungan"
                     spent={byBucket.savings.spent}
                     allocated={byBucket.savings.allocated}
-                    color="bg-sky-500"
+                    color="bg-info"
                 />
             </div>
 
             {/* Top Categories */}
             <div className="glass-card rounded-2xl p-4">
-                <h3 className="font-semibold mb-3">Kategori Teratas</h3>
+                <h3 className="font-semibold mb-3 text-base-content">Kategori Teratas</h3>
                 <div className="space-y-2">
                     {summary.topCategories.map((cat, i) => (
                         <div key={i} className="flex items-center justify-between">
-                            <span className="text-slate-600">{cat.name}</span>
+                            <span className="text-base-content/80">{cat.name}</span>
                             <div className="text-right">
-                                <span className="font-medium">{formatRupiah(cat.amount)}</span>
-                                <span className="text-xs text-slate-400 ml-2">
+                                <span className="font-medium text-base-content">{formatRupiah(cat.amount)}</span>
+                                <span className="text-xs text-base-content/50 ml-2">
                                     {cat.percentage.toFixed(1)}%
                                 </span>
                             </div>
@@ -103,13 +103,13 @@ export default function Dashboard() {
             {/* Quick Stats */}
             <div className="grid grid-cols-2 gap-3">
                 <div className="glass-card rounded-xl p-4 text-center">
-                    <p className="text-xs text-slate-500">Total Pengeluaran</p>
+                    <p className="text-xs text-base-content/70">Total Pengeluaran</p>
                     <p className="text-lg font-bold text-error">
                         {formatRupiah(summary.totalExpenses)}
                     </p>
                 </div>
                 <div className="glass-card rounded-xl p-4 text-center">
-                    <p className="text-xs text-slate-500">Sisa Budget</p>
+                    <p className="text-xs text-base-content/70">Sisa Budget</p>
                     <p className="text-lg font-bold text-success">
                         {formatRupiah(
                             budget.estimatedIncome - summary.totalExpenses
@@ -136,16 +136,16 @@ function BudgetCard({
 }) {
     const remaining = allocated - spent;
     const colorClasses = {
-        emerald: "bg-emerald-50 border-emerald-200",
-        amber: "bg-amber-50 border-amber-200",
-        sky: "bg-sky-50 border-sky-200",
+        emerald: "bg-accent bg-opacity-20 border-accent",
+        amber: "bg-warning bg-opacity-20 border-warning",
+        sky: "bg-info bg-opacity-20 border-info",
     };
 
     return (
         <div className={`rounded-xl p-3 border ${colorClasses[color]}`}>
             <span className="text-lg">{icon}</span>
-            <p className="text-xs text-slate-500 mt-1">{label}</p>
-            <p className="text-sm font-semibold">
+            <p className="text-xs text-base-content/70 mt-1">{label}</p>
+            <p className="text-sm font-semibold text-base-content">
                 {remaining >= 0 ? formatRupiah(remaining) : `-${formatRupiah(-remaining)}`}
             </p>
         </div>
@@ -168,7 +168,7 @@ function BucketProgress({
 
     return (
         <div>
-            <div className="flex justify-between text-sm mb-1">
+            <div className="flex justify-between text-sm mb-1 text-base-content">
                 <span>{label}</span>
                 <span className={isOverBudget ? "text-error" : ""}>
                     {formatRupiah(spent)} / {formatRupiah(allocated)}
@@ -187,13 +187,13 @@ function BucketProgress({
 function DashboardSkeleton() {
     return (
         <div className="space-y-4 animate-pulse">
-            <div className="h-24 bg-slate-200 rounded-2xl" />
+            <div className="h-24 bg-base-200 rounded-2xl" />
             <div className="grid grid-cols-3 gap-3">
-                <div className="h-20 bg-slate-200 rounded-xl" />
-                <div className="h-20 bg-slate-200 rounded-xl" />
-                <div className="h-20 bg-slate-200 rounded-xl" />
+                <div className="h-20 bg-base-200 rounded-xl" />
+                <div className="h-20 bg-base-200 rounded-xl" />
+                <div className="h-20 bg-base-200 rounded-xl" />
             </div>
-            <div className="h-40 bg-slate-200 rounded-2xl" />
+            <div className="h-40 bg-base-200 rounded-2xl" />
         </div>
     );
 }

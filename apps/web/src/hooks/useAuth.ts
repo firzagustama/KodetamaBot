@@ -1,123 +1,122 @@
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useTelegram } from "./useTelegram";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
-
-interface User {
-    id: string;
-    tier: "standard" | "pro" | "family";
-    isActive: boolean;
-    telegram: {
-        id: number;
-        username?: string;
-        firstName: string;
-        lastName?: string;
-    };
-}
-
-interface AuthState {
+interface UseAuthReturn {
     token: string | null;
-    user: User | null;
+    authenticated: boolean;
     loading: boolean;
     error: string | null;
-    authenticated: boolean;
+    setToken: (token: string) => void;
+    logout: () => void;
 }
 
-/**
- * Hook for managing Telegram WebApp authentication
- * Authenticates with the backend using Telegram's initData
- */
-export function useAuth() {
-    const { initData, user: telegramUser, ready } = useTelegram();
-    const [state, setState] = useState<AuthState>({
-        token: null,
-        user: null,
-        loading: true,
-        error: null,
-        authenticated: false,
-    });
+export function useAuth(): UseAuthReturn {
+    const { initData, webApp } = useTelegram();
+    const [token, setTokenState] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    const authenticate = useCallback(async () => {
-        // Don't attempt auth until Telegram SDK is ready
-        if (!ready) return;
+    useEffect(() => {
+        const authenticateUser = async () => {
+            try {
+                // 1. Check if we have a stored token (from widget login)
+                const storedToken = localStorage.getItem("auth_token");
+                if (storedToken) {
+                    console.log("Found stored token, verifying...");
+                    // Verify the stored token is still valid
+                    const isValid = await verifyToken(storedToken);
+                    if (isValid) {
+                        console.log("Stored token is valid");
+                        setTokenState(storedToken);
+                        setLoading(false);
+                        return;
+                    } else {
+                        console.log("Stored token is invalid, removing...");
+                        localStorage.removeItem("auth_token");
+                    }
+                }
 
-        // Check if we have initData (real Telegram environment)
-        if (!initData) {
-            setState({
-                token: null,
-                user: null,
-                loading: false,
-                error: import.meta.env.DEV
-                    ? "No Telegram WebApp detected. Set VITE_DEV_TELEGRAM_ID in .env for dev mode."
-                    : "Authentication required",
-                authenticated: false,
-            });
+                // 2. If in Telegram Mini App, use initData
+                if (webApp && initData) {
+                    console.log("Authenticating with Telegram Mini App initData");
+                    const response = await fetch("/api/auth/telegram", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({ initData }),
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || "Authentication failed");
+                    }
+
+                    const data = await response.json();
+                    console.log("Mini App auth successful");
+                    setTokenState(data.token);
+                    localStorage.setItem("auth_token", data.token);
+                    setError(null);
+                } else if (!webApp) {
+                    // 3. Not in Telegram Mini App, and no stored token
+                    console.log("Not in Mini App, showing widget login");
+                    setError(null); // Don't show error, just show login page
+                }
+            } catch (err) {
+                console.error("Auth error:", err);
+                setError(err instanceof Error ? err.message : "Authentication failed");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        authenticateUser();
+    }, [initData, webApp]);
+
+    const setToken = (newToken: string) => {
+        console.log("Setting new token");
+        if (!newToken) {
+            // If empty token, treat as logout
+            setTokenState(null);
+            localStorage.removeItem("auth_token");
+            setError(null);
             return;
         }
 
-        try {
-            const response = await fetch(`${API_URL}/auth/telegram`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ initData }),
-            });
+        setTokenState(newToken);
+        localStorage.setItem("auth_token", newToken);
+        setError(null);
+    };
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error ?? "Authentication failed");
-            }
-
-            const data = await response.json();
-
-            setState({
-                token: data.token,
-                user: data.user,
-                loading: false,
-                error: null,
-                authenticated: true,
-            });
-
-            // Store token in localStorage for persistence
-            localStorage.setItem("kodetama_token", data.token);
-        } catch (err) {
-            console.error("Authentication error:", err);
-            setState({
-                token: null,
-                user: null,
-                loading: false,
-                error: err instanceof Error ? err.message : "Authentication failed",
-                authenticated: false,
-            });
-        }
-    }, [initData, ready]);
-
-    const authAttempted = useRef(false);
-
-    useEffect(() => {
-        if (authAttempted.current) return;
-
-        if (ready && !state.authenticated && !state.error) {
-            authAttempted.current = true;
-            authenticate();
-        }
-    }, [ready, authenticate, state.authenticated, state.error]);
-
-    const logout = useCallback(() => {
-        setState({
-            token: null,
-            user: null,
-            loading: false,
-            error: null,
-            authenticated: false,
-        });
-    }, []);
+    const logout = () => {
+        console.log("Logging out");
+        setTokenState(null);
+        localStorage.removeItem("auth_token");
+        setError(null);
+    };
 
     return {
-        ...state,
-        telegramUser,
-        authenticate,
+        token,
+        authenticated: !!token,
+        loading,
+        error,
+        setToken,
         logout,
     };
+}
+
+// Helper function to verify token validity
+async function verifyToken(token: string): Promise<boolean> {
+    try {
+        const response = await fetch("/api/auth/me", {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        return response.ok;
+    } catch (error) {
+        console.error("Token verification failed:", error);
+        return false;
+    }
 }
