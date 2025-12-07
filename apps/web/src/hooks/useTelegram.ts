@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 declare global {
     interface Window {
@@ -55,31 +55,78 @@ interface TelegramUser {
 
 export function useTelegram() {
     const [ready, setReady] = useState(false);
-    const webApp = window.Telegram?.WebApp;
+    const isMountedRef = useRef(true);
+    const [webApp] = useState(() => window.Telegram?.WebApp);
 
     const user = webApp?.initDataUnsafe?.user;
     const initData = webApp?.initData;
 
     useEffect(() => {
-        if (webApp) {
-            webApp.ready();
-            setReady(true);
-        }
-    }, []);
+        isMountedRef.current = true;
 
-    const expand = useCallback(() => webApp?.expand(), [webApp]);
-    const close = useCallback(() => webApp?.close(), [webApp]);
+        // Add a small delay for iOS to ensure WebApp is fully loaded
+        const initWebApp = async () => {
+            if (webApp) {
+                try {
+                    // Call ready() synchronously
+                    webApp.ready();
+
+                    // Small delay before setting ready state (iOS fix)
+                    await new Promise(resolve => setTimeout(resolve, 100));
+
+                    if (isMountedRef.current) {
+                        setReady(true);
+                    }
+                } catch (error) {
+                    console.error("Error initializing Telegram WebApp:", error);
+                    if (isMountedRef.current) {
+                        setReady(true); // Still set ready even on error
+                    }
+                }
+            }
+        };
+
+        initWebApp();
+
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, [webApp]);
+
+    const expand = useCallback(() => {
+        try {
+            webApp?.expand();
+        } catch (error) {
+            console.error("Error expanding WebApp:", error);
+        }
+    }, [webApp]);
+
+    const close = useCallback(() => {
+        try {
+            webApp?.close();
+        } catch (error) {
+            console.error("Error closing WebApp:", error);
+        }
+    }, [webApp]);
 
     const showMainButton = useCallback((text: string, onClick: () => void) => {
-        if (webApp?.MainButton) {
-            webApp.MainButton.text = text;
-            webApp.MainButton.onClick(onClick);
-            webApp.MainButton.show();
+        try {
+            if (webApp?.MainButton) {
+                webApp.MainButton.text = text;
+                webApp.MainButton.onClick(onClick);
+                webApp.MainButton.show();
+            }
+        } catch (error) {
+            console.error("Error showing main button:", error);
         }
     }, [webApp]);
 
     const hideMainButton = useCallback(() => {
-        webApp?.MainButton.hide();
+        try {
+            webApp?.MainButton.hide();
+        } catch (error) {
+            console.error("Error hiding main button:", error);
+        }
     }, [webApp]);
 
     return {

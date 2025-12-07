@@ -5,7 +5,7 @@ import Dashboard from "./components/Dashboard";
 import BudgetManager from "./components/BudgetManager";
 import TransactionList from "./components/TransactionList";
 import GoogleIntegration from "./components/GoogleIntegration";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 type Tab = "dashboard" | "budget" | "transactions" | "google";
 
@@ -20,12 +20,18 @@ function App() {
 
     const [activeTab, setActiveTab] = useState<Tab>("dashboard");
     const [uiReady, setUiReady] = useState(false);
+    const hasExpanded = useRef(false);
+    const hasFetched = useRef(false);
 
     // ✅ Call tg.ready() first
     useEffect(() => {
-        if (ready) {
-            expand?.();
-            setUiReady(true); // Show UI immediately
+        if (ready && !hasExpanded.current) {
+            hasExpanded.current = true;
+            // Delay expand slightly for iOS
+            setTimeout(() => {
+                expand?.();
+                setUiReady(true);
+            }, 150);
         }
     }, [ready, expand]);
 
@@ -38,14 +44,16 @@ function App() {
 
     // ✅ Fetch budget/transactions in background
     useEffect(() => {
-        if (authenticated) {
-            fetchBudget().then(() => {
-                fetchTransactions();
-            });
+        if (authenticated && !hasFetched.current) {
+            hasFetched.current = true;
+            fetchBudget()
+                .then(() => fetchTransactions())
+                .catch((error) => {
+                    console.error("Error fetching data:", error);
+                    hasFetched.current = false; // Allow retry
+                });
         }
-        // Only run when authenticated changes
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [authenticated]);
+    }, [authenticated, fetchBudget, fetchTransactions]);
 
     // Loading / skeleton UI
     if (!uiReady || authLoading) {
