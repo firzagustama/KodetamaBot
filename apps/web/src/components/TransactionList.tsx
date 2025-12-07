@@ -21,16 +21,16 @@ export default function TransactionList() {
     const typeConfig = {
         income: { icon: "📈", color: "text-success", label: "Pemasukan" },
         expense: { icon: "📉", color: "text-error", label: "Pengeluaran" },
-        transfer: { icon: "↔️", color: "text-primary-500", label: "Transfer" },
-        adjustment: { icon: "⚙️", color: "text-slate-500", label: "Penyesuaian" },
+        transfer: { icon: "↔️", color: "text-primary", label: "Transfer" },
+        adjustment: { icon: "⚙️", color: "text-base-content/70", label: "Penyesuaian" },
     };
 
     if (transactions.length === 0) {
         return (
             <div className="glass-card rounded-2xl p-8 text-center">
                 <span className="text-4xl">📝</span>
-                <p className="text-slate-500 mt-2">Belum ada transaksi</p>
-                <p className="text-sm text-slate-400">
+                <p className="text-base-content/70 mt-2">Belum ada transaksi</p>
+                <p className="text-sm text-base-content/60">
                     Kirim pesan ke bot untuk mencatat transaksi
                 </p>
             </div>
@@ -41,7 +41,7 @@ export default function TransactionList() {
         <div className="space-y-3">
             <div className="flex items-center justify-between mb-2">
                 <h2 className="font-semibold">Transaksi Terkini</h2>
-                <span className="text-sm text-slate-500">
+                <span className="text-sm text-base-content/70">
                     {transactions.length} item
                 </span>
             </div>
@@ -53,12 +53,12 @@ export default function TransactionList() {
                         key={tx.id}
                         className="glass-card rounded-xl p-4 flex items-center gap-3"
                     >
-                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-xl">
+                        <div className="w-10 h-10 rounded-full bg-base-200 flex items-center justify-center text-xl">
                             {config.icon}
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="font-medium truncate">{tx.description}</p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-base-content/70">
                                 {tx.category} • {tx.bucket}
                             </p>
                         </div>
@@ -67,7 +67,7 @@ export default function TransactionList() {
                                 {tx.type === "income" ? "+" : "-"}
                                 {formatRupiah(tx.amount)}
                             </p>
-                            <p className="text-xs text-slate-400">
+                            <p className="text-xs text-base-content/60">
                                 {formatDate(tx.transactionDate)}
                             </p>
                         </div>

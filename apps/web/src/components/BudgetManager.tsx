@@ -17,7 +17,7 @@ export default function BudgetManager() {
     const [income, setIncome] = useState(budget?.estimatedIncome ?? 0);
 
     if (!budget) {
-        return <div className="animate-pulse h-40 bg-slate-200 rounded-2xl" />;
+        return <div className="animate-pulse h-40 bg-base-200 rounded-2xl" />;
     }
 
     const savings = 100 - needs - wants;
@@ -41,12 +41,12 @@ export default function BudgetManager() {
             <div className="glass-card rounded-2xl p-4">
                 <div className="flex items-center justify-between">
                     <div>
-                        <p className="text-sm text-slate-500">Periode</p>
+                        <p className="text-sm text-base-content/70">Periode</p>
                         <p className="font-semibold">{budget.period.name}</p>
                     </div>
                     <button
                         onClick={() => setEditing(!editing)}
-                        className="px-3 py-1.5 text-sm bg-primary-100 text-primary-600 rounded-lg hover:bg-primary-200 transition-colors"
+                        className="px-3 py-1.5 text-sm bg-primary/20 text-primary rounded-lg hover:bg-primary/30 transition-colors"
                     >
                         {editing ? "Batal" : "Edit"}
                     </button>
@@ -55,16 +55,16 @@ export default function BudgetManager() {
 
             {/* Income */}
             <div className="glass-card rounded-2xl p-4">
-                <p className="text-sm text-slate-500">Penghasilan Bulanan</p>
+                <p className="text-sm text-base-content/70">Penghasilan Bulanan</p>
                 {editing ? (
                     <input
                         type="number"
                         value={income}
                         onChange={(e) => setIncome(Number(e.target.value))}
-                        className="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        className="w-full p-2 border border-base-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                 ) : (
-                    <p className="text-2xl font-bold text-primary-600">
+                    <p className="text-2xl font-bold text-primary">
                         {formatRupiah(income)}
                     </p>
                 )}
@@ -110,7 +110,7 @@ export default function BudgetManager() {
                 {editing && (
                     <button
                         onClick={handleSave}
-                        className="w-full py-3 bg-primary-500 text-white font-semibold rounded-xl hover:bg-primary-600 transition-colors"
+                        className="w-full py-3 bg-primary text-primary-content font-semibold rounded-xl hover:bg-primary-focus transition-colors"
                     >
                         Simpan Perubahan
                     </button>
@@ -118,11 +118,11 @@ export default function BudgetManager() {
             </div>
 
             {/* Tips */}
-            <div className="bg-gradient-to-r from-primary-50 to-sky-50 rounded-2xl p-4 border border-primary-100">
-                <h4 className="font-medium text-primary-700 flex items-center gap-2">
+            <div className="bg-info/10 rounded-2xl p-4 border border-info/20">
+                <h4 className="font-medium text-info flex items-center gap-2">
                     💡 Tips
                 </h4>
-                <p className="text-sm text-slate-600 mt-2">
+                <p className="text-sm text-base-content/80 mt-2">
                     Setiap rupiah harus punya tujuan.
                     Alokasikan 50% untuk needs, 30% untuk wants, dan 20% untuk savings.
                 </p>
@@ -151,9 +151,9 @@ function AllocationSlider({
     color: "emerald" | "amber" | "sky";
 }) {
     const colorClasses = {
-        emerald: "accent-emerald-500",
-        amber: "accent-amber-500",
-        sky: "accent-sky-500",
+        emerald: "accent-primary",
+        amber: "accent-warning",
+        sky: "accent-info",
     };
 
     return (
@@ -165,7 +165,7 @@ function AllocationSlider({
                 </div>
                 <div className="text-right">
                     <span className="font-semibold">{value}%</span>
-                    <span className="text-slate-400 text-sm ml-2">
+                    <span className="text-base-content/50 text-sm ml-2">
                         {formatRupiah(amount)}
                     </span>
                 </div>

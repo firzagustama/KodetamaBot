@@ -91,7 +91,7 @@ export function TelegramLoginButton({
         <div>
             <div ref={containerRef} className="flex justify-center" />
             <noscript>
-                <div className="text-center text-sm text-slate-500 mt-2">
+                <div className="text-center text-sm text-base-content/70 mt-2">
                     JavaScript harus diaktifkan untuk login dengan Telegram
                 </div>
             </noscript>

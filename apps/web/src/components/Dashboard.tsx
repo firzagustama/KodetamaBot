@@ -66,7 +66,7 @@ export default function Dashboard() {
                     label="Kebutuhan"
                     spent={byBucket.needs.spent}
                     allocated={byBucket.needs.allocated}
-                    color="bg-accent"
+                    color="bg-primary"
                 />
                 <BucketProgress
                     label="Wants"
@@ -136,9 +136,9 @@ function BudgetCard({
 }) {
     const remaining = allocated - spent;
     const colorClasses = {
-        emerald: "bg-accent bg-opacity-20 border-accent",
-        amber: "bg-warning bg-opacity-20 border-warning",
-        sky: "bg-info bg-opacity-20 border-info",
+        emerald: "border-success/20 bg-success/10",
+        amber: "border-warning/20 bg-warning/10",
+        sky: "border-info/20 bg-info/10",
     };
 
     return (
