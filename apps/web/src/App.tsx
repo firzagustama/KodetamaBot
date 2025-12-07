@@ -6,6 +6,7 @@ import BudgetManager from "./components/BudgetManager";
 import TransactionList from "./components/TransactionList";
 import GoogleIntegration from "./components/GoogleIntegration";
 import { TelegramLoginButton } from "./components/TelegramLoginButton";
+import { setupSwipeBehavior } from "./utils/telegramBridge";
 import { useEffect, useState, useRef } from "react";
 
 type Tab = "dashboard" | "budget" | "transactions" | "google";
@@ -14,6 +15,7 @@ type Tab = "dashboard" | "budget" | "transactions" | "google";
 const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME;
 
 function App() {
+    const { isFullscreen, toggleFullscreen } = useTelegram();
     const { user, ready, expand, webApp } = useTelegram();
     const { token, authenticated, loading: authLoading } = useAuth();
     const { budget } = useStore();
@@ -30,6 +32,13 @@ function App() {
     const hasExpanded = useRef(false);
     const hasFetched = useRef(false);
 
+    // Toggle fullscreen
+    useEffect(() => {
+        if (!isFullscreen) {
+            toggleFullscreen();
+        }
+    }, [isFullscreen]);
+
     // Check if running inside Telegram Mini App
     useEffect(() => {
         const isInTelegram = !!webApp;
@@ -43,6 +52,9 @@ function App() {
             hasExpanded.current = true;
             setTimeout(() => {
                 expand?.();
+                // Disable vertical swipe to prevent app closing on scroll
+                setupSwipeBehavior(false);
+                console.log("✅ Disabled vertical swipe behavior to prevent closing on scroll");
                 setUiReady(true);
             }, 150);
         } else if (!isMiniApp) {
@@ -223,60 +235,65 @@ function App() {
 
     // ✅ Main UI (Authenticated)
     return (
-        <div className="min-h-screen pb-20 bg-base-100 text-base-content transition-colors duration-300">
-            {/* Header */}
-            <header className="sticky top-0 z-10 text-primary-content p-4 shadow-lg">
+        <div className="min-h-screen bg-base-100 text-base-content transition-colors duration-300">
+            {/* Header - Fixed at top */}
+            <header className="fixed pt-16 left-0 right-0 z-10 text-primary-content bg-base-200 p-4 shadow-lg">
                 <div className="flex items-center gap-3">
-                    <div className="avatar placeholder">
-                        <div className="w-10 h-10 bg-primary-content bg-opacity-20 rounded-full">
-                            <span className="text-lg font-bold">{user?.first_name?.[0] ?? "K"}</span>
-                        </div>
-                    </div>
-                    <div className="flex-1">
-                        <h1 className="font-semibold">Halo, {user?.first_name ?? "User"} 👋</h1>
+                    <div className="flex-1 text-center">
+                        <h1 className="font-semibold">Periode</h1>
                         <p className="text-sm text-primary-content text-opacity-80">{budget?.period.name ?? "Dashboard"}</p>
                     </div>
                     {/* Logout button */}
-                    <button
-                        onClick={() => {
-                            setToken("");
-                            localStorage.removeItem("auth_token");
-                            window.location.reload();
-                        }}
-                        className="btn btn-ghost btn-sm text-primary-content text-opacity-80 hover:text-primary-content"
-                    >
-                        Keluar
-                    </button>
+                    {!isMiniApp && (
+                        <button
+                            onClick={() => {
+                                setToken("");
+                                localStorage.removeItem("auth_token");
+                                window.location.reload();
+                            }}
+                            className="btn btn-ghost btn-sm text-primary-content text-opacity-80 hover:text-primary-content"
+                        >
+                            Keluar
+                        </button>
+                    )}
                 </div>
             </header>
 
             {/* Content */}
-            <main className="p-4">
+            <main className="min-h-screen pt-36 pb-28 px-4 overflow-y-auto">
                 {activeTab === "dashboard" && <Dashboard />}
                 {activeTab === "budget" && <BudgetManager />}
                 {activeTab === "transactions" && <TransactionList />}
                 {activeTab === "google" && <GoogleIntegration />}
             </main>
 
-            {/* Bottom Navigation */}
-            <nav className="dock">
-                <NavButton icon="📊" label="Dashboard" active={activeTab === "dashboard"} onClick={() => setActiveTab("dashboard")} />
-                <NavButton icon="💰" label="Budget" active={activeTab === "budget"} onClick={() => setActiveTab("budget")} />
-                <NavButton icon="📝" label="Transaksi" active={activeTab === "transactions"} onClick={() => setActiveTab("transactions")} />
-                <NavButton icon="📁" label="Google" active={activeTab === "google"} onClick={() => setActiveTab("google")} />
-            </nav>
+            {/* Bottom Navigation - Fixed at bottom */}
+            <div className="fixed bottom-0 left-0 right-0 z-10 flex pt-4 pb-10 bg-base-200 border-t border-base-300">
+                <NavButton icon="Dashboard" label="Dashboard" active={activeTab === "dashboard"} onClick={() => setActiveTab("dashboard")} />
+                <NavButton icon="Budget" label="Budget" active={activeTab === "budget"} onClick={() => setActiveTab("budget")} />
+                <NavButton icon="Transaksi" label="Transaksi" active={activeTab === "transactions"} onClick={() => setActiveTab("transactions")} />
+                <NavButton icon="Google" label="Google" active={activeTab === "google"} onClick={() => setActiveTab("google")} />
+            </div>
         </div>
     );
 }
 
 function NavButton({ icon, label, active, onClick }: { icon: string; label: string; active: boolean; onClick: () => void }) {
+    const iconPath = [
+        ["Google", <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0 0a8.949 8.949 0 0 0 4.951-1.488A3.987 3.987 0 0 0 13 16h-2a3.987 3.987 0 0 0-3.951 3.512A8.948 8.948 0 0 0 12 21Zm3-11a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />],
+        ["Dashboard", <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v15a1 1 0 0 0 1 1h15M8 16l2.5-5.5 3 3L17.273 7 20 9.667" />],
+        ["Budget", <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8H5m12 0a1 1 0 0 1 1 1v2.6M17 8l-4-4M5 8a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.6M5 8l4-4 4 4m6 4h-4a2 2 0 1 0 0 4h4a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1Z" />],
+        ["Transaksi", <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v13H7a2 2 0 0 0-2 2Zm0 0a2 2 0 0 0 2 2h12M9 3v14m7 0v4" />],
+    ]
     return (
         <button
             onClick={onClick}
-            className={`btn btn-ghost btn-sm flex flex-col h-auto py-2 px-3 ${active ? "btn-active text-primary" : "text-base-content text-opacity-60"}`}
+            className={`${active ? "text-primary" : "text-base-content"} flex flex-col items-center gap-1 flex-1`}
         >
-            <span className="text-xl">{icon}</span>
-            <span className="text-xs mt-1">{label}</span>
+            <svg className={`w-6 h-6 ${active ? "text-primary" : "text-base-content"}`} aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                {iconPath.find((item) => item[0] === icon)?.[1]}
+            </svg>
+            <span className="text-xs">{label}</span>
         </button>
     );
 }
