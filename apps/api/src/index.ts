@@ -1,8 +1,10 @@
 import "dotenv/config";
+import path from "path";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import rateLimit from "@fastify/rate-limit";
+import { logger } from "./utils/logger.js";
 import { authRoutes } from "./routes/auth.js";
 import { userRoutes } from "./routes/users.js";
 import { budgetRoutes } from "./routes/budgets.js";
@@ -24,8 +26,12 @@ const JWT_SECRET = process.env.JWT_SECRET ?? "your-secret-key";
 const fastify = Fastify({
     logger: {
         level: process.env.LOG_LEVEL ?? "info",
+        file: path.join(process.env.LOG_DIR ?? "./logs", "api-fastify.log"),
     },
 });
+
+// Add custom logger to fastify instance
+fastify.decorate('customLogger', logger);
 
 // Plugins
 await fastify.register(cors, {
@@ -42,7 +48,6 @@ await fastify.register(rateLimit, {
     timeWindow: "1 minute",
 });
 
-// Routes
 // Routes
 await fastify.register(authRoutes, { prefix: "/api/auth" });
 await fastify.register(userRoutes, { prefix: "/api/users" });

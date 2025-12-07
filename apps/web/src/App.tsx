@@ -12,6 +12,7 @@ type Tab = "dashboard" | "budget" | "transactions" | "google";
 function App() {
     const { user, ready, expand } = useTelegram();
     const { token, authenticated, loading: authLoading, error: authError } = useAuth();
+    const { budget } = useStore();
 
     // Use selectors to avoid re-renders on unrelated store changes
     const setToken = useStore((state) => state.setToken);
@@ -32,7 +33,7 @@ function App() {
         if (ready && authenticated) {
             expand();
             fetchBudget().then(() => {
-                // Fetch transactions after budget so we have periodId
+                // Fetch summary and transaction after budget so we have periodId
                 fetchTransactions();
             });
         }
@@ -95,7 +96,7 @@ function App() {
                         <h1 className="font-semibold">
                             Halo, {user?.first_name ?? "User"} 👋
                         </h1>
-                        <p className="text-sm text-white/80">Desember 2025</p>
+                        <p className="text-sm text-white/80">{budget?.period.name}</p>
                     </div>
                 </div>
             </header>

@@ -13,8 +13,9 @@ export default function Dashboard() {
     const { budget, summary, fetchSummary } = useStore();
 
     useEffect(() => {
+        if (!budget) return;
         fetchSummary();
-    }, [fetchSummary]);
+    }, [budget]);
 
     if (!budget || !summary) {
         return <DashboardSkeleton />;

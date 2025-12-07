@@ -14,16 +14,17 @@ export default function BudgetManager() {
     const [editing, setEditing] = useState(false);
     const [needs, setNeeds] = useState(budget?.needsPercentage ?? 50);
     const [wants, setWants] = useState(budget?.wantsPercentage ?? 30);
+    const [income, setIncome] = useState(budget?.estimatedIncome ?? 0);
 
     if (!budget) {
         return <div className="animate-pulse h-40 bg-slate-200 rounded-2xl" />;
     }
 
     const savings = 100 - needs - wants;
-    const income = budget.estimatedIncome;
 
     const handleSave = async () => {
         await updateBudget({
+            estimatedIncome: income,
             needsPercentage: needs,
             wantsPercentage: wants,
             savingsPercentage: savings,
@@ -55,9 +56,18 @@ export default function BudgetManager() {
             {/* Income */}
             <div className="glass-card rounded-2xl p-4">
                 <p className="text-sm text-slate-500">Penghasilan Bulanan</p>
-                <p className="text-2xl font-bold text-primary-600">
-                    {formatRupiah(income)}
-                </p>
+                {editing ? (
+                    <input
+                        type="number"
+                        value={income}
+                        onChange={(e) => setIncome(Number(e.target.value))}
+                        className="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                ) : (
+                    <p className="text-2xl font-bold text-primary-600">
+                        {formatRupiah(income)}
+                    </p>
+                )}
             </div>
 
             {/* Budget Allocation */}
@@ -107,13 +117,13 @@ export default function BudgetManager() {
                 )}
             </div>
 
-            {/* ZBB Tips */}
+            {/* Tips */}
             <div className="bg-gradient-to-r from-primary-50 to-sky-50 rounded-2xl p-4 border border-primary-100">
                 <h4 className="font-medium text-primary-700 flex items-center gap-2">
                     💡 Tips
                 </h4>
                 <p className="text-sm text-slate-600 mt-2">
-                    Dengar! Setiap rupiah harus punya tujuan.
+                    Setiap rupiah harus punya tujuan.
                     Alokasikan 50% untuk needs, 30% untuk wants, dan 20% untuk savings.
                 </p>
             </div>

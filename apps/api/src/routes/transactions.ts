@@ -4,6 +4,7 @@ import { transactions, budgets, datePeriods } from "@kodetama/db/schema";
 import { eq, desc, sql, and } from "drizzle-orm";
 
 import { authenticate } from "../middleware/auth.js";
+import { logger } from "../utils/logger.js";
 
 export async function transactionRoutes(fastify: FastifyInstance): Promise<void> {
 
@@ -36,6 +37,15 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
     }, async (request) => {
         const userId = (request.user as { id: string }).id;
         const { periodId: rawPeriodId, page = "1", pageSize = "20" } = request.query;
+        const clientIP = request.ip || 'unknown';
+
+        logger.info("Transaction list request", {
+            userId,
+            ip: clientIP,
+            periodId: rawPeriodId,
+            page,
+            pageSize
+        });
 
         // Resolve periodId (handles "default")
         const periodId = await resolvePeriodId(userId, rawPeriodId);
@@ -45,6 +55,10 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
 
         // If no periodId provided, return empty list
         if (!periodId) {
+            logger.warn("Transaction list requested with no default period", {
+                userId,
+                ip: clientIP
+            });
             return {
                 items: [],
                 total: 0,
@@ -54,39 +68,64 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
             };
         }
 
-        const items = await db.query.transactions.findMany({
-            where: eq(transactions.periodId, periodId),
-            orderBy: [desc(transactions.transactionDate)],
-            limit: pageSizeNum,
-            offset: offset,
-            with: {
-                category: true,
-            },
-        });
+        try {
+            const items = await db.query.transactions.findMany({
+                where: eq(transactions.periodId, periodId),
+                orderBy: [desc(transactions.transactionDate)],
+                limit: pageSizeNum,
+                offset: offset,
+                with: {
+                    category: true,
+                },
+            });
 
-        // Get total count
-        const countResult = await db
-            .select({ count: sql<number>`count(*)` })
-            .from(transactions)
-            .where(eq(transactions.periodId, periodId));
+            // Get total count
+            const countResult = await db
+                .select({ count: sql<number>`count(*)` })
+                .from(transactions)
+                .where(eq(transactions.periodId, periodId));
 
-        const total = Number(countResult[0]?.count ?? 0);
+            const total = Number(countResult[0]?.count ?? 0);
+            const returnedCount = items.length;
 
-        return {
-            items: items.map((tx) => ({
-                id: tx.id,
-                type: tx.type,
-                amount: tx.amount,
-                category: tx.category?.name ?? "Uncategorized",
-                bucket: tx.bucket,
-                description: tx.description,
-                transactionDate: tx.transactionDate.toISOString(),
-            })),
-            total,
-            page: pageNum,
-            pageSize: pageSizeNum,
-            hasMore: offset + items.length < total,
-        };
+            logger.info("Transaction list served successfully", {
+                userId,
+                periodId,
+                page: pageNum,
+                returnedCount,
+                totalCount: total,
+                ip: clientIP
+            });
+
+            return {
+                items: items.map((tx) => ({
+                    id: tx.id,
+                    type: tx.type,
+                    amount: tx.amount,
+                    category: tx.category?.name ?? "Uncategorized",
+                    bucket: tx.bucket,
+                    description: tx.description,
+                    transactionDate: tx.transactionDate.toISOString(),
+                })),
+                total,
+                page: pageNum,
+                pageSize: pageSizeNum,
+                hasMore: offset + items.length < total,
+            };
+        } catch (err) {
+            logger.error("Database error in transaction list", {
+                userId,
+                periodId,
+                error: err instanceof Error ? err.message : 'Unknown database error'
+            });
+            return {
+                items: [],
+                total: 0,
+                page: pageNum,
+                pageSize: pageSizeNum,
+                hasMore: false,
+            };
+        }
     });
 
     /**
@@ -107,23 +146,53 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
         };
     }>("/", async (request) => {
         const { userId, periodId, type, amount, categoryId, bucket, description, rawMessage, transactionDate } = request.body;
+        const clientIP = request.ip || 'unknown';
 
-        const newTx = await db
-            .insert(transactions)
-            .values({
+        logger.info("New transaction creation attempt", {
+            userId,
+            periodId,
+            type,
+            amount,
+            bucket,
+            ip: clientIP
+        });
+
+        try {
+            const newTx = await db
+                .insert(transactions)
+                .values({
+                    userId,
+                    periodId,
+                    type,
+                    amount,
+                    categoryId: categoryId ?? null,
+                    bucket: bucket ?? null,
+                    description: description ?? null,
+                    rawMessage: rawMessage ?? null,
+                    transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
+                })
+                .returning();
+
+            logger.info("Transaction created successfully", {
+                transactionId: newTx[0].id,
+                userId,
+                type,
+                amount: parseFloat(amount),
+                bucket,
+                ip: clientIP
+            });
+
+            return newTx[0];
+        } catch (err) {
+            logger.error("Failed to create transaction", {
                 userId,
                 periodId,
                 type,
                 amount,
-                categoryId: categoryId ?? null,
-                bucket: bucket ?? null,
-                description: description ?? null,
-                rawMessage: rawMessage ?? null,
-                transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
-            })
-            .returning();
-
-        return newTx[0];
+                error: err instanceof Error ? err.message : 'Unknown database error'
+            });
+            throw err;
+        }
     });
 
     /**
@@ -134,17 +203,44 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
         Params: { id: string };
     }>("/:id", async (request, reply) => {
         const { id } = request.params;
+        const clientIP = request.ip || 'unknown';
 
-        const deleted = await db
-            .delete(transactions)
-            .where(eq(transactions.id, id))
-            .returning();
+        logger.info("Transaction deletion attempt", {
+            transactionId: id,
+            ip: clientIP
+        });
 
-        if (deleted.length === 0) {
-            return reply.status(404).send({ error: "Transaction not found" });
+        try {
+            const deleted = await db
+                .delete(transactions)
+                .where(eq(transactions.id, id))
+                .returning();
+
+            if (deleted.length === 0) {
+                logger.warn("Transaction deletion failed: not found", {
+                    transactionId: id,
+                    ip: clientIP
+                });
+                return reply.status(404).send({ error: "Transaction not found" });
+            }
+
+            const deletedTx = deleted[0];
+            logger.info("Transaction deleted successfully", {
+                transactionId: id,
+                userId: deletedTx.userId,
+                type: deletedTx.type,
+                amount: parseFloat(deletedTx.amount),
+                ip: clientIP
+            });
+
+            return { id, deleted: true };
+        } catch (err) {
+            logger.error("Failed to delete transaction", {
+                transactionId: id,
+                error: err instanceof Error ? err.message : 'Unknown database error'
+            });
+            throw err;
         }
-
-        return { id, deleted: true };
     });
 
     /**

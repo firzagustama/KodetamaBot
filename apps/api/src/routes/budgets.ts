@@ -162,6 +162,7 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
         if (savingsPercentage !== undefined) updateData.savingsPercentage = savingsPercentage;
 
         // Recalculate amounts if we have the data
+        console.log(income);
         if (income && needsPercentage !== undefined) {
             updateData.needsAmount = (income * needsPercentage / 100).toFixed(2);
         }
@@ -172,6 +173,7 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
             updateData.savingsAmount = (income * savingsPercentage / 100).toFixed(2);
         }
 
+        console.log(updateData);
         const updated = await db
             .update(budgets)
             .set(updateData)
