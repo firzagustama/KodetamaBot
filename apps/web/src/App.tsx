@@ -124,8 +124,8 @@ function App() {
     if (!uiReady || authLoading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-4 bg-base-100 text-base-content">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                <p className="text-sm text-base-content/70">Memuat...</p>
+                <span className="loading loading-spinner loading-lg"></span>
+                <p className="text-sm text-base-content text-opacity-70">Memuat...</p>
             </div>
         );
     }
@@ -139,26 +139,26 @@ function App() {
                     <div className="text-center mb-6">
                         <div className="text-6xl mb-4">💰</div>
                         <h1 className="text-2xl font-bold text-base-content">Kodetama Finance</h1>
-                        <p className="text-base-content/70 text-sm mt-2">
+                        <p className="text-base-content text-opacity-70 text-sm mt-2">
                             Kelola keuangan Anda dengan mudah
                         </p>
                     </div>
 
                     {/* Error message from widget auth */}
                     {loginError && (
-                        <div className="mb-4 p-3 bg-error/10 border border-error/20 rounded-lg">
-                            <p className="text-error text-sm">
-                                ❌ {loginError}
-                            </p>
+                        <div className="alert alert-error mb-4">
+                            <span>❌</span>
+                            <span>{loginError}</span>
                         </div>
                     )}
 
                     {/* Info message if not in mini app */}
                     {!isMiniApp && !loginError && (
-                        <div className="mb-4 p-3 bg-info/10 border border-info/20 rounded-lg">
-                            <p className="text-info text-sm">
-                                ℹ️ Anda juga bisa membuka aplikasi ini dari bot Telegram untuk pengalaman yang lebih baik.
-                            </p>
+                        <div className="alert alert-info mb-4">
+                            <span>ℹ️</span>
+                            <span>
+                                Anda juga bisa membuka aplikasi ini dari bot Telegram untuk pengalaman yang lebih baik.
+                            </span>
                         </div>
                     )}
 
@@ -166,14 +166,14 @@ function App() {
                     <div className="space-y-4">
                         {/* Telegram Login Widget */}
                         <div className="text-center">
-                            <p className="text-sm text-base-content/80 mb-4">
+                            <div className="text-sm text-base-content text-opacity-80 mb-4">
                                 Login dengan akun Telegram Anda:
-                            </p>
+                            </div>
 
                             {isLoggingIn ? (
                                 <div className="flex flex-col items-center gap-2 py-4">
-                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                                    <p className="text-sm text-base-content/70">Memproses login...</p>
+                                    <span className="loading loading-spinner loading-md"></span>
+                                    <p className="text-sm text-base-content text-opacity-70">Memproses login...</p>
                                 </div>
                             ) : (
                                 <TelegramLoginButton
@@ -189,35 +189,30 @@ function App() {
                         </div>
 
                         {/* Divider */}
-                        <div className="relative">
-                            <div className="absolute inset-0 flex items-center">
-                                <div className="w-full border-t border-base-300"></div>
-                            </div>
-                            <div className="relative flex justify-center text-sm">
-                                <span className="px-2 bg-base-100 text-base-content/60">atau</span>
-                            </div>
-                        </div>
+                        <div className="divider">atau</div>
 
                         {/* Mini App Link */}
-                        <div className="text-center p-4 bg-base-200 rounded-lg">
-                            <p className="text-sm text-base-content/80 mb-2">
-                                Gunakan di Telegram Mini App
-                            </p>
-                            <a
-                                href={`https://t.me/${BOT_USERNAME}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 text-primary hover:text-primary-focus font-medium"
-                            >
-                                <span>Buka Bot</span>
-                                <span>→</span>
-                            </a>
+                        <div className="card card-compact bg-base-200">
+                            <div className="card-body text-center">
+                                <div className="text-sm text-base-content text-opacity-80 mb-2">
+                                    Gunakan di Telegram Mini App
+                                </div>
+                                <a
+                                    href={`https://t.me/${BOT_USERNAME}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn btn-primary btn-sm"
+                                >
+                                    <span>Buka Bot</span>
+                                    <span>→</span>
+                                </a>
+                            </div>
                         </div>
                     </div>
 
                     {/* Footer */}
                     <div className="mt-6 text-center">
-                        <p className="text-xs text-base-content/50">
+                        <p className="text-xs text-base-content text-opacity-50">
                             Dengan login, Anda menyetujui penggunaan data Telegram Anda
                         </p>
                     </div>
@@ -230,14 +225,16 @@ function App() {
     return (
         <div className="min-h-screen pb-20 bg-base-100 text-base-content transition-colors duration-300">
             {/* Header */}
-            <header className="sticky top-0 z-10 bg-primary text-primary-content p-4 shadow-lg">
+            <header className="sticky top-0 z-10 text-primary-content p-4 shadow-lg">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                        <span className="text-lg font-bold">{user?.first_name?.[0] ?? "K"}</span>
+                    <div className="avatar placeholder">
+                        <div className="w-10 h-10 bg-primary-content bg-opacity-20 rounded-full">
+                            <span className="text-lg font-bold">{user?.first_name?.[0] ?? "K"}</span>
+                        </div>
                     </div>
                     <div className="flex-1">
                         <h1 className="font-semibold">Halo, {user?.first_name ?? "User"} 👋</h1>
-                        <p className="text-sm text-primary-content/80">{budget?.period.name ?? "Dashboard"}</p>
+                        <p className="text-sm text-primary-content text-opacity-80">{budget?.period.name ?? "Dashboard"}</p>
                     </div>
                     {/* Logout button */}
                     <button
@@ -246,7 +243,7 @@ function App() {
                             localStorage.removeItem("auth_token");
                             window.location.reload();
                         }}
-                        className="text-sm text-primary-content/80 hover:text-primary-content"
+                        className="btn btn-ghost btn-sm text-primary-content text-opacity-80 hover:text-primary-content"
                     >
                         Keluar
                     </button>
@@ -262,7 +259,7 @@ function App() {
             </main>
 
             {/* Bottom Navigation */}
-            <nav className="fixed bottom-0 left-0 right-0 bg-base-100 border-t border-base-300 p-2 flex justify-around shadow-lg">
+            <nav className="dock">
                 <NavButton icon="📊" label="Dashboard" active={activeTab === "dashboard"} onClick={() => setActiveTab("dashboard")} />
                 <NavButton icon="💰" label="Budget" active={activeTab === "budget"} onClick={() => setActiveTab("budget")} />
                 <NavButton icon="📝" label="Transaksi" active={activeTab === "transactions"} onClick={() => setActiveTab("transactions")} />
@@ -276,7 +273,7 @@ function NavButton({ icon, label, active, onClick }: { icon: string; label: stri
     return (
         <button
             onClick={onClick}
-            className={`flex flex-col items-center p-2 rounded-lg transition-colors ${active ? "text-primary bg-primary/10" : "text-base-content/60 hover:text-primary"}`}
+            className={`btn btn-ghost btn-sm flex flex-col h-auto py-2 px-3 ${active ? "btn-active text-primary" : "text-base-content text-opacity-60"}`}
         >
             <span className="text-xl">{icon}</span>
             <span className="text-xs mt-1">{label}</span>

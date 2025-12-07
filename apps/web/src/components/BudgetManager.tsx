@@ -38,94 +38,101 @@ export default function BudgetManager() {
     return (
         <div className="space-y-4">
             {/* Period Header */}
-            <div className="glass-card rounded-2xl p-4">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <p className="text-sm text-base-content/70">Periode</p>
-                        <p className="font-semibold">{budget.period.name}</p>
+            <div className="card card-compact bg-base-200 bg-opacity-50">
+                <div className="card-body">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <div className="text-sm text-base-content text-opacity-70">Periode</div>
+                            <div className="font-semibold">{budget.period.name}</div>
+                        </div>
+                        <button
+                            onClick={() => setEditing(!editing)}
+                            className={`btn btn-sm ${editing ? 'btn-outline' : 'btn-primary'}`}
+                        >
+                            {editing ? "Batal" : "Edit"}
+                        </button>
                     </div>
-                    <button
-                        onClick={() => setEditing(!editing)}
-                        className="px-3 py-1.5 text-sm bg-primary/20 text-primary rounded-lg hover:bg-primary/30 transition-colors"
-                    >
-                        {editing ? "Batal" : "Edit"}
-                    </button>
                 </div>
             </div>
 
             {/* Income */}
-            <div className="glass-card rounded-2xl p-4">
-                <p className="text-sm text-base-content/70">Penghasilan Bulanan</p>
-                {editing ? (
-                    <input
-                        type="number"
-                        value={income}
-                        onChange={(e) => setIncome(Number(e.target.value))}
-                        className="w-full p-2 border border-base-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                ) : (
-                    <p className="text-2xl font-bold text-primary">
-                        {formatRupiah(income)}
-                    </p>
-                )}
+            <div className="card card-compact bg-base-200 bg-opacity-50">
+                <div className="card-body">
+                    <div className="text-sm text-base-content text-opacity-70">Penghasilan Bulanan</div>
+                    {editing ? (
+                        <input
+                            type="number"
+                            value={income}
+                            onChange={(e) => setIncome(Number(e.target.value))}
+                            className="input input-bordered w-full"
+                        />
+                    ) : (
+                        <div className="text-2xl font-bold text-primary">
+                            {formatRupiah(income)}
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Budget Allocation */}
-            <div className="glass-card rounded-2xl p-4 space-y-4">
-                <h3 className="font-semibold">Alokasi Budget (Total: 100%)</h3>
+            <div className="card card-compact bg-base-200 bg-opacity-50">
+                <div className="card-body space-y-4">
+                    <h3 className="card-title text-base-content">Alokasi Budget (Total: 100%)</h3>
 
-                <AllocationSlider
-                    icon="🏠"
-                    label="Needs"
-                    value={needs}
-                    onChange={setNeeds}
-                    amount={income * (needs / 100)}
-                    disabled={!editing}
-                    max={100 - wants}
-                    color="emerald"
-                />
+                    <AllocationSlider
+                        icon="🏠"
+                        label="Needs"
+                        value={needs}
+                        onChange={setNeeds}
+                        amount={income * (needs / 100)}
+                        disabled={!editing}
+                        max={100 - wants}
+                        color="success"
+                    />
 
-                <AllocationSlider
-                    icon="🎮"
-                    label="Wants"
-                    value={wants}
-                    onChange={setWants}
-                    amount={income * (wants / 100)}
-                    disabled={!editing}
-                    max={100 - needs}
-                    color="amber"
-                />
+                    <AllocationSlider
+                        icon="🎮"
+                        label="Wants"
+                        value={wants}
+                        onChange={setWants}
+                        amount={income * (wants / 100)}
+                        disabled={!editing}
+                        max={100 - needs}
+                        color="warning"
+                    />
 
-                <AllocationSlider
-                    icon="💵"
-                    label="Savings"
-                    value={savings}
-                    onChange={() => { }}
-                    amount={income * (savings / 100)}
-                    disabled={true}
-                    max={100}
-                    color="sky"
-                />
+                    <AllocationSlider
+                        icon="💵"
+                        label="Savings"
+                        value={savings}
+                        onChange={() => { }}
+                        amount={income * (savings / 100)}
+                        disabled={true}
+                        max={100}
+                        color="info"
+                    />
 
-                {editing && (
-                    <button
-                        onClick={handleSave}
-                        className="w-full py-3 bg-primary text-primary-content font-semibold rounded-xl hover:bg-primary-focus transition-colors"
-                    >
-                        Simpan Perubahan
-                    </button>
-                )}
+                    {editing && (
+                        <button
+                            onClick={handleSave}
+                            className="btn btn-primary w-full"
+                        >
+                            Simpan Perubahan
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Tips */}
-            <div className="bg-info/10 rounded-2xl p-4 border border-info/20">
-                <h4 className="font-medium text-info flex items-center gap-2">
-                    💡 Tips
-                </h4>
-                <p className="text-sm text-base-content/80 mt-2">
-                    Setiap rupiah harus punya tujuan.
-                    Alokasikan 50% untuk needs, 30% untuk wants, dan 20% untuk savings.
-                </p>
+            <div className="alert alert-info">
+                <span>💡</span>
+                <div>
+                    <div className="font-medium">Tips</div>
+                    <div className="text-sm text-base-content text-opacity-80">
+                        Setiap rupiah harus punya tujuan.
+                        Alokasikan 50% untuk needs, 30% untuk wants, dan 20% untuk savings.
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -148,14 +155,8 @@ function AllocationSlider({
     amount: number;
     disabled: boolean;
     max: number;
-    color: "emerald" | "amber" | "sky";
+    color: "success" | "warning" | "info";
 }) {
-    const colorClasses = {
-        emerald: "accent-primary",
-        amber: "accent-warning",
-        sky: "accent-info",
-    };
-
     return (
         <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -165,7 +166,7 @@ function AllocationSlider({
                 </div>
                 <div className="text-right">
                     <span className="font-semibold">{value}%</span>
-                    <span className="text-base-content/50 text-sm ml-2">
+                    <span className="text-base-content text-opacity-50 text-sm ml-2">
                         {formatRupiah(amount)}
                     </span>
                 </div>
@@ -177,8 +178,7 @@ function AllocationSlider({
                 value={value}
                 onChange={(e) => onChange(parseInt(e.target.value))}
                 disabled={disabled}
-                className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${colorClasses[color]} ${disabled ? "opacity-50" : ""
-                    }`}
+                className={`range range-${color} w-full ${disabled ? "opacity-50" : ""}`}
             />
         </div>
     );
