@@ -57,26 +57,12 @@ export function useTelegram() {
     const [ready, setReady] = useState(false);
     const webApp = window.Telegram?.WebApp;
 
-    // Fallback for development
-    const devUser: TelegramUser | undefined = process.env.ADMIN_TELEGRAM_ID
-        ? {
-            id: parseInt(process.env.ADMIN_TELEGRAM_ID),
-            first_name: "Admin",
-            last_name: "Dev",
-            username: "admindev",
-            language_code: "id",
-        }
-        : undefined;
-
-    const user = webApp?.initDataUnsafe?.user ?? devUser;
-    const initData = webApp?.initData ?? "";
+    const user = webApp?.initDataUnsafe?.user;
+    const initData = webApp?.initData;
 
     useEffect(() => {
         if (webApp) {
             webApp.ready();
-            setReady(true);
-        } else {
-            // Development fallback
             setReady(true);
         }
     }, []);
