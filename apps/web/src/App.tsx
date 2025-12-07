@@ -34,7 +34,7 @@ function App() {
     useEffect(() => {
         const isInTelegram = !!webApp;
         setIsMiniApp(isInTelegram);
-        console.log("Running in Telegram Mini App:", isInTelegram);
+        console.log("Running in Telegram Mini App :", isInTelegram);
     }, [webApp]);
 
     // ✅ Call tg.ready() first (only for mini app)
