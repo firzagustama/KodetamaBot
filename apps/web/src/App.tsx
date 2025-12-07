@@ -16,7 +16,7 @@ const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME;
 
 function App() {
     const { isFullscreen, toggleFullscreen } = useTelegram();
-    const { user, ready, expand, webApp } = useTelegram();
+    const { ready, expand, webApp } = useTelegram();
     const { token, authenticated, loading: authLoading } = useAuth();
     const { budget } = useStore();
 
