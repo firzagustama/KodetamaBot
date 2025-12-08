@@ -56,7 +56,7 @@ function App() {
                 if (!hasRequestedFullscreen.current) {
                     hasRequestedFullscreen.current = true;
                     // Uncomment if you want auto-fullscreen:
-                    // requestFullscreen();
+                    requestFullscreen();
                 }
 
                 setUiReady(true);
