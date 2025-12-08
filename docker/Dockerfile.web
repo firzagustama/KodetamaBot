@@ -11,8 +11,12 @@ RUN pnpm install --frozen-lockfile
 
 # Build
 FROM base AS builder
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+COPY packages/shared/package.json ./packages/shared/
+COPY apps/web/package.json ./apps/web/
+COPY packages/shared ./packages/shared/
+COPY apps/web ./apps/web/
+RUN pnpm install --frozen-lockfile
 ARG VITE_API_URL
 ARG VITE_BOT_USERNAME
 ENV VITE_API_URL=$VITE_API_URL
