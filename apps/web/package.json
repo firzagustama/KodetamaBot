@@ -10,8 +10,10 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
+        "@tma.js/sdk-react": "^3.0.11",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
+        "vite-plugin-terminal": "^1.3.0",
         "zustand": "^4.5.0"
     },
     "devDependencies": {

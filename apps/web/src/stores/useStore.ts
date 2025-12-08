@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { authFetch } from "../utils/apiClient";
 
 interface Budget {
     id: string;
@@ -51,6 +52,7 @@ interface GoogleFolder {
 interface State {
     // Auth
     token: string | null;
+    on401Handler: (() => Promise<string | null>) | null;
 
     // Data
     budget: Budget | null;
@@ -63,6 +65,7 @@ interface State {
 
     // Actions
     setToken: (token: string | null) => void;
+    setOn401Handler: (handler: () => Promise<string | null>) => void;
     fetchBudget: () => Promise<void>;
     fetchTransactions: () => Promise<void>;
     fetchSummary: () => Promise<void>;
@@ -71,33 +74,9 @@ interface State {
     reset: () => void;
 }
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
-
-/**
- * Helper to make authenticated API requests
- */
-async function authFetch(
-    url: string,
-    token: string | null,
-    options: RequestInit = {}
-): Promise<Response> {
-    const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-        ...(options.headers as Record<string, string>),
-    };
-
-    if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    return fetch(url, {
-        ...options,
-        headers,
-    });
-}
-
 export const useStore = create<State>((set, get) => ({
     token: null,
+    on401Handler: null,
     budget: null,
     transactions: [],
     summary: null,
@@ -108,15 +87,18 @@ export const useStore = create<State>((set, get) => ({
 
     setToken: (token) => set({ token }),
 
+    setOn401Handler: (handler) => set({ on401Handler: handler }),
+
     fetchBudget: async () => {
-        const { token } = get();
+        const { token, on401Handler } = get();
         set({ loading: true, error: null });
 
         try {
-            const res = await authFetch(`${API_URL}/budgets/current`, token);
+            const res = await authFetch(`/budgets/current`, token, {}, on401Handler || undefined);
 
             if (!res.ok) {
                 if (res.status === 401) {
+                    // Let apiClient handle 401 retry, if that fails throw error
                     throw new Error("Unauthorized");
                 }
                 if (res.status === 404) {
@@ -147,17 +129,17 @@ export const useStore = create<State>((set, get) => ({
     },
 
     fetchTransactions: async () => {
-        const { token, budget } = get();
+        const { token, budget, on401Handler } = get();
         set({ loading: true, error: null });
 
         try {
             // Need periodId from budget to fetch transactions
             const periodId = budget?.period?.id;
             const url = periodId
-                ? `${API_URL}/transactions?periodId=${periodId}`
-                : `${API_URL}/transactions`;
+                ? `/transactions?periodId=${periodId}`
+                : `/transactions`;
 
-            const res = await authFetch(url, token);
+            const res = await authFetch(url, token, {}, on401Handler || undefined);
 
             if (!res.ok) {
                 if (res.status === 401) {
@@ -183,15 +165,15 @@ export const useStore = create<State>((set, get) => ({
     },
 
     fetchSummary: async () => {
-        const { token, budget } = get();
+        const { token, budget, on401Handler } = get();
 
         try {
             const periodId = budget?.period?.id;
             const url = periodId
-                ? `${API_URL}/transactions/summary?periodId=${periodId}`
-                : `${API_URL}/transactions/summary?periodId=default`;
+                ? `/transactions/summary?periodId=${periodId}`
+                : `/transactions/summary?periodId=default`;
 
-            const res = await authFetch(url, token);
+            const res = await authFetch(url, token, {}, on401Handler || undefined);
 
             if (!res.ok) {
                 throw new Error("Failed to fetch summary");
@@ -205,12 +187,12 @@ export const useStore = create<State>((set, get) => ({
     },
 
     fetchGoogleData: async () => {
-        const { token } = get();
+        const { token, on401Handler } = get();
 
         try {
             const [sheetRes, folderRes] = await Promise.all([
-                authFetch(`${API_URL}/google/sheets/current`, token),
-                authFetch(`${API_URL}/google/drive/folder`, token),
+                authFetch(`/google/sheets/current`, token, {}, on401Handler || undefined),
+                authFetch(`/google/drive/folder`, token, {}, on401Handler || undefined),
             ]);
 
             if (sheetRes.ok) {
@@ -228,14 +210,14 @@ export const useStore = create<State>((set, get) => ({
     },
 
     updateBudget: async (data) => {
-        const { budget, token } = get();
+        const { budget, token, on401Handler } = get();
         if (!budget) return;
 
         try {
-            const res = await authFetch(`${API_URL}/budgets/${budget.period.id}`, token, {
+            const res = await authFetch(`/budgets/${budget.period.id}`, token, {
                 method: "PUT",
                 body: JSON.stringify(data),
-            });
+            }, on401Handler || undefined);
 
             if (!res.ok) {
                 throw new Error("Failed to update budget");
@@ -250,6 +232,7 @@ export const useStore = create<State>((set, get) => ({
     reset: () => {
         set({
             token: null,
+            on401Handler: null,
             budget: null,
             transactions: [],
             summary: null,
@@ -260,4 +243,3 @@ export const useStore = create<State>((set, get) => ({
         });
     },
 }));
-

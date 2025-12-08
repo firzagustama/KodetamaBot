@@ -14,11 +14,12 @@ type Tab = "dashboard" | "budget" | "transactions" | "google";
 const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME;
 
 function App() {
-    const { ready, expand, webApp, requestFullscreen } = useTelegram();
+    const { ready, expand, webApp, requestFullscreen, initData } = useTelegram();
     const { token, authenticated, loading: authLoading } = useAuth();
     const { budget } = useStore();
 
     const setToken = useStore((state) => state.setToken);
+    const setOn401Handler = useStore((state) => state.setOn401Handler);
     const fetchBudget = useStore((state) => state.fetchBudget);
     const fetchTransactions = useStore((state) => state.fetchTransactions);
 
@@ -72,6 +73,51 @@ function App() {
             setToken(token);
         }
     }, [token, setToken]);
+
+    // ✅ Set up 401 handler for seamless token renewal
+    useEffect(() => {
+        const handle401 = async (): Promise<string | null> => {
+            if (!initData) {
+                console.log('[401] No Telegram initData available for re-auth');
+                return null;
+            }
+
+            try {
+                console.log('[401] Attempting re-authentication with Telegram...');
+
+                const response = await fetch('/api/auth/telegram', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ initData }),
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    console.error('[401] Re-auth failed:', data.error);
+                    return null;
+                }
+
+                console.log('[401] Re-auth successful, got new token');
+                const newToken = data.token;
+
+                if (newToken) {
+                    setToken(newToken);
+                    localStorage.setItem('auth_token', newToken);
+                    return newToken;
+                }
+
+                return null;
+            } catch (error) {
+                console.error('[401] Re-auth error:', error);
+                return null;
+            }
+        };
+
+        setOn401Handler(handle401);
+    }, [initData, setToken, setOn401Handler]);
 
     // ✅ Fetch budget/transactions in background
     useEffect(() => {

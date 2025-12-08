@@ -36,15 +36,15 @@ export function useAuth(): UseAuthReturn {
                     }
                 }
 
-                // 2. If in Telegram Mini App, use initData
-                if (webApp && initData) {
+                // 2. Telegram Auth
+                if (initData && webApp) {
                     console.log("Authenticating with Telegram Mini App initData");
                     const response = await fetch("/api/auth/telegram", {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
                         },
-                        body: JSON.stringify({ initData }),
+                        body: JSON.stringify({ initData: initData }),
                     });
 
                     if (!response.ok) {
@@ -53,15 +53,11 @@ export function useAuth(): UseAuthReturn {
                     }
 
                     const data = await response.json();
-                    console.log("Mini App auth successful");
                     setTokenState(data.token);
                     localStorage.setItem("auth_token", data.token);
                     setError(null);
-                } else if (!webApp) {
-                    // 3. Not in Telegram Mini App, and no stored token
-                    console.log("Not in Mini App, showing widget login");
-                    setError(null); // Don't show error, just show login page
                 }
+
             } catch (err) {
                 console.error("Auth error:", err);
                 setError(err instanceof Error ? err.message : "Authentication failed");

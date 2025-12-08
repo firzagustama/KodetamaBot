@@ -1,8 +1,9 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import terminal from "vite-plugin-terminal";
 
 export default defineConfig({
-    plugins: [react()],
+    plugins: [react(), terminal({ console: "terminal" })],
     server: {
         allowedHosts: true,
 

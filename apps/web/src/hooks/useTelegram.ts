@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import { init, useRawInitData } from "@tma.js/sdk-react";
 import {
     ready as bridgeReady,
     expand as bridgeExpand,
@@ -74,7 +75,10 @@ interface TelegramUser {
     language_code?: string;
 }
 
+init();
+
 export function useTelegram() {
+    const initData = useRawInitData();
     const [ready, setReady] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
@@ -82,7 +86,6 @@ export function useTelegram() {
     const [webApp] = useState(() => window.Telegram?.WebApp);
 
     const user = webApp?.initDataUnsafe?.user;
-    const initData = webApp?.initData;
     const isFullscreenSupported = typeof webApp?.isFullscreen !== 'undefined';
 
     useEffect(() => {
@@ -95,8 +98,8 @@ export function useTelegram() {
                     bridgeReady();
 
                     // Initialize states
-                    setIsFullscreen(webApp.isFullscreen || false);
-                    setIsExpanded(webApp.isExpanded || false);
+                    setIsFullscreen(true);
+                    setIsExpanded(true);
 
                     // Small delay before setting ready state (iOS fix)
                     await new Promise(resolve => setTimeout(resolve, 100));
