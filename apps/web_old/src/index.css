@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Telegram Mini App theme variables (for when in Telegram) */
+:root {
+  --tg-theme-bg-color: #ffffff;
+  --tg-theme-text-color: #000000;
+  --tg-theme-button-color: #0ea5e9;
+  --tg-theme-button-text-color: #ffffff;
+}
+
+.dark {
+  --tg-theme-bg-color: #0f172a;
+  --tg-theme-text-color: #f1f5f9;
+  --tg-theme-button-color: #38bdf8;
+}
+
+/* DaisyUI will handle all other theme variables automatically */
+
+body {
+  font-family: "Inter", system-ui, "sans-serif";
+  /* DaisyUI uses bg-base-100 and text-base-content */
+  @apply bg-base-100 text-base-content;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Custom scrollbar with DaisyUI colors */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-neutral rounded-full;
+}
+
+/* DaisyUI Card style */
+.glass-card {
+  @apply bg-base-100 bg-opacity-80 backdrop-blur-sm border border-base-300 shadow-lg;
+}
+
+/* DaisyUI Progress bar style */
+.progress-bar {
+  @apply h-2 rounded-full bg-base-200 overflow-hidden;
+}
+
+.progress-fill {
+  @apply h-full rounded-full transition-all duration-300;
+}

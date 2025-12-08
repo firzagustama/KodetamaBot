@@ -1,34 +1,37 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import terminal from "vite-plugin-terminal";
+import react from '@vitejs/plugin-react-swc';
+import { defineConfig } from 'vite';
+import mkcert from 'vite-plugin-mkcert';
+import tsconfigPaths from 'vite-tsconfig-paths';
 
+// https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [
-        react(),
-        ...(process.env.NODE_ENV === 'development' ? [terminal({ console: "terminal" })] : [])
-    ],
-    server: {
-        allowedHosts: true,
-
-        port: 5173,
-        strictPort: true,
-
-        proxy: {
-            "/api": {
-                target: "http://localhost:3000",
-                changeOrigin: true,
-                secure: false
-            },
-        },
+  base: '/reactjs-template/',
+  css: {
+    preprocessorOptions: {
+      scss: {
+        api: 'modern',
+      },
     },
-    build: {
-        outDir: "dist",
-        sourcemap: true,
-        rollupOptions: {
-            external: ["/@id/__x00__virtual:terminal/console"],
-        },
-    },
-    define: {
-        "process.env.ADMIN_TELEGRAM_ID": JSON.stringify(process.env.ADMIN_TELEGRAM_ID),
-    },
+  },
+  plugins: [
+    // Allows using React dev server along with building a React application with Vite.
+    // https://npmjs.com/package/@vitejs/plugin-react-swc
+    react(),
+    // Allows using the compilerOptions.paths property in tsconfig.json.
+    // https://www.npmjs.com/package/vite-tsconfig-paths
+    tsconfigPaths(),
+    // Creates a custom SSL certificate valid for the local machine.
+    // Using this plugin requires admin rights on the first dev-mode launch.
+    // https://www.npmjs.com/package/vite-plugin-mkcert
+    process.env.HTTPS && mkcert(),
+  ],
+  build: {
+    target: 'esnext',
+    minify: 'terser'
+  },
+  publicDir: './public',
+  server: {
+    // Exposes your dev server and makes it accessible for the devices in the same network.
+    host: true,
+  },
 });

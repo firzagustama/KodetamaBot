@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { initData, useSignal } from "@tma.js/sdk-react";
+import { useTelegram } from "./useTelegram";
 
 interface UseAuthReturn {
     token: string | null;
@@ -11,8 +11,7 @@ interface UseAuthReturn {
 }
 
 export function useAuth(): UseAuthReturn {
-    const initDataState = useSignal(initData.state);
-    // Mini app is ready when initData is available
+    const { initData, webApp } = useTelegram();
     const [token, setTokenState] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -20,7 +19,7 @@ export function useAuth(): UseAuthReturn {
     useEffect(() => {
         const authenticateUser = async () => {
             try {
-                // 1. Check if we have a stored token (from widget login or previous auth)
+                // 1. Check if we have a stored token (from widget login)
                 const storedToken = localStorage.getItem("auth_token");
                 if (storedToken) {
                     console.log("Found stored token, verifying...");
@@ -37,16 +36,15 @@ export function useAuth(): UseAuthReturn {
                     }
                 }
 
-                // 2. Telegram Mini App auth
-                if (initDataState) {
+                // 2. Telegram Auth
+                if (initData && webApp) {
                     console.log("Authenticating with Telegram Mini App initData");
-
-                    const response = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/auth/telegram`, {
+                    const response = await fetch("/api/auth/telegram", {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
                         },
-                        body: JSON.stringify({ initData: initDataState }),
+                        body: JSON.stringify({ initData: initData }),
                     });
 
                     if (!response.ok) {
@@ -69,7 +67,7 @@ export function useAuth(): UseAuthReturn {
         };
 
         authenticateUser();
-    }, [initDataState]);
+    }, [initData, webApp]);
 
     const setToken = (newToken: string) => {
         console.log("Setting new token");
@@ -106,7 +104,7 @@ export function useAuth(): UseAuthReturn {
 // Helper function to verify token validity
 async function verifyToken(token: string): Promise<boolean> {
     try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/auth/me`, {
+        const response = await fetch("/api/auth/me", {
             method: "GET",
             headers: {
                 Authorization: `Bearer ${token}`,
