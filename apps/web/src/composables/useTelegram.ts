@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { ref, computed, onMounted, onUnmounted, type Ref } from "vue";
 import {
     ready as bridgeReady,
     expand as bridgeExpand,
@@ -75,120 +75,117 @@ interface TelegramUser {
 }
 
 export function useTelegram() {
-    const [ready, setReady] = useState(false);
-    const [isFullscreen, setIsFullscreen] = useState(false);
-    const [isExpanded, setIsExpanded] = useState(false);
-    const isMountedRef = useRef(true);
-    const [webApp] = useState(() => window.Telegram?.WebApp);
+    const ready = ref(false);
+    const isFullscreen = ref(false);
+    const isExpanded = ref(false);
+    const isMounted = ref(true);
+    const webApp = ref(window.Telegram?.WebApp);
 
-    const user = webApp?.initDataUnsafe?.user;
-    const initData = webApp?.initData;
-    const isFullscreenSupported = typeof webApp?.isFullscreen !== 'undefined';
+    const user = computed(() => webApp.value?.initDataUnsafe?.user);
+    const initData = computed(() => webApp.value?.initData);
+    const isFullscreenSupported = computed(() => typeof webApp.value?.isFullscreen !== 'undefined');
 
-    useEffect(() => {
-        isMountedRef.current = true;
+    onMounted(async () => {
+        if (webApp.value) {
+            try {
+                // Use bridge implementation for cross-platform support
+                bridgeReady();
 
-        const initWebApp = async () => {
-            if (webApp) {
-                try {
-                    // Use bridge implementation for cross-platform support
-                    bridgeReady();
+                // Initialize states
+                isFullscreen.value = webApp.value.isFullscreen || false;
+                isExpanded.value = webApp.value.isExpanded || false;
 
-                    // Initialize states
-                    setIsFullscreen(webApp.isFullscreen || false);
-                    setIsExpanded(webApp.isExpanded || false);
+                // Small delay before setting ready state (iOS fix)
+                await new Promise(resolve => setTimeout(resolve, 100));
 
-                    // Small delay before setting ready state (iOS fix)
-                    await new Promise(resolve => setTimeout(resolve, 100));
-
-                    if (isMountedRef.current) {
-                        setReady(true);
-                        console.log('✅ Telegram WebApp initialized');
-                    }
-                } catch (error) {
-                    console.error("Error initializing Telegram WebApp:", error);
-                    if (isMountedRef.current) {
-                        setReady(true);
-                    }
+                if (isMounted.value) {
+                    ready.value = true;
+                    console.log('✅ Telegram WebApp initialized');
+                }
+            } catch (error) {
+                console.error("Error initializing Telegram WebApp:", error);
+                if (isMounted.value) {
+                    ready.value = true;
                 }
             }
-        };
+        } else {
+            // No webApp available, still set ready
+            ready.value = true;
+        }
+    });
 
-        initWebApp();
-
-        return () => {
-            isMountedRef.current = false;
-        };
-    }, [webApp]);
+    onUnmounted(() => {
+        isMounted.value = false;
+    });
 
     /**
      * Expand viewport using bridge
      */
-    const expand = useCallback(() => {
+    const expand = () => {
         try {
             bridgeExpand();
-            setTimeout(() => setIsExpanded(true), 100);
+            setTimeout(() => isExpanded.value = true, 100);
         } catch (error) {
             console.error("Error expanding WebApp:", error);
         }
-    }, []);
+    };
 
     /**
      * Close Mini App using bridge
      */
-    const close = useCallback(() => {
+    const close = () => {
         try {
             bridgeClose();
         } catch (error) {
             console.error("Error closing WebApp:", error);
         }
-    }, []);
+    };
 
     /**
      * Request fullscreen mode (v8.0+)
      */
-    const requestFullscreen = useCallback(() => {
+    const requestFullscreen = () => {
         try {
             bridgeRequestFullscreen();
             setTimeout(() => {
-                setIsFullscreen(true);
+                isFullscreen.value = true;
                 console.log("✅ Fullscreen mode activated");
             }, 100);
         } catch (error) {
             console.error("Error requesting fullscreen:", error);
         }
-    }, []);
+    };
 
     /**
      * Exit fullscreen mode
      */
-    const exitFullscreen = useCallback(() => {
+    const exitFullscreen = () => {
         try {
             bridgeExitFullscreen();
             setTimeout(() => {
-                setIsFullscreen(false);
+                isFullscreen.value = false;
                 console.log("✅ Exited fullscreen mode");
             }, 100);
         } catch (error) {
             console.error("Error exiting fullscreen:", error);
         }
-    }, []);
+    };
 
     /**
      * Toggle fullscreen mode
      */
-    const toggleFullscreen = useCallback(() => {
-        if (isFullscreen) {
+    const toggleFullscreen = () => {
+        if (isFullscreen.value) {
             exitFullscreen();
         } else {
             requestFullscreen();
         }
-    }, [isFullscreen, requestFullscreen, exitFullscreen]);
+    };
 
     /**
      * Show main button
      */
-    const showMainButton = useCallback((text: string, onClick: () => void) => {
+    const showMainButton = (text: string, onClick: () => void) => {
         try {
             setupMainButton({
                 is_visible: true,
@@ -197,55 +194,55 @@ export function useTelegram() {
             });
 
             // Also set up click handler using WebApp API
-            if (webApp?.MainButton) {
-                webApp.MainButton.onClick(onClick);
+            if (webApp.value?.MainButton) {
+                webApp.value.MainButton.onClick(onClick);
             }
         } catch (error) {
             console.error("Error showing main button:", error);
         }
-    }, [webApp]);
+    };
 
     /**
      * Hide main button
      */
-    const hideMainButton = useCallback(() => {
+    const hideMainButton = () => {
         try {
             setupMainButton({ is_visible: false });
         } catch (error) {
             console.error("Error hiding main button:", error);
         }
-    }, []);
+    };
 
     /**
      * Show back button
      */
-    const showBackButton = useCallback((onClick?: () => void) => {
+    const showBackButton = (onClick?: () => void) => {
         try {
             setupBackButton(true);
 
-            if (onClick && webApp?.BackButton) {
-                webApp.BackButton.onClick(onClick);
+            if (onClick && webApp.value?.BackButton) {
+                webApp.value.BackButton.onClick(onClick);
             }
         } catch (error) {
             console.error("Error showing back button:", error);
         }
-    }, [webApp]);
+    };
 
     /**
      * Hide back button
      */
-    const hideBackButton = useCallback(() => {
+    const hideBackButton = () => {
         try {
             setupBackButton(false);
         } catch (error) {
             console.error("Error hiding back button:", error);
         }
-    }, []);
+    };
 
     /**
      * Trigger haptic feedback
      */
-    const vibrate = useCallback((type: 'light' | 'medium' | 'heavy' | 'success' | 'error' | 'warning') => {
+    const vibrate = (type: 'light' | 'medium' | 'heavy' | 'success' | 'error' | 'warning') => {
         try {
             if (type === 'success' || type === 'error' || type === 'warning') {
                 hapticFeedback('notification', { notification_type: type });
@@ -255,29 +252,29 @@ export function useTelegram() {
         } catch (error) {
             console.error("Error triggering haptic feedback:", error);
         }
-    }, []);
+    };
 
     return {
-        webApp,
+        webApp: webApp as Ref<TelegramWebApp | undefined>,
         user,
         initData,
-        ready,
+        ready: ready as Ref<boolean>,
 
         // Viewport control
         expand,
         close,
-        isExpanded,
+        isExpanded: isExpanded as Ref<boolean>,
 
         // Fullscreen control (v8.0+)
         requestFullscreen,
         exitFullscreen,
         toggleFullscreen,
-        isFullscreen,
+        isFullscreen: isFullscreen as Ref<boolean>,
         isFullscreenSupported,
 
         // Viewport info
-        viewportHeight: webApp?.viewportHeight || 0,
-        viewportStableHeight: webApp?.viewportStableHeight || 0,
+        viewportHeight: computed(() => webApp.value?.viewportHeight || 0),
+        viewportStableHeight: computed(() => webApp.value?.viewportStableHeight || 0),
 
         // Buttons
         showMainButton,
