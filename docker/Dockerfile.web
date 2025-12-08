@@ -17,7 +17,6 @@ ARG VITE_API_URL
 ARG VITE_BOT_USERNAME
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_BOT_USERNAME=$VITE_BOT_USERNAME
-RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @kodetama/web build
 
 # Serve with nginx
