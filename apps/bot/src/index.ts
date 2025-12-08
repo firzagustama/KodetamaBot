@@ -556,20 +556,21 @@ async function setBotCommands() {
     ]);
 
     // Set Menu Button to Web App if URL is configured
-    if (process.env.WEB_APP_URL) {
-        try {
-            await bot.api.setChatMenuButton({
-                menu_button: {
-                    type: "web_app",
-                    text: "Dashboard",
-                    web_app: { url: process.env.WEB_APP_URL },
-                },
-            });
-            logger.info("Bot menu button set to Web App");
-        } catch (error) {
-            logger.error("Failed to set bot menu button:", error);
-        }
-    }
+    // if (process.env.WEB_APP_URL) {
+    //     try {
+    //         await bot.api.setChatMenuButton({
+    //             menu_button: {
+    //                 type: "web_app",
+    //                 text: "Dashboard",
+    //                 web_app: { url: process.env.WEB_APP_URL },
+    //             },
+    //         });
+    //         logger.info("Bot menu button set to Web App");
+    //     } catch (error) {
+    //         logger.error("Failed to set bot menu button:", error);
+    //     }
+    // }
+    logger.info("Set menu button from botfather")
 
     logger.info("Bot commands menu set");
 }
