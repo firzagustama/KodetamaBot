@@ -35,19 +35,10 @@ function normalizeThemeParams(
  */
 export async function init(options: {
   debug: boolean;
-  eruda: boolean;
   mockForMacOS: boolean;
 }): Promise<void> {
   setDebug(options.debug);
   initSDK();
-
-  // ✅ Eruda
-  if (options.eruda) {
-    void import("eruda").then(({ default: eruda }) => {
-      eruda.init();
-      eruda.position({ x: window.innerWidth - 50, y: 0 });
-    });
-  }
 
   // ✅ macOS Telegram workaround
   if (options.mockForMacOS) {
