@@ -10,6 +10,7 @@ import { userRoutes } from "./routes/users.js";
 import { budgetRoutes } from "./routes/budgets.js";
 import { transactionRoutes } from "./routes/transactions.js";
 import { googleRoutes } from "./routes/google.js";
+import { loggingMiddleware } from "./middleware/loggingMiddleware.js";
 
 // =============================================================================
 // CONFIGURATION

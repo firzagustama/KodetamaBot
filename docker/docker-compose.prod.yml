@@ -77,16 +77,6 @@ services:
     ports:
       - "${API_PORT:-3002}:3000" # Map external to internal
 
-  # Mini App (Static)
-  web:
-    image: ghcr.io/firzagustama/kodetamabot-web:latest
-    container_name: kodetama_web
-    restart: unless-stopped
-    env_file:
-      - .env
-    ports:
-      - "8081:80"
-
 volumes:
   postgres_data:
   redis_data:

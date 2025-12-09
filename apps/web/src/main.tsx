@@ -20,7 +20,6 @@ try {
     }).then(() => {
         root.render(
             <StrictMode>
-                SUCCESS RENDERED {launchParams.tgWebAppPlatform}
                 <App />
             </StrictMode>
         )

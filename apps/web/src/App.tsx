@@ -273,7 +273,7 @@ function App() {
     return (
         <div className="min-h-screen bg-base-100 text-base-content transition-colors duration-300">
             {/* Header - Fixed at top */}
-            <header className="fixed pt-16 left-0 right-0 z-10 text-primary-content bg-base-200 p-4 shadow-lg">
+            <header className="fixed left-0 right-0 z-10 text-primary-content bg-base-200 py-16 px-4 pb-4 shadow-lg">
                 <div className="flex items-center gap-3">
                     <div className="flex-1 text-center">
                         <h1 className="font-semibold">Periode</h1>

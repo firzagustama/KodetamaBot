@@ -7,7 +7,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  # IMAGE_NAME: ${{ toLower(github.repository) }}
 
 jobs:
   lint-and-typecheck:
@@ -87,12 +86,45 @@ jobs:
             VITE_API_URL=${{ secrets.VITE_API_URL }}
             VITE_BOT_USERNAME=${{ secrets.VITE_BOT_USERNAME }}
 
-  deploy:
-    needs: build-and-push
+  build-web:
+    needs: [lint-and-typecheck, changes]
+    if: contains(needs.changes.outputs.services, 'web')
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
     steps:
-      - name: Deploy to VPS
+      - uses: actions/checkout@v4
+      
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        
+      - name: Build web app
+        run: pnpm --filter web build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_BOT_USERNAME: ${{ secrets.VITE_BOT_USERNAME }}
+          
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: apps/web/dist
+          retention-days: 1
+
+  deploy:
+    needs: [build-and-push, build-web]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && always() && (needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped')
+    steps:
+      - name: Deploy Docker services to VPS
+        if: needs.build-and-push.result == 'success'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -103,3 +135,22 @@ jobs:
             docker compose pull
             docker compose up -d
             docker system prune -f
+
+      - name: Download web build artifacts
+        if: needs.build-web.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: web-build
+          path: ./dist
+
+      - name: Deploy web to VPS
+        if: needs.build-web.result == 'success'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "./dist/*"
+          target: "/var/www/finance.kodetama.id"
+          strip_components: 1
+          rm: true

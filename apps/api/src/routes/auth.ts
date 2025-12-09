@@ -4,6 +4,7 @@ import { db } from "@kodetama/db";
 import { users, telegramAccounts } from "@kodetama/db/schema";
 import { eq } from "drizzle-orm";
 import { logger } from "../utils/logger.js";
+import { loggingMiddleware } from "../middleware/loggingMiddleware.js";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "";
 
@@ -180,12 +181,14 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
      */
     fastify.post<{
         Body: { initData: string };
-    }>("/telegram", async (request, reply) => {
+    }>("/telegram", {
+        preHandler: [loggingMiddleware],
+    }, async (request, reply) => {
         const { initData } = request.body;
         const clientIP = request.ip || 'unknown';
         const userAgent = request.headers['user-agent'] || 'unknown';
 
-        logger.info("Telegram Mini App auth attempt", { ip: clientIP, userAgent, body: request.body });
+        logger.info("Telegram Mini App auth attempt", { ip: clientIP, userAgent });
 
         if (!initData) {
             logger.warn("Telegram auth failed: missing initData", { ip: clientIP });
@@ -263,7 +266,9 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
      */
     fastify.post<{
         Body: TelegramWidgetData;
-    }>("/telegram-widget", async (request, reply) => {
+    }>("/telegram-widget", {
+        preHandler: [loggingMiddleware],
+    }, async (request, reply) => {
         const authData = request.body;
         const clientIP = request.ip || 'unknown';
         const userAgent = request.headers['user-agent'] || 'unknown';
@@ -374,7 +379,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
      * Get current authenticated user
      */
     fastify.get("/me", {
-        preHandler: async (request, reply) => {
+        preHandler: [async (request, reply) => {
             try {
                 await request.jwtVerify();
             } catch (err) {
@@ -384,16 +389,9 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
                 });
                 return reply.status(401).send({ error: "Unauthorized" });
             }
-        },
+        }, loggingMiddleware],
     }, async (request) => {
         const payload = request.user as { id: string; telegramId: number };
-        const clientIP = request.ip || 'unknown';
-
-        logger.info("User profile request", {
-            userId: payload.id,
-            telegramId: payload.telegramId,
-            ip: clientIP
-        });
 
         try {
             const user = await db.query.users.findFirst({
@@ -411,11 +409,6 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
                 });
                 return { error: "User not found" };
             }
-
-            logger.info("User profile served successfully", {
-                userId: payload.id,
-                tier: user.tier
-            });
 
             return {
                 user: {
