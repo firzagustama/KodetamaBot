@@ -15,7 +15,7 @@ try {
 
     await init({
         debug,
-        mockForMacOS: platform === 'macos',
+        mockForMacOS: platform === 'macos ',
     }).then(() => {
         root.render(
             <StrictMode>

@@ -31,7 +31,7 @@ export async function loggingMiddleware(
                     resBody = resBody.substring(0, 500) + "...";
                 }
             } catch {
-                resBody = "[Unable to stringify]";
+                resBody = "[ Unable to stringify ]";
             }
         }
 
