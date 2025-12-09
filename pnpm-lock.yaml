@@ -115,9 +115,6 @@ importers:
       '@tma.js/sdk-react':
         specifier: ^3.0.11
         version: 3.0.11(@types/react@18.3.27)(react@18.3.1)(typescript@5.9.3)
-      eruda:
-        specifier: ^3.4.3
-        version: 3.4.3
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -2985,10 +2982,6 @@ packages:
 
   /error-kid@1.0.2:
     resolution: {integrity: sha512-Xvq0ZrY/azCbREWKt9E/3mXDF0MkuEVVvHnOKutUhtq2O8pyneEixQ4nSFkA19Xfn+/OVSg//iVG0dxIDj7DIA==}
-    dev: false
-
-  /eruda@3.4.3:
-    resolution: {integrity: sha512-J2TsF4dXSspOXev5bJ6mljv0dRrxj21wklrDzbvPmYaEmVoC+2psylyRi70nUPFh1mTQfIBsSusUtAMZtUN+/w==}
     dev: false
 
   /es-define-property@1.0.1:
