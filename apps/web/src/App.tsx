@@ -14,7 +14,7 @@ type Tab = "dashboard" | "budget" | "transactions" | "google";
 const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME;
 
 function App() {
-    const { ready, expand, webApp, requestFullscreen, initData } = useTelegram();
+    const { ready, expand, webApp, requestFullscreen, initDataRaw } = useTelegram();
     const { token, authenticated, loading: authLoading } = useAuth();
     const { budget } = useStore();
 
@@ -77,7 +77,7 @@ function App() {
     // ✅ Set up 401 handler for seamless token renewal
     useEffect(() => {
         const handle401 = async (): Promise<string | null> => {
-            if (!initData) {
+            if (!initDataRaw) {
                 console.log('[401] No Telegram initData available for re-auth');
                 return null;
             }
@@ -90,7 +90,7 @@ function App() {
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ initData }),
+                    body: JSON.stringify({ initData: initDataRaw }),
                 });
 
                 const data = await response.json();
@@ -117,7 +117,7 @@ function App() {
         };
 
         setOn401Handler(handle401);
-    }, [initData, setToken, setOn401Handler]);
+    }, [initDataRaw, setToken, setOn401Handler]);
 
     // ✅ Fetch budget/transactions in background
     useEffect(() => {

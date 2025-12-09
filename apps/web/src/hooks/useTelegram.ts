@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { init, useRawInitData } from "@tma.js/sdk-react";
+import { initData, useSignal } from "@tma.js/sdk-react";
 import {
     ready as bridgeReady,
     expand as bridgeExpand,
@@ -75,10 +75,9 @@ interface TelegramUser {
     language_code?: string;
 }
 
-init();
 
 export function useTelegram() {
-    const initData = useRawInitData();
+    const initDataRaw = useSignal(initData.raw)
     const [ready, setReady] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
@@ -263,7 +262,7 @@ export function useTelegram() {
     return {
         webApp,
         user,
-        initData,
+        initDataRaw,
         ready,
 
         // Viewport control

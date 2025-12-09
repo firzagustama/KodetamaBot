@@ -11,7 +11,7 @@ interface UseAuthReturn {
 }
 
 export function useAuth(): UseAuthReturn {
-    const { initData, webApp } = useTelegram();
+    const { initDataRaw, webApp } = useTelegram();
     const [token, setTokenState] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -37,14 +37,14 @@ export function useAuth(): UseAuthReturn {
                 }
 
                 // 2. Telegram Auth
-                if (initData && webApp) {
-                    console.log("Authenticating with Telegram Mini App initData");
+                if (initDataRaw && webApp) {
+                    console.log("Authenticating with Telegram Mini App initDataRaw");
                     const response = await fetch("/api/auth/telegram", {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
                         },
-                        body: JSON.stringify({ initData: initData }),
+                        body: JSON.stringify({ initData: initDataRaw }),
                     });
 
                     if (!response.ok) {
@@ -67,7 +67,7 @@ export function useAuth(): UseAuthReturn {
         };
 
         authenticateUser();
-    }, [initData, webApp]);
+    }, [initDataRaw, webApp]);
 
     const setToken = (newToken: string) => {
         console.log("Setting new token");

@@ -32,6 +32,7 @@ function validateTelegramWebAppData(initData: string): { valid: boolean; user?: 
     try {
         const params = new URLSearchParams(initData);
         const hash = params.get("hash");
+        console.log("hash:", hash);
         params.delete("hash");
 
         // Sort params alphabetically
@@ -184,7 +185,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
         const clientIP = request.ip || 'unknown';
         const userAgent = request.headers['user-agent'] || 'unknown';
 
-        logger.info("Telegram Mini App auth attempt", { ip: clientIP, userAgent });
+        logger.info("Telegram Mini App auth attempt", { ip: clientIP, userAgent, body: request.body });
 
         if (!initData) {
             logger.warn("Telegram auth failed: missing initData", { ip: clientIP });
