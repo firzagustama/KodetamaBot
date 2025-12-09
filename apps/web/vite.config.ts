@@ -23,6 +23,7 @@ export default defineConfig({
     },
     build: {
         outDir: "dist",
+        target: "esnext",
         sourcemap: true,
         rollupOptions: {
             external: ["/@id/__x00__virtual:terminal/console"],
