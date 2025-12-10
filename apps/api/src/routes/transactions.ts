@@ -5,7 +5,21 @@ import { eq, desc, sql, and } from "drizzle-orm";
 
 import { authenticate } from "../middleware/auth.js";
 import { logger } from "../utils/logger.js";
-import { loggingMiddleware, loggingMiddleware } from "../middleware/loggingMiddleware.js";
+import { loggingMiddleware } from "../middleware/loggingMiddleware.js";
+
+// Indonesian date formatting helper
+function formatIndonesianDate(date: Date): string {
+    return date.toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+    });
+}
+
+// Helper to get date-only string (YYYY-MM-DD)
+function getDateKey(date: Date): string {
+    return date.toISOString().split('T')[0];
+}
 
 export async function transactionRoutes(fastify: FastifyInstance): Promise<void> {
 
@@ -25,7 +39,7 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
 
     /**
      * GET /transactions
-     * List transactions for current period
+     * List transactions for current period, grouped by day
      */
     fastify.get<{
         Querystring: {
@@ -51,7 +65,7 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
                 userId,
             });
             return {
-                items: [],
+                days: [],
                 total: 0,
                 page: pageNum,
                 pageSize: pageSizeNum,
@@ -60,26 +74,38 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
         }
 
         try {
-            const items = await db.query.transactions.findMany({
+            // Get period information first
+            const period = await db.query.datePeriods.findFirst({
+                where: eq(datePeriods.id, periodId),
+            });
+
+            if (!period) {
+                return {
+                    days: [],
+                    total: 0,
+                    page: pageNum,
+                    pageSize: pageSizeNum,
+                    hasMore: false,
+                };
+            }
+
+            // Get all transactions for the period to group by day
+            const allTransactions = await db.query.transactions.findMany({
                 where: eq(transactions.periodId, periodId),
                 orderBy: [desc(transactions.transactionDate)],
-                limit: pageSizeNum,
-                offset: offset,
                 with: {
                     category: true,
                 },
             });
 
-            // Get total count
-            const countResult = await db
-                .select({ count: sql<number>`count(*)` })
-                .from(transactions)
-                .where(eq(transactions.periodId, periodId));
-
-            const total = Number(countResult[0]?.count ?? 0);
-
-            return {
-                items: items.map((tx) => ({
+            // Group transactions by date
+            const transactionsByDate: Record<string, any[]> = {};
+            for (const tx of allTransactions) {
+                const dateStr = getDateKey(tx.transactionDate);
+                if (!transactionsByDate[dateStr]) {
+                    transactionsByDate[dateStr] = [];
+                }
+                transactionsByDate[dateStr].push({
                     id: tx.id,
                     type: tx.type,
                     amount: tx.amount,
@@ -87,11 +113,56 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
                     bucket: tx.bucket,
                     description: tx.description,
                     transactionDate: tx.transactionDate.toISOString(),
-                })),
-                total,
+                });
+            }
+
+            // Generate all dates in the period range (for empty days)
+            const startDate = new Date(period.startDate);
+            const endDate = new Date(period.endDate);
+            const allDatesInPeriod: string[] = [];
+            const currentDay = new Date(startDate);
+
+            while (currentDay <= endDate) {
+                allDatesInPeriod.push(getDateKey(currentDay));
+                currentDay.setDate(currentDay.getDate() + 1);
+            }
+
+            // Create paginated list of transactions (flatten for pagination)
+            const allTxs = allTransactions.slice(offset, offset + pageSizeNum);
+
+            // Group the transactions by day (only include days that have transactions in this page)
+            const daysMap: Record<string, any[]> = {};
+            for (const tx of allTxs) {
+                const dateStr = getDateKey(tx.transactionDate);
+                if (!daysMap[dateStr]) {
+                    daysMap[dateStr] = [];
+                }
+                daysMap[dateStr].push({
+                    id: tx.id,
+                    type: tx.type,
+                    amount: tx.amount,
+                    category: tx.category?.name ?? "Uncategorized",
+                    bucket: tx.bucket,
+                    description: tx.description,
+                    transactionDate: tx.transactionDate.toISOString(),
+                });
+            }
+
+            // Create final days array (only days that appear in this page)
+            const days = Object.entries(daysMap)
+                .sort(([a], [b]) => b.localeCompare(a)) // Sort by date desc
+                .map(([dateStr, dayTransactions]) => ({
+                    date: dateStr,
+                    formattedDate: formatIndonesianDate(new Date(dateStr)),
+                    transactions: dayTransactions,
+                }));
+
+            return {
+                days,
+                total: allTransactions.length,
                 page: pageNum,
                 pageSize: pageSizeNum,
-                hasMore: offset + items.length < total,
+                hasMore: offset + pageSizeNum < allTransactions.length,
             };
         } catch (err) {
             logger.error("Database error in transaction list", {
@@ -100,7 +171,7 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
                 error: err instanceof Error ? err.message : 'Unknown database error'
             });
             return {
-                items: [],
+                days: [],
                 total: 0,
                 page: pageNum,
                 pageSize: pageSizeNum,

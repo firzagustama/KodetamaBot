@@ -98,9 +98,9 @@ export async function upsertBudget(data: {
                 needsAmount: needsAmount.toString(),
                 wantsAmount: wantsAmount.toString(),
                 savingsAmount: savingsAmount.toString(),
-                needsPercentage: data.needsPercent,
-                wantsPercentage: data.wantsPercent,
-                savingsPercentage: data.savingsPercent,
+                needsPercentage: data.needsPercent.toString(),
+                wantsPercentage: data.wantsPercent.toString(),
+                savingsPercentage: data.savingsPercent.toString(),
                 updatedAt: new Date(),
             })
             .where(eq(budgets.id, existing.id));
@@ -114,9 +114,9 @@ export async function upsertBudget(data: {
         needsAmount: needsAmount.toString(),
         wantsAmount: wantsAmount.toString(),
         savingsAmount: savingsAmount.toString(),
-        needsPercentage: data.needsPercent,
-        wantsPercentage: data.wantsPercent,
-        savingsPercentage: data.savingsPercent,
+        needsPercentage: data.needsPercent.toString(),
+        wantsPercentage: data.wantsPercent.toString(),
+        savingsPercentage: data.savingsPercent.toString(),
     }).returning({ id: budgets.id });
 
     return newBudget.id;

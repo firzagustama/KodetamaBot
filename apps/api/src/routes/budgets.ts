@@ -160,9 +160,9 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
         };
 
         if (estimatedIncome) updateData.estimatedIncome = estimatedIncome;
-        if (needsPercentage !== undefined) updateData.needsPercentage = needsPercentage;
-        if (wantsPercentage !== undefined) updateData.wantsPercentage = wantsPercentage;
-        if (savingsPercentage !== undefined) updateData.savingsPercentage = savingsPercentage;
+        if (needsPercentage !== undefined) updateData.needsPercentage = needsPercentage.toString();
+        if (wantsPercentage !== undefined) updateData.wantsPercentage = wantsPercentage.toString();
+        if (savingsPercentage !== undefined) updateData.savingsPercentage = savingsPercentage.toString();
 
         // Recalculate amounts if we have the data
         if (income && needsPercentage !== undefined) {
@@ -216,9 +216,9 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
                 needsAmount: (income * needsPercentage / 100).toFixed(2),
                 wantsAmount: (income * wantsPercentage / 100).toFixed(2),
                 savingsAmount: (income * savingsPercentage / 100).toFixed(2),
-                needsPercentage,
-                wantsPercentage,
-                savingsPercentage,
+                needsPercentage: needsPercentage.toString(),
+                wantsPercentage: wantsPercentage.toString(),
+                savingsPercentage: savingsPercentage.toString(),
             })
             .returning();
 

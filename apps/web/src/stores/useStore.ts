@@ -149,11 +149,30 @@ export const useStore = create<State>((set, get) => ({
             }
 
             const data = await res.json();
-            set({
-                transactions: (data.items ?? []).map((t: Record<string, unknown>) => ({
+
+            // New format: flatten transactions from days
+            const allTransactions: Transaction[] = [];
+            if (data.days) {
+                for (const day of data.days) {
+                    for (const tx of day.transactions) {
+                        allTransactions.push({
+                            ...tx,
+                            amount: parseFloat(tx.amount),
+                        });
+                    }
+                }
+            }
+
+            // Backward compatibility: also check for old items format
+            if (data.items) {
+                allTransactions.push(...data.items.map((t: Record<string, unknown>) => ({
                     ...t,
                     amount: parseFloat(t.amount as string),
-                })),
+                })));
+            }
+
+            set({
+                transactions: allTransactions,
                 loading: false,
             });
         } catch (err) {

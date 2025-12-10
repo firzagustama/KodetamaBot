@@ -2,8 +2,6 @@ import { useStore } from "../stores/useStore";
 import { useEffect } from "react";
 import {
     Wallet,
-    TrendingUp,
-    TrendingDown,
     Target,
     ShoppingBag,
     Home,
@@ -185,7 +183,7 @@ export default function Dashboard() {
 
 /* --- SUB COMPONENTS --- */
 
-function BucketCard({ icon, label, allocated, spent, colorClass, barClass }: any) {
+function BucketCard({ icon, label, allocated, spent, colorClass }: any) {
     const remaining = allocated - spent;
     const isNegative = remaining < 0;
 

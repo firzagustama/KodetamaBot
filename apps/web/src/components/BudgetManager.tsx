@@ -189,7 +189,6 @@ export default function BudgetManager() {
                             <ReadOnlyRow
                                 label="Kebutuhan (Needs)"
                                 amount={needs}
-                                total={income}
                                 color="text-success"
                                 icon={<Home size={18} />}
                             />
@@ -214,7 +213,6 @@ export default function BudgetManager() {
                             <ReadOnlyRow
                                 label="Keinginan (Wants)"
                                 amount={wants}
-                                total={income}
                                 color="text-warning"
                                 icon={<ShoppingBag size={18} />}
                             />
@@ -283,7 +281,7 @@ export default function BudgetManager() {
 }
 
 // Sub-component for Read-only view
-function ReadOnlyRow({ label, amount, total, color, icon }: any) {
+function ReadOnlyRow({ label, amount, color, icon }: any) {
     return (
         <div className="flex items-center justify-between group">
             <div className="flex items-center gap-3">
