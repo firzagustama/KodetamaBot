@@ -73,10 +73,8 @@ export type Transaction = z.infer<typeof TransactionSchema>;
 // =============================================================================
 // AI PARSING SCHEMAS
 // =============================================================================
-
-export const ParsedTransactionSchema = z.object({
+const Transaction = z.object({
     type: z.enum(TX_TYPES),
-    message: z.string(),
     amount: z.number().positive(),
     category: z.string(),
     bucket: z.string(),
@@ -84,6 +82,12 @@ export const ParsedTransactionSchema = z.object({
     confidence: z.number().min(0).max(1),
     needsConfirmation: z.boolean().optional(), // for amounts under 1000
     suggestedAmount: z.number().optional(), // suggested if needs confirmation
+});
+
+export const ParsedTransactionSchema = z.object({
+    isMultiple: z.boolean().optional(),
+    message: z.string(),
+    transactions: z.array(Transaction),
 });
 export type ParsedTransaction = z.infer<typeof ParsedTransactionSchema>;
 

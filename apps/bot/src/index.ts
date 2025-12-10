@@ -15,13 +15,13 @@ import {
     isUserRegistered,
     getUserByTelegramId,
     getBudgetSummary,
-    getLastTransaction,
     deleteTransaction,
     getPeriodTotals,
     resolvePeriodId,
     getCurrentPeriod,
     saveTransaction,
     trackAiUsage,
+    getTransactions,
 } from "./services/index.js";
 
 // =============================================================================
@@ -54,8 +54,8 @@ bot.use(
             step: "idle",
             registrationData: null,
             onboardingData: null,
-            lastTransactionId: null,
-            pendingTransaction: null,
+            lastTransactionIds: [],
+            pendingTransactions: [],
         }),
     })
 );
@@ -90,17 +90,12 @@ async function saveAndConfirmTransaction(
     const transactionId = await saveTransaction({
         userId,
         periodId,
-        type: parsed.type,
-        amount: parsed.amount,
-        description: parsed.description,
-        category: parsed.category,
-        bucket: parsed.bucket,
+        transaction: parsed,
         rawMessage,
-        aiConfidence: parsed.confidence,
     });
 
     // Store last transaction ID in session for undo
-    ctx.session.lastTransactionId = transactionId;
+    ctx.session.lastTransactionIds = [transactionId];
 
     // Track AI usage
     if (usage) {
@@ -332,17 +327,17 @@ bot.command("undo", async (ctx) => {
         }
 
         // Get last transaction from session or DB
-        const lastTxId = ctx.session.lastTransactionId;
-        const lastTx = await getLastTransaction(account.userId);
+        const lastTxIds = ctx.session.lastTransactionIds;
+        const lastTxs = await getTransactions(lastTxIds);
 
-        if (!lastTx) {
+        if (!lastTxs) {
             await ctx.reply("Tidak ada transaksi yang bisa dibatalkan.");
             return;
         }
 
         // Only allow undo if it matches session or is recent (within 5 minutes)
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-        if (lastTx.createdAt < fiveMinutesAgo && lastTx.id !== lastTxId) {
+        if (lastTxs[0].createdAt < fiveMinutesAgo && lastTxs[0].id !== lastTxIds[0]) {
             await ctx.reply(
                 "Transaksi terakhir sudah lebih dari 5 menit yang lalu.\n" +
                 "Untuk keamanan, hanya transaksi terbaru yang bisa dibatalkan."
@@ -350,18 +345,22 @@ bot.command("undo", async (ctx) => {
             return;
         }
 
-        const deleted = await deleteTransaction(lastTx.id);
-        if (deleted) {
-            ctx.session.lastTransactionId = null;
-            await ctx.reply(
-                "✅ *Transaksi Dibatalkan*\n\n" +
-                `📝 ${lastTx.description ?? "Transaksi"}\n` +
-                `💰 ${formatRupiah(parseFloat(lastTx.amount))}`,
-                { parse_mode: "Markdown" }
-            );
-        } else {
-            await ctx.reply("Gagal membatalkan transaksi.");
+        try {
+            for (const id of lastTxIds) {
+                await deleteTransaction(id);
+            }
+        } catch (error) {
+            logger.error("Error undoing transaction:", error);
+            await ctx.reply("Terjadi kesalahan saat membatalkan transaksi.");
         }
+
+        let summary = "*Transaksi Dibatalkan*\n";
+        for (const tx of lastTxs) {
+            summary +=
+                `\n📝 ${tx.description ?? "Transaksi"}\n` +
+                `💰 ${formatRupiah(parseFloat(tx.amount))}\n`;
+        }
+        await ctx.reply(summary);
     } catch (error) {
         logger.error("Error undoing transaction:", error);
         await ctx.reply("Terjadi kesalahan saat membatalkan transaksi.");
@@ -399,7 +398,7 @@ bot.command("cancel", async (ctx) => {
     ctx.session.step = "idle";
     ctx.session.registrationData = null;
     ctx.session.onboardingData = null;
-    ctx.session.pendingTransaction = null;
+    ctx.session.pendingTransactions = [];
 
     await ctx.reply(
         "❌ Percakapan dibatalkan.\n\n" +
@@ -429,9 +428,9 @@ bot.on("callback_query:data", async (ctx) => {
 
     // Transaction confirmation callbacks
     if (data === "confirm_transaction") {
-        const { pendingTransaction } = ctx.session;
+        const { pendingTransactions } = ctx.session;
 
-        if (!pendingTransaction) {
+        if (!pendingTransactions) {
             await ctx.answerCallbackQuery("Tidak ada konfirmasi yang sedang berlangsung.");
             return;
         }
@@ -439,13 +438,13 @@ bot.on("callback_query:data", async (ctx) => {
         try {
             await saveAndConfirmTransaction(
                 ctx,
-                pendingTransaction.parsed,
-                pendingTransaction.usage,
-                pendingTransaction.userId,
-                pendingTransaction.rawMessage
+                pendingTransactions[0].parsed,
+                pendingTransactions[0].usage,
+                pendingTransactions[0].userId,
+                pendingTransactions[0].rawMessage
             );
 
-            ctx.session.pendingTransaction = null;
+            ctx.session.pendingTransactions = [];
             await ctx.answerCallbackQuery("✅ Transaksi dikonfirmasi!");
         } catch (error) {
             logger.error("Error saving confirmed transaction:", error);
@@ -456,14 +455,14 @@ bot.on("callback_query:data", async (ctx) => {
     }
 
     if (data === "reject_transaction") {
-        const { pendingTransaction } = ctx.session;
+        const { pendingTransactions } = ctx.session;
 
-        if (!pendingTransaction) {
+        if (!pendingTransactions) {
             await ctx.answerCallbackQuery("Tidak ada konfirmasi yang sedang berlangsung.");
             return;
         }
 
-        ctx.session.pendingTransaction = null;
+        ctx.session.pendingTransactions = [];
 
         try {
             await ctx.editMessageText(
@@ -477,6 +476,78 @@ bot.on("callback_query:data", async (ctx) => {
         }
 
         return;
+    }
+
+    if (data === "confirm_multiple_transactions") {
+        await ctx.answerCallbackQuery();
+
+        const pending = ctx.session.pendingTransactions;
+        if (!pending) {
+            await ctx.reply("❌ Sesi konfirmasi sudah kedaluwarsa. Coba kirim ulang.");
+            return;
+        }
+
+        // Ensure period exists
+        const periodId = await resolvePeriodId(pending[0].userId);
+        if (!periodId) {
+            await ctx.reply("❌ Gagal menyimpan. Period tidak ditemukan.");
+            return;
+        }
+
+        // Save all transactions
+        const savedIds: string[] = [];
+        try {
+            for (const transaction of pending) {
+                const transactionId = await saveTransaction({
+                    userId: transaction.userId,
+                    periodId,
+                    transaction: transaction.parsed,
+                    rawMessage: transaction.rawMessage
+                });
+                savedIds.push(transactionId);
+            }
+
+            ctx.session.lastTransactionIds = savedIds;
+            ctx.session.pendingTransactions = [];
+
+            // Track usage
+            if (pending[0].usage) {
+                await trackAiUsage({
+                    userId: pending[0].userId,
+                    model: pending[0].usage.model ?? "unknown",
+                    operation: "parse_multiple_transactions",
+                    inputTokens: pending[0].usage.inputTokens ?? 0,
+                    outputTokens: pending[0].usage.outputTokens ?? 0,
+                });
+            }
+
+            // Send summary
+            const income = pending.filter((t: any) => t.type === "income");
+            const expense = pending.filter((t: any) => t.type === "expense");
+
+            let summary = `✅ *${pending.length} Transaksi Tersimpan!*\n\n`;
+
+            if (income.length > 0) {
+                const total = income.reduce((sum: number, t: any) => sum + t.amount, 0);
+                summary += `📥 Pemasukan: ${formatRupiah(total)}\n`;
+            }
+
+            if (expense.length > 0) {
+                const total = expense.reduce((sum: number, t: any) => sum + t.amount, 0);
+                summary += `📤 Pengeluaran: ${formatRupiah(total)}\n`;
+            }
+
+            summary += `\n_Ketik /undo untuk membatalkan_`;
+
+            await ctx.editMessageText(summary, { parse_mode: "Markdown" });
+        } catch (error) {
+            logger.error("Failed to save multiple transactions:", error);
+            await ctx.editMessageText("❌ Gagal menyimpan transaksi.");
+        }
+    } else if (data === "reject_multiple_transactions") {
+        await ctx.answerCallbackQuery();
+        ctx.session.pendingTransactions = [];
+        await ctx.editMessageText("❌ Transaksi dibatalkan.");
     }
 
     await ctx.answerCallbackQuery();

@@ -39,8 +39,8 @@ export interface SessionData {
     step: string;
     registrationData: RegistrationData | null;
     onboardingData: OnboardingData | null;
-    lastTransactionId: string | null;
-    pendingTransaction: PendingTransactionData | null;
+    lastTransactionIds: string[];
+    pendingTransactions: PendingTransactionData[];
 }
 
 // =============================================================================

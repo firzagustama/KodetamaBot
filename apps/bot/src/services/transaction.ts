@@ -3,7 +3,7 @@ import { transactions, categories, aiUsage } from "@kodetama/db/schema";
 import { eq, and, desc, sql, ilike } from "drizzle-orm";
 import type { TxType } from "@kodetama/shared";
 
-export interface SaveTransactionData {
+interface Transaction {
     userId: string;
     periodId: string;
     type: TxType;
@@ -12,8 +12,13 @@ export interface SaveTransactionData {
     category?: string;
     categoryId?: string;
     bucket?: string;
-    rawMessage?: string;
     aiConfidence?: number;
+}
+export interface SaveTransactionData {
+    userId: string;
+    periodId: string;
+    transaction: Transaction;
+    rawMessage?: string;
 }
 
 /**
@@ -60,18 +65,18 @@ async function findOrCreateCategory(
  * Save a new transaction
  */
 export async function saveTransaction(data: SaveTransactionData): Promise<string> {
-    if (data.type === "other") return "";
+    if (data.transaction.type === "other") return "";
 
     let categoryId: string | undefined;
 
     // Handle category linking
-    if (data.categoryId) {
+    if (data.transaction.categoryId) {
         // Direct categoryId provided
-        categoryId = data.categoryId;
-    } else if (data.category) {
+        categoryId = data.transaction.categoryId;
+    } else if (data.transaction.category) {
         // Category name provided - find or create it
         try {
-            categoryId = await findOrCreateCategory(data.userId, null, data.category, data.bucket);
+            categoryId = await findOrCreateCategory(data.userId, null, data.transaction.category, data.transaction.bucket);
         } catch (error) {
             console.warn("Failed to find/create category:", error);
             // Continue without categoryId
@@ -82,12 +87,12 @@ export async function saveTransaction(data: SaveTransactionData): Promise<string
         userId: data.userId,
         periodId: data.periodId,
         categoryId: categoryId,
-        type: data.type,
-        amount: data.amount.toString(),
-        description: data.description,
-        bucket: data.bucket,
+        type: data.transaction.type,
+        amount: data.transaction.amount.toString(),
+        description: data.transaction.description,
+        bucket: data.transaction.bucket,
         rawMessage: data.rawMessage,
-        aiConfidence: data.aiConfidence?.toString(),
+        aiConfidence: data.transaction.aiConfidence?.toString(),
     }).returning({ id: transactions.id });
 
     return tx.id;
@@ -100,6 +105,13 @@ export async function getLastTransaction(userId: string) {
     return await db.query.transactions.findFirst({
         where: eq(transactions.userId, userId),
         orderBy: desc(transactions.createdAt),
+    });
+}
+
+export async function getTransactions(ids: string[]) {
+    return await db.query.transactions.findMany({
+        where: (transactions, { inArray }) =>
+            inArray(transactions.id, ids),
     });
 }
 

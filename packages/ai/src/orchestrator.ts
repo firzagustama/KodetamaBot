@@ -86,6 +86,7 @@ export class AIOrchestrator {
         const content = response.choices[0]?.message?.content ?? "{}";
         const parsed = JSON.parse(content) as ParsedTransaction;
 
+        console.log(parsed)
         return {
             result: parsed,
             usage: {
