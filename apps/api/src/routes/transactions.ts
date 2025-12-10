@@ -24,11 +24,16 @@ function getDateKey(date: Date): string {
 export async function transactionRoutes(fastify: FastifyInstance): Promise<void> {
 
     // Helper function to resolve periodId (handles "default")
-    async function resolvePeriodId(userId: string, periodId?: string): Promise<string | null> {
+    async function resolvePeriodId(targetId: string, targetType: "user" | "group", periodId?: string): Promise<string | null> {
         if (!periodId) return null;
         if (periodId === "default") {
             const currentPeriod = await db.query.datePeriods.findFirst({
-                where: and(eq(datePeriods.userId, userId), eq(datePeriods.isCurrent, true)),
+                where: and(
+                    targetType === "group"
+                        ? eq(datePeriods.groupId, targetId)
+                        : eq(datePeriods.userId, targetId),
+                    eq(datePeriods.isCurrent, true)
+                ),
 
             });
             return currentPeriod?.id ?? null;
@@ -50,11 +55,11 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
     }>("/", {
         preHandler: [authenticate, loggingMiddleware],
     }, async (request) => {
-        const userId = (request.user as { id: string }).id;
+        const payload = request.user as { id: string; targetId: string; targetType: "user" | "group" };
         const { periodId: rawPeriodId, page = "1", pageSize = "20" } = request.query;
 
         // Resolve periodId (handles "default")
-        const periodId = await resolvePeriodId(userId, rawPeriodId);
+        const periodId = await resolvePeriodId(payload.targetId, payload.targetType, rawPeriodId);
         const pageNum = parseInt(page);
         const pageSizeNum = parseInt(pageSize);
         const offset = (pageNum - 1) * pageSizeNum;
@@ -62,7 +67,8 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
         // If no periodId provided, return empty list
         if (!periodId) {
             logger.warn("Transaction list requested with no default period", {
-                userId,
+                targetId: payload.targetId,
+                targetType: payload.targetType,
             });
             return {
                 days: [],
@@ -166,7 +172,8 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
             };
         } catch (err) {
             logger.error("Database error in transaction list", {
-                userId,
+                targetId: payload.targetId,
+                targetType: payload.targetType,
                 periodId,
                 error: err instanceof Error ? err.message : 'Unknown database error'
             });
@@ -304,11 +311,11 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
     }>("/summary", {
         preHandler: [authenticate, loggingMiddleware]
     }, async (request) => {
-        const userId = (request.user as { id: string }).id;
+        const payload = request.user as { id: string; targetId: string; targetType: "user" | "group" };
         const { periodId: rawPeriodId } = request.query;
 
         // Resolve periodId (handles "default")
-        const periodId = await resolvePeriodId(userId, rawPeriodId);
+        const periodId = await resolvePeriodId(payload.targetId, payload.targetType, rawPeriodId);
 
         // Return empty data if no periodId
         if (!periodId) {

@@ -1,8 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import crypto from "crypto";
 import { db } from "@kodetama/db";
-import { users, telegramAccounts } from "@kodetama/db/schema";
-import { eq } from "drizzle-orm";
+import { users, telegramAccounts, groups, familyMembers } from "@kodetama/db/schema";
+import { eq, and } from "drizzle-orm";
 import { logger } from "../utils/logger.js";
 import { loggingMiddleware } from "../middleware/loggingMiddleware.js";
 
@@ -14,6 +14,11 @@ interface TelegramUser {
     last_name?: string;
     username?: string;
     language_code?: string;
+}
+
+interface TelegramChat {
+    id: number;
+    type: string;
 }
 
 interface TelegramWidgetData {
@@ -29,7 +34,7 @@ interface TelegramWidgetData {
 /**
  * Validate Telegram WebApp initData (for Mini App)
  */
-function validateTelegramWebAppData(initData: string): { valid: boolean; user?: TelegramUser } {
+function validateTelegramWebAppData(initData: string): { valid: boolean; user?: TelegramUser; chat?: TelegramChat } {
     try {
         const params = new URLSearchParams(initData);
         const hash = params.get("hash");
@@ -61,7 +66,10 @@ function validateTelegramWebAppData(initData: string): { valid: boolean; user?: 
         const userStr = params.get("user");
         const user = userStr ? JSON.parse(userStr) as TelegramUser : undefined;
 
-        return { valid: true, user };
+        const chatStr = params.get("chat");
+        const chat = chatStr ? JSON.parse(chatStr) as TelegramChat : undefined;
+
+        return { valid: true, user, chat };
     } catch {
         return { valid: false };
     }
@@ -195,7 +203,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
             return reply.status(400).send({ error: "initData is required" });
         }
 
-        const { valid, user: telegramUser } = validateTelegramWebAppData(initData);
+        const { valid, user: telegramUser, chat: telegramChat } = validateTelegramWebAppData(initData);
 
         if (!valid || !telegramUser) {
             logger.warn("Telegram auth failed: invalid initData", {
@@ -210,7 +218,8 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
         logger.info("Telegram auth validation successful", {
             ip: clientIP,
             telegramUserId: telegramUser.id,
-            username: telegramUser.username
+            username: telegramUser.username,
+            telegramChat
         });
 
         const user = await db.query.telegramAccounts.findFirst({
@@ -233,14 +242,56 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
                 return reply.status(500).send({ error: "User account not found" });
             }
 
+            // Determine target context for JWT
+            let targetId = userId;
+            let targetType: "user" | "group" = "user";
+
+            if (telegramChat && (telegramChat.type === "group" || telegramChat.type === "supergroup")) {
+                // Check if group exists and user is member
+                const group = await db.query.groups.findFirst({
+                    where: eq(groups.telegramGroupId, telegramChat.id),
+                });
+
+                if (group) {
+                    // Check if user is member of the group
+                    const member = await db.query.familyMembers.findFirst({
+                        where: and(
+                            eq(familyMembers.groupId, group.id),
+                            eq(familyMembers.userId, userId)
+                        ),
+                    });
+
+                    const isMember = member !== undefined;
+
+                    if (isMember) {
+                        targetId = group.id;
+                        targetType = "group";
+                        logger.info("Authenticating for group context", {
+                            userId,
+                            groupId: group.id,
+                            telegramGroupId: telegramChat.id
+                        });
+                    } else {
+                        logger.warn("User not member of group", {
+                            userId,
+                            telegramGroupId: telegramChat.id
+                        });
+                    }
+                } else {
+                    logger.warn("Group not found", { telegramGroupId: telegramChat.id });
+                }
+            }
+
             const token = fastify.jwt.sign(
-                { id: userId, telegramId: telegramUser.id },
+                { id: userId, telegramId: telegramUser.id, targetId, targetType },
                 { expiresIn: "7d" }
             );
 
             logger.info("JWT token generated successfully", {
                 userId,
                 telegramUserId: telegramUser.id,
+                targetId,
+                targetType,
                 isNewUser
             });
 
@@ -256,6 +307,10 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
                         firstName: telegramUser.first_name,
                         lastName: telegramUser.last_name,
                     },
+                },
+                context: {
+                    targetId,
+                    targetType,
                 },
             };
         } catch (err) {

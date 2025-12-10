@@ -1,7 +1,6 @@
 import type { BotContext } from "../../types.js";
-import { CommandHandler, CommandExecutionResult } from "../../core/CommandHandler.js";
+import { CommandHandler, CommandExecutionResult, getTargetContext } from "../../core/index.js";
 import {
-    getUserByTelegramId,
     isUserRegistered,
 } from "../../services/index.js";
 
@@ -32,16 +31,18 @@ export class StartCommand extends CommandHandler {
             return { success: true };
         }
 
-        // Check if user has completed onboarding (has active period)
-        const account = await getUserByTelegramId(user.id);
-        if (account) {
-            const currentPeriod = await this.resolvePeriodId(account.userId);
-            if (!currentPeriod) {
-                // Start onboarding
-                await ctx.reply("Sepertinya kamu belum mengatur budget. Mari kita setup dulu!");
-                await ctx.conversation.enter("onboardingConversation");
-                return { success: true };
-            }
+        // Get target context for period resolution
+        const target = await getTargetContext(ctx);
+        console.log("target", target);
+        const currentPeriod = await this.resolvePeriodId(target);
+        if (!currentPeriod) {
+            // Start onboarding - use context-appropriate message
+            const onboardingMessage = target.isGroup
+                ? "Sepertinya grup ini belum memiliki budget yang diatur. Mari kita setup dulu untuk mulai mencatat transaksi grup!"
+                : "Sepertinya kamu belum mengatur budget. Mari kita setup dulu!";
+            await ctx.reply(onboardingMessage);
+            await ctx.conversation.enter("onboardingConversation");
+            return { success: true };
         }
 
         // Build keyboard with Mini App if URL is configured
@@ -83,10 +84,12 @@ export class StartCommand extends CommandHandler {
         }
     }
 
-    private async resolvePeriodId(userId: string): Promise<string | null> {
+    private async resolvePeriodId(target: { targetId: string; isGroup: boolean; userId: string }): Promise<string | null> {
         // Import here to avoid circular dependency
-        const { getCurrentPeriod } = await import("../../services/index.js");
-        const period = await getCurrentPeriod(userId);
+        const { getCurrentPeriod, getCurrentGroupPeriod } = await import("../../services/index.js");
+        const period = target.isGroup
+            ? await getCurrentGroupPeriod(target.targetId, target.userId)
+            : await getCurrentPeriod(target.targetId);
         return period?.id ?? null;
     }
 }

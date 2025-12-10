@@ -99,8 +99,8 @@ KodetamaBot/
 |---------|-------------|
 | `/start` | Start or register |
 | `/help` | Usage help |
-| `/budget` | View current month's budget |
-| `/summary` | Transaction summary |
+| `/budget` | View current month's budget (personal or group budget depending on context) |
+| `/summary` | Transaction summary (personal or group transactions depending on context) |
 | `/undo` | Cancel last transaction (within 5 minutes) |
 | `/wallet` | View wallet balance (coming soon) |
 | `/export` | Export to Google Sheets (coming soon) |
@@ -255,10 +255,11 @@ Examples:
 
 For Family tier users, group transactions are parsed when the bot is mentioned in Telegram groups:
 
-### Group Setup
+### Group Setup - Automatic Registration
 1. Register individual family members with Family tier
-2. Set up group with owner approval
-3. Add family members to the group
+2. Any Family tier user can trigger `/start` in an unregistered group to automatically create and register it
+3. The user becomes the group owner, others can be added later
+4. Add additional family members to the group (optional)
 
 ### Group Transaction Usage
 - **Mention bot first**: `@botusername makan 20rb` or `botusername makan 20rb`

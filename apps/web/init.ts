@@ -40,6 +40,8 @@ export async function init(options: {
   setDebug(options.debug);
   initSDK();
 
+  localStorage.removeItem("auth_token");
+
   // ✅ macOS Telegram workaround
   if (options.mockForMacOS) {
     let firstThemeSent = false;

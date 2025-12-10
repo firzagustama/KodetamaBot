@@ -1,33 +1,28 @@
 import type { BotContext } from "../../types.js";
-import { CommandHandler, CommandExecutionResult } from "../../core/CommandHandler.js";
+import { CommandHandler, CommandExecutionResult, getTargetContext } from "../../core/index.js";
 import { formatRupiah } from "@kodetama/shared";
 import {
-    getUserByTelegramId,
     getCurrentPeriod,
+    getCurrentGroupPeriod,
     getBudgetSummary,
 } from "../../services/index.js";
 import { logger } from "../../utils/logger.js";
 
 /**
  * Handles /budget command - shows budget overview with progress bars
+ * Works for both private chats (personal budget) and group chats (family budget)
  */
 export class BudgetCommand extends CommandHandler {
     protected readonly commandName = "budget";
 
     async execute(ctx: BotContext): Promise<CommandExecutionResult> {
-        const user = ctx.from;
-        if (!user) {
-            return { success: false, error: new Error("No user information") };
-        }
-
         try {
-            const account = await getUserByTelegramId(user.id);
-            if (!account) {
-                await ctx.reply("Kamu belum terdaftar. Ketik /start untuk mendaftar.");
-                return { success: true };
-            }
+            const target = await getTargetContext(ctx);
 
-            const period = await getCurrentPeriod(account.userId);
+            const period = target.isGroup
+                ? await getCurrentGroupPeriod(target.targetId, target.userId)
+                : await getCurrentPeriod(target.targetId);
+
             if (!period) {
                 await ctx.reply(
                     "Belum ada budget yang diatur.\n" +
@@ -36,7 +31,7 @@ export class BudgetCommand extends CommandHandler {
                 return { success: true };
             }
 
-            const summary = await getBudgetSummary(account.userId, period.id);
+            const summary = await getBudgetSummary(target.targetId, period.id, target.isGroup);
             if (!summary) {
                 await ctx.reply(
                     "Belum ada budget yang diatur untuk bulan ini.\n" +

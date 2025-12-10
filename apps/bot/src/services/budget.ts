@@ -13,8 +13,11 @@ export async function getBudget(periodId: string) {
 
 /**
  * Get budget summary with spending data
+ * @param targetId - User ID (personal) or Group ID (family)
+ * @param periodId - Period ID
+ * @param isGroupContext - Whether this is for a group budget
  */
-export async function getBudgetSummary(userId: string, periodId: string) {
+export async function getBudgetSummary(targetId: string, periodId: string, isGroupContext = false) {
     // Get budget
     const budget = await getBudget(periodId);
 
@@ -22,7 +25,7 @@ export async function getBudgetSummary(userId: string, periodId: string) {
         return null;
     }
 
-    // Get spending by bucket
+    // Get spending by bucket - filter by target context
     const spending = await db
         .select({
             bucket: transactions.bucket,
@@ -31,7 +34,9 @@ export async function getBudgetSummary(userId: string, periodId: string) {
         .from(transactions)
         .where(
             and(
-                eq(transactions.userId, userId),
+                isGroupContext
+                    ? eq(transactions.groupId, targetId)
+                    : eq(transactions.userId, targetId),
                 eq(transactions.periodId, periodId),
                 eq(transactions.type, "expense")
             )
