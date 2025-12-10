@@ -4,6 +4,7 @@ import { budgets, datePeriods } from "@kodetama/db/schema";
 import { eq, and } from "drizzle-orm";
 
 import { authenticate } from "../middleware/auth.js";
+import { loggingMiddleware } from "../middleware/loggingMiddleware.js";
 
 export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
 
@@ -146,7 +147,9 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
             wantsPercentage?: number;
             savingsPercentage?: number;
         };
-    }>("/:periodId", async (request, reply) => {
+    }>("/:periodId", {
+        preHandler: loggingMiddleware,
+    }, async (request, reply) => {
         const { periodId } = request.params;
         const { estimatedIncome, needsPercentage, wantsPercentage, savingsPercentage } = request.body;
 
@@ -162,7 +165,6 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
         if (savingsPercentage !== undefined) updateData.savingsPercentage = savingsPercentage;
 
         // Recalculate amounts if we have the data
-        console.log(income);
         if (income && needsPercentage !== undefined) {
             updateData.needsAmount = (income * needsPercentage / 100).toFixed(2);
         }
@@ -173,7 +175,7 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
             updateData.savingsAmount = (income * savingsPercentage / 100).toFixed(2);
         }
 
-        console.log(updateData);
+        console.log("[DATABASE] insert to db", updateData);
         const updated = await db
             .update(budgets)
             .set(updateData)
@@ -199,7 +201,9 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
             wantsPercentage: number;
             savingsPercentage: number;
         };
-    }>("/", async (request) => {
+    }>("/", {
+        preHandler: loggingMiddleware,
+    }, async (request) => {
         const { periodId, estimatedIncome, needsPercentage, wantsPercentage, savingsPercentage } = request.body;
 
         const income = parseFloat(estimatedIncome);

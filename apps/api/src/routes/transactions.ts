@@ -5,6 +5,7 @@ import { eq, desc, sql, and } from "drizzle-orm";
 
 import { authenticate } from "../middleware/auth.js";
 import { logger } from "../utils/logger.js";
+import { loggingMiddleware } from "../middleware/loggingMiddleware.js";
 
 export async function transactionRoutes(fastify: FastifyInstance): Promise<void> {
 
@@ -250,7 +251,7 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
     fastify.get<{
         Querystring: { periodId?: string };
     }>("/summary", {
-        preHandler: authenticate,
+        preHandler: [authenticate, loggingMiddleware]
     }, async (request) => {
         const userId = (request.user as { id: string }).id;
         const { periodId: rawPeriodId } = request.query;

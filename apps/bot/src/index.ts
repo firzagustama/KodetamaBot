@@ -2,7 +2,7 @@ import "dotenv/config";
 import { Bot, session, GrammyError, HttpError, InlineKeyboard } from "grammy";
 import { conversations, createConversation } from "@grammyjs/conversations";
 import { hydrate } from "@grammyjs/hydrate";
-import { run, sequentialize } from "@grammyjs/runner";
+import { sequentialize } from "@grammyjs/runner";
 import type { BotContext, SessionData } from "./types.js";
 import { registrationConversation } from "./conversations/registration.js";
 import { onboardingConversation } from "./conversations/onboarding.js";
@@ -634,7 +634,7 @@ async function main() {
     } else {
         // Polling mode for development
         await bot.api.deleteWebhook();
-        run(bot);
+        bot.start();
         logger.info("Bot is running with polling...");
     }
 }

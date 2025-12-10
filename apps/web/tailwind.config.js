@@ -5,11 +5,12 @@ export default {
         extend: {
             fontFamily: {
                 sans: ["Inter", "system-ui", "sans-serif"],
-            },
+            }
         },
     },
     plugins: [require('daisyui')],
     daisyui: {
         themes: ["light", "dark", "business"],
+        darkTheme: "business"
     },
 };

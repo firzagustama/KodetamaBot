@@ -213,6 +213,13 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
             username: telegramUser.username
         });
 
+        const user = await db.query.telegramAccounts.findFirst({
+            where: eq(telegramAccounts.telegramId, telegramUser.id),
+        });
+        if (!user) {
+            return reply.status(403).send({ error: "User not found" });
+        }
+
         try {
             const { userId, isNewUser } = await findOrCreateUser(telegramUser);
 
@@ -390,7 +397,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
                 return reply.status(401).send({ error: "Unauthorized" });
             }
         }, loggingMiddleware],
-    }, async (request) => {
+    }, async (request, reply) => {
         const payload = request.user as { id: string; telegramId: number };
 
         try {
@@ -407,7 +414,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
                     userId: payload.id,
                     telegramId: payload.telegramId
                 });
-                return { error: "User not found" };
+                return reply.status(403).send({ error: "User not found" });
             }
 
             return {
