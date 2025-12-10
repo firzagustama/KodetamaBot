@@ -5,7 +5,7 @@ import { eq, desc, sql, and } from "drizzle-orm";
 
 import { authenticate } from "../middleware/auth.js";
 import { logger } from "../utils/logger.js";
-import { loggingMiddleware } from "../middleware/loggingMiddleware.js";
+import { loggingMiddleware, loggingMiddleware } from "../middleware/loggingMiddleware.js";
 
 export async function transactionRoutes(fastify: FastifyInstance): Promise<void> {
 
@@ -34,19 +34,10 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
             pageSize?: string;
         };
     }>("/", {
-        preHandler: authenticate,
+        preHandler: [authenticate, loggingMiddleware],
     }, async (request) => {
         const userId = (request.user as { id: string }).id;
         const { periodId: rawPeriodId, page = "1", pageSize = "20" } = request.query;
-        const clientIP = request.ip || 'unknown';
-
-        logger.info("Transaction list request", {
-            userId,
-            ip: clientIP,
-            periodId: rawPeriodId,
-            page,
-            pageSize
-        });
 
         // Resolve periodId (handles "default")
         const periodId = await resolvePeriodId(userId, rawPeriodId);
@@ -58,7 +49,6 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
         if (!periodId) {
             logger.warn("Transaction list requested with no default period", {
                 userId,
-                ip: clientIP
             });
             return {
                 items: [],
@@ -87,16 +77,6 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
                 .where(eq(transactions.periodId, periodId));
 
             const total = Number(countResult[0]?.count ?? 0);
-            const returnedCount = items.length;
-
-            logger.info("Transaction list served successfully", {
-                userId,
-                periodId,
-                page: pageNum,
-                returnedCount,
-                totalCount: total,
-                ip: clientIP
-            });
 
             return {
                 items: items.map((tx) => ({

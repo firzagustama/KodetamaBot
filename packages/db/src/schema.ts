@@ -99,9 +99,9 @@ export const budgets = pgTable("budgets", {
     needsAmount: decimal("needs_amount", { precision: 15, scale: 2 }).notNull(),
     wantsAmount: decimal("wants_amount", { precision: 15, scale: 2 }).notNull(),
     savingsAmount: decimal("savings_amount", { precision: 15, scale: 2 }).notNull(),
-    needsPercentage: integer("needs_percentage").notNull().default(50),
-    wantsPercentage: integer("wants_percentage").notNull().default(30),
-    savingsPercentage: integer("savings_percentage").notNull().default(20),
+    needsPercentage: decimal("needs_percentage", { precision: 5, scale: 2 }).notNull().default("50"),
+    wantsPercentage: decimal("wants_percentage", { precision: 5, scale: 2 }).notNull().default("30"),
+    savingsPercentage: decimal("savings_percentage", { precision: 5, scale: 2 }).notNull().default("20"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

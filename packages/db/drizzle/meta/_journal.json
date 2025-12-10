@@ -15,6 +15,13 @@
       "when": 1765038180775,
       "tag": "0001_abnormal_war_machine",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1765370772417,
+      "tag": "0002_typical_shocker",
+      "breakpoints": true
     }
   ]
 }
