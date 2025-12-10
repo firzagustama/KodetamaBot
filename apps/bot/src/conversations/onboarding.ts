@@ -5,9 +5,9 @@ import { AIOrchestrator } from "@kodetama/ai";
 import {
     parseIndonesianAmount,
     formatRupiah,
-    calculateBudgetAllocation,
     getIndonesianMonth,
 } from "@kodetama/shared";
+import { BudgetCalculationService } from "../domain/services/index.js";
 
 import { logger } from "../utils/logger.js";
 import {
@@ -287,7 +287,8 @@ export async function onboardingConversation(
         const finalWantsPercent = conversation.session.onboardingData.wantsPercentage!;
         const finalSavingsPercent = conversation.session.onboardingData.savingsPercentage!;
 
-        const allocation = calculateBudgetAllocation(
+        const budgetService = new BudgetCalculationService();
+        const allocation = budgetService.calculateBudgetAllocation(
             estimatedIncome,
             finalNeedsPercent,
             finalWantsPercent,
