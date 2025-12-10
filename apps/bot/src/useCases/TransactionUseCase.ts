@@ -5,6 +5,7 @@ import { logger } from "../utils/logger.js";
 import {
     saveTransaction,
     resolvePeriodId,
+    resolveGroupPeriodId,
     trackAiUsage,
 } from "../services/index.js";
 
@@ -352,6 +353,180 @@ export class TransactionUseCase {
                 periodId,
                 transaction,
                 rawMessage
+            });
+            savedIds.push(transactionId);
+        }
+
+        return savedIds;
+    }
+
+    // =============================================================================
+    // GROUP TRANSACTION METHODS (Family tier)
+    // =============================================================================
+
+    /**
+     * Save a single group transaction with confirmation
+     */
+    async saveGroupTransactionWithConfirmation(
+        ctx: BotContext,
+        transaction: any,
+        usage: any,
+        userId: string,
+        groupId: string,
+        rawMessage: string
+    ): Promise<TransactionResult> {
+        try {
+            // Track AI usage
+            if (usage) {
+                await trackAiUsage({
+                    userId,
+                    model: usage.model ?? "unknown",
+                    operation: "parse_transaction",
+                    inputTokens: usage.inputTokens ?? 0,
+                    outputTokens: usage.outputTokens ?? 0,
+                });
+            }
+
+            // Ensure group period exists
+            const periodId = await resolveGroupPeriodId(groupId, userId);
+            if (!periodId) {
+                await ctx.reply("❌ Gagal membuat periode untuk grup ini.", {
+                    reply_to_message_id: ctx.message?.message_id
+                });
+                return { success: false, error: new Error("No active group period") };
+            }
+
+            // Save transaction to database with groupId
+            const transactionId = await saveTransaction({
+                userId,
+                periodId,
+                transaction,
+                rawMessage,
+                groupId,
+            });
+
+            // Store last transaction ID in session for undo
+            ctx.session.lastTransactionIds.push(transactionId);
+
+            // Format confirmation message for group
+            const message = TransactionFormatter.formatTransactionConfirmation(transaction);
+
+            await ctx.reply(message, {
+                parse_mode: "Markdown",
+                reply_to_message_id: ctx.message?.message_id
+            });
+
+            return { success: true, message };
+        } catch (error) {
+            logger.error("Failed to save group transaction:", error);
+            return { success: false, error: error as Error };
+        }
+    }
+
+    /**
+     * Save multiple group transactions with confirmation check
+     */
+    async saveMultipleGroupTransactionsWithConfirmation(
+        ctx: BotContext,
+        transactions: any[],
+        usage: any,
+        userId: string,
+        groupId: string,
+        rawMessage: string,
+        aiMessage: string
+    ): Promise<TransactionResult> {
+        try {
+            // Track AI usage
+            if (usage) {
+                await trackAiUsage({
+                    userId,
+                    model: usage.model ?? "unknown",
+                    operation: "parse_multiple_transactions",
+                    inputTokens: usage.inputTokens ?? 0,
+                    outputTokens: usage.outputTokens ?? 0,
+                });
+            }
+
+            // Ensure group period exists
+            const periodId = await resolveGroupPeriodId(groupId, userId);
+            if (!periodId) {
+                await ctx.reply("❌ Gagal membuat periode untuk grup ini.", {
+                    reply_to_message_id: ctx.message?.message_id
+                });
+                return { success: false, error: new Error("No active group period") };
+            }
+
+            // Check if any transaction needs confirmation
+            const lowConfidence = transactions.filter(t => t.confidence < 0.9);
+
+            if (lowConfidence.length > 0) {
+                // Store pending transactions for confirmation (with groupId)
+                ctx.session.pendingTransactions = transactions.map(t => ({
+                    ...t,
+                    groupId
+                }));
+
+                // Send confirmation request
+                const message = TransactionFormatter.formatMultipleTransactionsConfirmation(
+                    transactions,
+                    rawMessage
+                );
+                const keyboard = TransactionFormatter.getMultipleTransactionsKeyboard();
+
+                await ctx.reply(message, {
+                    parse_mode: "Markdown",
+                    reply_markup: keyboard,
+                    reply_to_message_id: ctx.message?.message_id
+                });
+
+                return { success: true, message: "Pending confirmation" };
+            }
+
+            // All high confidence - save all immediately
+            const savedIds = await this.saveGroupTransactionsToDatabase(
+                userId,
+                periodId,
+                groupId,
+                transactions,
+                rawMessage
+            );
+
+            // Store last batch transaction IDs for bulk undo
+            ctx.session.lastTransactionIds.push(...savedIds);
+
+            // Send success message
+            const message = TransactionFormatter.formatMultipleTransactionsSuccess(transactions) + `\n\n${aiMessage}`;
+            await ctx.reply(message, {
+                parse_mode: "Markdown",
+                reply_to_message_id: ctx.message?.message_id
+            });
+
+            return { success: true, message };
+        } catch (error) {
+            logger.error("Failed to save multiple group transactions:", error);
+            return { success: false, error: error as Error };
+        }
+    }
+
+    /**
+     * Helper method to save multiple group transactions
+     */
+    private async saveGroupTransactionsToDatabase(
+        userId: string,
+        periodId: string,
+        groupId: string,
+        transactions: any[],
+        rawMessage: string
+    ): Promise<string[]> {
+        const savedIds: string[] = [];
+
+        for (const transaction of transactions) {
+            const transactionId = await saveTransaction({
+                userId,
+                periodId,
+                transaction,
+                rawMessage,
+                groupId,
             });
             savedIds.push(transactionId);
         }

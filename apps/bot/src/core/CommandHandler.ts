@@ -27,7 +27,13 @@ export abstract class CommandHandler {
 
         // Remove leading slash and split by space to get command name
         const parts = message.text.trim().split(/\s+/);
-        const command = parts[0].toLowerCase();
+        let command = parts[0].toLowerCase();
+
+        // Strip @botname suffix for group commands like "/start@botname"
+        const atIndex = command.indexOf('@');
+        if (atIndex !== -1) {
+            command = command.substring(0, atIndex);
+        }
 
         return command === `/${this.commandName}`;
     }

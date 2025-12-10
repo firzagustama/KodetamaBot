@@ -19,6 +19,7 @@ export interface SaveTransactionData {
     periodId: string;
     transaction: Transaction;
     rawMessage?: string;
+    groupId?: string;
 }
 
 /**
@@ -76,7 +77,12 @@ export async function saveTransaction(data: SaveTransactionData): Promise<string
     } else if (data.transaction.category) {
         // Category name provided - find or create it
         try {
-            categoryId = await findOrCreateCategory(data.userId, null, data.transaction.category, data.transaction.bucket);
+            categoryId = await findOrCreateCategory(
+                data.groupId ? null : data.userId,
+                data.groupId || null,
+                data.transaction.category,
+                data.transaction.bucket
+            );
         } catch (error) {
             console.warn("Failed to find/create category:", error);
             // Continue without categoryId
@@ -87,6 +93,7 @@ export async function saveTransaction(data: SaveTransactionData): Promise<string
         userId: data.userId,
         periodId: data.periodId,
         categoryId: categoryId,
+        groupId: data.groupId,
         type: data.transaction.type,
         amount: data.transaction.amount.toString(),
         description: data.transaction.description,

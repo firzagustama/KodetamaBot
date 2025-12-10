@@ -5,6 +5,27 @@
 // Import existing entity types from types.ts to avoid conflicts
 import type { User, TelegramAccount, DatePeriod, Budget, Transaction, PendingRegistration } from "./types.js";
 
+// =============================================================================
+// GROUP DOMAIN ENTITIES
+// =============================================================================
+
+export interface Group {
+    id: string;
+    telegramGroupId: number; // Stored as bigint in DB but represented as number in JS
+    name: string;
+    ownerId: string;
+    isActive: boolean;
+    createdAt: Date;
+}
+
+export interface FamilyMember {
+    id: string;
+    groupId: string;
+    userId: string;
+    role: string;
+    joinedAt: Date;
+}
+
 // Define Category type since it's not exported from types.ts
 export interface Category {
     id: string;
@@ -165,6 +186,12 @@ export interface IPendingRegistrationRepository {
 export interface IAIUsageRepository {
     save(usage: Omit<AIUsage, "id">): Promise<string>;
     findByUser(userId: string, limit?: number): Promise<AIUsage[]>;
+}
+
+export interface IGroupRepository {
+    findByTelegramId(telegramGroupId: number): Promise<Group | null>;
+    findMembers(groupId: string): Promise<FamilyMember[]>;
+    isUserMember(userId: string, groupId: string): Promise<boolean>;
 }
 
 // =============================================================================

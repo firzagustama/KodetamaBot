@@ -1,0 +1,5 @@
+- read README.md to get grasp about the application
+- For coding implementation, always use SOLID principles and clean architecture
+- Read for existing code first before executing
+- After final code changes done, run "pnpm typecheck" followed by "pnpm build" to make sure it's correct
+- After no error, update README.md for changes

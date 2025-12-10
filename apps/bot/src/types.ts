@@ -32,6 +32,7 @@ export interface PendingTransactionData {
     parsed: any; // Parsed AI result
     usage: any; // AI usage data
     userId: string; // User ID
+    groupId?: string; // Group ID (for group transactions)
     rawMessage: string; // Original message
 }
 

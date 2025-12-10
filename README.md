@@ -251,13 +251,37 @@ Examples:
 
 ---
 
+## 👨‍👩‍👧‍👦 Family Tier - Group Usage
+
+For Family tier users, group transactions are parsed when the bot is mentioned in Telegram groups:
+
+### Group Setup
+1. Register individual family members with Family tier
+2. Set up group with owner approval
+3. Add family members to the group
+
+### Group Transaction Usage
+- **Mention bot first**: `@botusername makan 20rb` or `botusername makan 20rb`
+- **Same natural language**: Supports all Indonesian shorthand like private chats
+- **Shared categories**: Transaction categories are shared at group level
+- **Member attribution**: Each transaction tracks which family member logged it
+- **Group budgets**: Transactions are associated with shared group budget periods
+
+### Commands in Groups
+- **Commands work everywhere**: `/start`, `/help`, `/budget` work in both private and group chats
+- **Bot-specific commands**: In groups with multiple bots, use `/start@botname`, `/help@botname`, etc.
+- **Registration/onboarding**: Can be done in groups, but private chat recommended for privacy
+- **Group focus**: Groups are primarily for transaction logging to avoid spam
+
+---
+
 ## 📊 User Tiers
 
 | Tier | Features |
 |------|----------|
 | **Standard** | Basic transaction logging, budget tracking |
 | **Pro** | Voice transcription, invoice upload, AI summaries |
-| **Family** | Shared group budgets, multi-user tracking |
+| **Family** | Shared group budgets, multi-user tracking, group transaction parsing |
 
 ---
 
