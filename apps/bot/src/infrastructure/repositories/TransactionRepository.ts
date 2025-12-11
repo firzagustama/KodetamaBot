@@ -64,9 +64,7 @@ export class TransactionRepository implements ITransactionRepository {
     }
 
     async save(transaction: Omit<Transaction, "id" | "createdAt">): Promise<string> {
-        // Convert "other" type to "expense" for database storage
-        // This maintains existing behavior where "other" transactions are stored as expenses
-        const dbType = transaction.type === "other" ? "expense" : transaction.type as "income" | "expense" | "transfer" | "adjustment";
+        const dbType = transaction.type as "income" | "expense" | "transfer" | "adjustment";
 
         const [result] = await db.insert(transactions).values({
             ...transaction,

@@ -7,7 +7,7 @@ import { z } from "zod";
 export const TIERS = ["standard", "pro", "family"] as const;
 export type Tier = (typeof TIERS)[number];
 
-export const TX_TYPES = ["income", "expense", "transfer", "adjustment", "other"] as const;
+export const TX_TYPES = ["income", "expense", "transfer", "adjustment"] as const;
 export type TxType = (typeof TX_TYPES)[number];
 
 export const REGISTRATION_STATUS = ["pending", "approved", "rejected"] as const;
@@ -85,7 +85,6 @@ const Transaction = z.object({
 });
 
 export const ParsedTransactionSchema = z.object({
-    isMultiple: z.boolean().optional(),
     message: z.string(),
     transactions: z.array(Transaction),
 });

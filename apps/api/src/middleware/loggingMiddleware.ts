@@ -23,8 +23,8 @@ export async function loggingMiddleware(
         let resBody = "-";
         if (payload) {
             try {
-                resBody = typeof payload === "string" 
-                    ? payload 
+                resBody = typeof payload === "string"
+                    ? payload
                     : JSON.stringify(payload);
                 // Truncate if too long
                 if (resBody.length > 500) {
@@ -37,7 +37,8 @@ export async function loggingMiddleware(
 
         // Compact log format
         logger.info(
-            `${method} ${url} ${statusCode} ${duration}ms | Req: ${reqBody} | Res: ${resBody}`
+            `${method} ${url} ${statusCode} ${duration}ms`
+            // `${method} ${url} ${statusCode} ${duration}ms | Req: ${reqBody} | Res: ${resBody}`
         );
 
         return originalSend(payload);

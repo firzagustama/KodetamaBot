@@ -38,7 +38,6 @@ function validateTelegramWebAppData(initData: string): { valid: boolean; user?: 
     try {
         const params = new URLSearchParams(initData);
         const hash = params.get("hash");
-        console.log("hash:", hash);
         params.delete("hash");
 
         // Sort params alphabetically
@@ -155,12 +154,6 @@ async function findOrCreateUser(telegramUser: {
     } else {
         userId = telegramAccount.userId;
 
-        logger.info("Existing user login", {
-            userId,
-            telegramUserId: telegramUser.id,
-            username: telegramUser.username
-        });
-
         // Update telegram account info
         await db
             .update(telegramAccounts)
@@ -193,34 +186,16 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
         preHandler: [loggingMiddleware],
     }, async (request, reply) => {
         const { initData } = request.body;
-        const clientIP = request.ip || 'unknown';
-        const userAgent = request.headers['user-agent'] || 'unknown';
-
-        logger.info("Telegram Mini App auth attempt", { ip: clientIP, userAgent });
 
         if (!initData) {
-            logger.warn("Telegram auth failed: missing initData", { ip: clientIP });
             return reply.status(400).send({ error: "initData is required" });
         }
 
         const { valid, user: telegramUser, chat: telegramChat } = validateTelegramWebAppData(initData);
 
         if (!valid || !telegramUser) {
-            logger.warn("Telegram auth failed: invalid initData", {
-                ip: clientIP,
-                userAgent,
-                telegramUserId: telegramUser?.id,
-                valid
-            });
             return reply.status(401).send({ error: "Invalid initData" });
         }
-
-        logger.info("Telegram auth validation successful", {
-            ip: clientIP,
-            telegramUserId: telegramUser.id,
-            username: telegramUser.username,
-            telegramChat
-        });
 
         const user = await db.query.telegramAccounts.findFirst({
             where: eq(telegramAccounts.telegramId, telegramUser.id),
@@ -230,7 +205,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
         }
 
         try {
-            const { userId, isNewUser } = await findOrCreateUser(telegramUser);
+            const { userId } = await findOrCreateUser(telegramUser);
 
             // Get full user record
             const user = await db.query.users.findFirst({
@@ -286,14 +261,6 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
                 { id: userId, telegramId: telegramUser.id, targetId, targetType },
                 { expiresIn: "7d" }
             );
-
-            logger.info("JWT token generated successfully", {
-                userId,
-                telegramUserId: telegramUser.id,
-                targetId,
-                targetType,
-                isNewUser
-            });
 
             return {
                 token,
@@ -404,12 +371,6 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
                 { id: userId, telegramId: authData.id },
                 { expiresIn: "30d" } // Longer expiry for widget login
             );
-
-            logger.info("Widget JWT token generated successfully", {
-                userId,
-                telegramUserId: authData.id,
-                isNewUser
-            });
 
             return {
                 success: true,

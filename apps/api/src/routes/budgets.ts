@@ -13,8 +13,8 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
      * Get current period budget for authenticated user
      */
     fastify.get("/current", {
-        preHandler: authenticate,
-    }, async (request) => {
+        preHandler: [authenticate, loggingMiddleware],
+    }, async (request, reply) => {
         const payload = request.user as { id: string; targetId: string; targetType: "user" | "group" };
 
         // Find current period for target context
@@ -28,28 +28,7 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
         });
 
         if (!currentPeriod) {
-            // Return default empty budget if no active period found
-            const now = new Date();
-            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-            const monthName = now.toLocaleString('id-ID', { month: 'long', year: 'numeric' });
-
-            return {
-                id: "default",
-                estimatedIncome: "0",
-                needsAmount: "0",
-                wantsAmount: "0",
-                savingsAmount: "0",
-                needsPercentage: 50,
-                wantsPercentage: 30,
-                savingsPercentage: 20,
-                period: {
-                    id: "default",
-                    name: monthName,
-                    startDate: startOfMonth.toISOString(),
-                    endDate: endOfMonth.toISOString(),
-                },
-            };
+            return reply.status(403).send({ error: "Current period not found" });
         }
 
         const budget = await db.query.budgets.findFirst({
@@ -57,23 +36,7 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
         });
 
         if (!budget) {
-            // Return default empty budget if period exists but no budget
-            return {
-                id: "default",
-                estimatedIncome: "0",
-                needsAmount: "0",
-                wantsAmount: "0",
-                savingsAmount: "0",
-                needsPercentage: 50,
-                wantsPercentage: 30,
-                savingsPercentage: 20,
-                period: {
-                    id: currentPeriod.id,
-                    name: currentPeriod.name,
-                    startDate: currentPeriod.startDate.toISOString(),
-                    endDate: currentPeriod.endDate.toISOString(),
-                },
-            };
+            return reply.status(403).send({ error: "Budget not found" });
         }
 
         return {
@@ -100,7 +63,9 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
      */
     fastify.get<{
         Params: { periodId: string };
-    }>("/:periodId", async (request, reply) => {
+    }>("/:periodId", {
+        preHandler: [loggingMiddleware],
+    }, async (request, reply) => {
         const { periodId } = request.params;
 
         const period = await db.query.datePeriods.findFirst({

@@ -1,7 +1,7 @@
 import type { Context, SessionFlavor } from "grammy";
 import type { ConversationFlavor } from "@grammyjs/conversations";
 import type { HydrateFlavor } from "@grammyjs/hydrate";
-import type { Tier } from "@kodetama/shared";
+import type { ParsedTransaction, Tier } from "@kodetama/shared";
 
 // =============================================================================
 // SESSION DATA
@@ -36,12 +36,22 @@ export interface PendingTransactionData {
     rawMessage: string; // Original message
 }
 
+export interface TransactionData {
+    account: {
+        userId: string,
+        periodId: string
+    },
+    parsed: ParsedTransaction,
+    usage: any,
+    rawMessage: string,
+}
+
 export interface SessionData {
     step: string;
     registrationData: RegistrationData | null;
     onboardingData: OnboardingData | null;
     lastTransactionIds: string[];
-    pendingTransactions: PendingTransactionData[];
+    pendingTransactions: TransactionData | null
 }
 
 // =============================================================================

@@ -66,8 +66,6 @@ async function findOrCreateCategory(
  * Save a new transaction
  */
 export async function saveTransaction(data: SaveTransactionData): Promise<string> {
-    if (data.transaction.type === "other") return "";
-
     let categoryId: string | undefined;
 
     // Handle category linking

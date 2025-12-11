@@ -1,59 +1,33 @@
-// src/hooks/useKeyboardOpen.ts
-import { useEffect, useState, useRef } from "react";
+import { useState, useEffect } from "react";
+import { viewport, useSignal } from "@tma.js/sdk-react";
 
 export function useKeyboardOpen() {
     const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
-    const initialHeightRef = useRef(window.innerHeight);
+
+    // Track viewport height and stable height using signals
+    const height = useSignal(viewport.height);
+    const stableHeight = useSignal(viewport.stableHeight);
+    const isStable = useSignal(viewport.isStable);
 
     useEffect(() => {
-        // Strategy 1: Check if window resizes significantly (Android)
-        const handleResize = () => {
-            const currentHeight = window.innerHeight;
-            const initialHeight = initialHeightRef.current;
-
-            // If height drops by more than 20%, assume keyboard is open
-            const keyboardOpen = currentHeight < initialHeight * 0.80;
-
-            setIsKeyboardOpen(keyboardOpen);
-
-            console.log("handleResize", {
-                currentHeight,
-                initialHeight,
-                keyboardOpen
-            });
-        };
-
-        // Strategy 2: Check if an input is focused (iOS/Universal)
-        const handleFocusIn = () => {
-            const activeTag = document.activeElement?.tagName;
-            const shouldOpen = activeTag === "INPUT" || activeTag === "TEXTAREA";
-
-            if (shouldOpen) {
-                setIsKeyboardOpen(true);
+        // Mount viewport if not already mounted
+        try {
+            if (!viewport.isMounted()) {
+                viewport.mount();
             }
+        } catch (error) {
+            // Already mounted or not available
+        }
+    }, []);
 
-            console.log("handleFocusIn", {
-                activeTag,
-                shouldOpen
-            });
-        };
-
-        const handleFocusOut = () => {
-            setIsKeyboardOpen(false);
-            console.log("handleFocusOut - keyboard closed");
-        };
-
-        // Listeners
-        window.addEventListener("resize", handleResize);
-        window.addEventListener("focusin", handleFocusIn);
-        window.addEventListener("focusout", handleFocusOut);
-
-        return () => {
-            window.removeEventListener("resize", handleResize);
-            window.removeEventListener("focusin", handleFocusIn);
-            window.removeEventListener("focusout", handleFocusOut);
-        };
-    }, []); // Empty dependency array is correct now
+    useEffect(() => {
+        // If viewport height is significantly less than stable height, keyboard is likely open
+        // We use 0.75 as threshold (if height is less than 75% of stable height)
+        if (isStable && stableHeight && height) {
+            const isOpen = height < stableHeight * 0.75;
+            setIsKeyboardOpen(isOpen);
+        }
+    }, [height, stableHeight, isStable]);
 
     return isKeyboardOpen;
 }

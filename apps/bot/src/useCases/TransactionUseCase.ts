@@ -1,4 +1,4 @@
-import type { BotContext } from "../types.js";
+import type { BotContext, TransactionData } from "../types.js";
 import { AIOrchestrator } from "@kodetama/ai";
 import { TransactionFormatter } from "../utils/TransactionFormatter.js";
 import { logger } from "../utils/logger.js";
@@ -85,17 +85,14 @@ export class TransactionUseCase {
      */
     async saveMultipleTransactionsWithConfirmation(
         ctx: BotContext,
-        transactions: any[],
-        usage: any,
-        userId: string,
-        rawMessage: string,
-        aiMessage: string
+        transaction: TransactionData
     ): Promise<TransactionResult> {
         try {
+            const { account, parsed, usage, rawMessage } = transaction
             // Track AI usage
             if (usage) {
                 await trackAiUsage({
-                    userId,
+                    userId: account.userId,
                     model: usage.model ?? "unknown",
                     operation: "parse_multiple_transactions",
                     inputTokens: usage.inputTokens ?? 0,
@@ -103,26 +100,15 @@ export class TransactionUseCase {
                 });
             }
 
-            // Ensure period exists
-            const periodId = await resolvePeriodId(userId);
-            if (!periodId) {
-                await ctx.reply("Transaksi belum tercatat... Kamu belum mengatur budget. Mari kita setup dulu!");
-                await ctx.conversation.enter("onboardingConversation");
-                return { success: false, error: new Error("No active period") };
-            }
-
             // Check if any transaction needs confirmation
+            const transactions = parsed.transactions
             const lowConfidence = transactions.filter(t => t.confidence < 0.9);
-
             if (lowConfidence.length > 0) {
                 // Store pending transactions for confirmation
-                ctx.session.pendingTransactions = transactions;
+                ctx.session.pendingTransactions = transaction;
 
                 // Send confirmation request
-                const message = TransactionFormatter.formatMultipleTransactionsConfirmation(
-                    transactions,
-                    rawMessage
-                );
+                const message = TransactionFormatter.formatMultipleTransactionsConfirmation(transactions);
                 const keyboard = TransactionFormatter.getMultipleTransactionsKeyboard();
 
                 await ctx.reply(message, {
@@ -134,13 +120,13 @@ export class TransactionUseCase {
             }
 
             // All high confidence - save all immediately
-            const savedIds = await this.saveTransactionsToDatabase(userId, periodId, transactions, rawMessage);
+            const savedIds = await this.saveTransactionsToDatabase(account.userId, account.periodId, transactions, rawMessage);
 
             // Store last batch transaction IDs for bulk undo
-            ctx.session.lastTransactionIds.push(...savedIds);
+            ctx.session.lastTransactionIds = savedIds;
 
             // Send success message
-            const message = TransactionFormatter.formatMultipleTransactionsSuccess(transactions) + `\n\n${aiMessage}`;
+            const message = TransactionFormatter.formatMultipleTransactionsSuccess(transactions) + `\n\n${parsed.message}`;
             await ctx.reply(message, { parse_mode: "Markdown" });
 
             return { success: true, message };
@@ -154,14 +140,14 @@ export class TransactionUseCase {
      * Confirm pending transactions (from callback)
      */
     async confirmPendingTransactions(ctx: BotContext): Promise<TransactionResult> {
-        const pending = ctx.session.pendingTransactions;
-
-        if (!pending || pending.length === 0) {
+        if (!ctx.session.pendingTransactions) {
             return { success: false, error: new Error("No pending transactions") };
         }
 
+        const { account, parsed, usage, rawMessage } = ctx.session.pendingTransactions;
+
         try {
-            const periodId = await resolvePeriodId(pending[0].userId);
+            const periodId = await resolvePeriodId(account.userId);
             if (!periodId) {
                 await ctx.reply("❌ Gagal menyimpan. Period tidak ditemukan.");
                 return { success: false, error: new Error("No active period") };
@@ -169,28 +155,28 @@ export class TransactionUseCase {
 
             // Save all transactions
             const savedIds = await this.saveTransactionsToDatabase(
-                pending[0].userId,
+                account.userId,
                 periodId,
-                pending,
-                pending[0].rawMessage
+                parsed.transactions,
+                rawMessage
             );
 
             ctx.session.lastTransactionIds = savedIds;
-            ctx.session.pendingTransactions = [];
+            ctx.session.pendingTransactions = null;
 
             // Track usage
-            if (pending[0].usage) {
+            if (usage) {
                 await trackAiUsage({
-                    userId: pending[0].userId,
-                    model: pending[0].usage.model ?? "unknown",
+                    userId: account.userId,
+                    model: usage.model ?? "unknown",
                     operation: "confirm_multiple_transactions",
-                    inputTokens: pending[0].usage.inputTokens ?? 0,
-                    outputTokens: pending[0].usage.outputTokens ?? 0,
+                    inputTokens: usage.inputTokens ?? 0,
+                    outputTokens: usage.outputTokens ?? 0,
                 });
             }
 
             // Send summary
-            const message = TransactionFormatter.formatMultipleTransactionsSuccess(pending);
+            const message = TransactionFormatter.formatMultipleTransactionsSuccess(parsed.transactions);
             await ctx.editMessageText(message, { parse_mode: "Markdown" });
 
             return { success: true, message };
@@ -202,63 +188,10 @@ export class TransactionUseCase {
     }
 
     /**
-     * Confirm single pending transaction (from callback)
-     */
-    async confirmSinglePendingTransaction(ctx: BotContext): Promise<TransactionResult> {
-        const pending = ctx.session.pendingTransactions;
-
-        if (!pending || pending.length === 0 || !pending[0]) {
-            return { success: false, error: new Error("No pending transaction") };
-        }
-
-        try {
-            const transaction = pending[0];
-            const periodId = await resolvePeriodId(transaction.userId);
-
-            if (!periodId) {
-                await ctx.reply("❌ Gagal menyimpan. Period tidak ditemukan.");
-                return { success: false, error: new Error("No active period") };
-            }
-
-            // Save transaction
-            const transactionId = await saveTransaction({
-                userId: transaction.userId,
-                periodId,
-                transaction: transaction.parsed,
-                rawMessage: transaction.rawMessage
-            });
-
-            ctx.session.lastTransactionIds = [transactionId];
-            ctx.session.pendingTransactions = [];
-
-            // Track AI usage
-            if (transaction.usage) {
-                await trackAiUsage({
-                    userId: transaction.userId,
-                    model: transaction.usage.model ?? "unknown",
-                    operation: "confirm_transaction",
-                    inputTokens: transaction.usage.inputTokens ?? 0,
-                    outputTokens: transaction.usage.outputTokens ?? 0,
-                });
-            }
-
-            // Update message
-            const message = TransactionFormatter.formatTransactionConfirmationForEdit(transaction.parsed);
-            await ctx.editMessageText(message, { parse_mode: "Markdown" });
-
-            return { success: true, message };
-        } catch (error) {
-            logger.error("Failed to save confirmed transaction:", error);
-            await ctx.editMessageText("❌ Terjadi kesalahan saat menyimpan transaksi.");
-            return { success: false, error: error as Error };
-        }
-    }
-
-    /**
      * Reject pending transactions
      */
     async rejectPendingTransactions(ctx: BotContext): Promise<TransactionResult> {
-        ctx.session.pendingTransactions = [];
+        ctx.session.pendingTransactions = null;
 
         try {
             const message = TransactionFormatter.formatRejectionMessage();
@@ -461,15 +394,14 @@ export class TransactionUseCase {
 
             if (lowConfidence.length > 0) {
                 // Store pending transactions for confirmation (with groupId)
-                ctx.session.pendingTransactions = transactions.map(t => ({
-                    ...t,
-                    groupId
-                }));
+                // ctx.session.pendingTransactions = transactions.map(t => ({
+                //     ...t,
+                //     groupId
+                // }));
 
                 // Send confirmation request
                 const message = TransactionFormatter.formatMultipleTransactionsConfirmation(
                     transactions,
-                    rawMessage
                 );
                 const keyboard = TransactionFormatter.getMultipleTransactionsKeyboard();
 

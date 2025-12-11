@@ -1,39 +1,10 @@
 import type { BotContext } from "../types.js";
-import { AIOrchestrator } from "@kodetama/ai";
-import { TransactionFormatter } from "../utils/TransactionFormatter.js";
-import { TransactionUseCase } from "../useCases/TransactionUseCase.js";
 import { GroupRepository } from "../infrastructure/repositories/index.js";
 import { getUserByTelegramId } from "../services/index.js";
 import { logger } from "../utils/logger.js";
 
 // Initialize shared instances
-let ai: AIOrchestrator | null = null;
-let transactionUseCase: TransactionUseCase | null = null;
 let groupRepo: GroupRepository | null = null;
-
-/**
- * Get or create AI orchestrator (singleton pattern)
- */
-function getAiOrchestrator(): AIOrchestrator {
-    if (!ai) {
-        ai = new AIOrchestrator({
-            apiKey: process.env.OPENROUTER_API_KEY ?? "",
-            model: process.env.OPENROUTER_MODEL,
-        });
-    }
-    return ai;
-}
-
-/**
- * Get or create transaction use case (singleton pattern)
- */
-function getTransactionUseCase(): TransactionUseCase {
-    if (!transactionUseCase) {
-        const aiOrchestrator = getAiOrchestrator();
-        transactionUseCase = new TransactionUseCase(aiOrchestrator);
-    }
-    return transactionUseCase;
-}
 
 /**
  * Get or create group repository (singleton pattern)
@@ -83,7 +54,6 @@ export async function handleGroupMessage(ctx: BotContext): Promise<void> {
 
     try {
         const groupRepo = getGroupRepository();
-        const useCase = getTransactionUseCase();
 
         // Check if group is authorized (exists and is active)
         if (!ctx.chat) {
@@ -127,93 +97,8 @@ export async function handleGroupMessage(ctx: BotContext): Promise<void> {
         // Skip commands - these are handled by CommandRegistry regardless of group context
         if (cleanedMessage.startsWith("/")) return;
 
-        // Parse transaction using AI
-        const parseResult = await useCase.parseTransaction(cleanedMessage);
-
-        if (!parseResult.success) {
-            throw new Error("Failed to parse transaction");
-        }
-
-        const { parsed, usage } = parseResult;
-
-        logger.info(`Group transaction parsed for user ${ctx.from.id} in group ${ctx.chat?.id}:`, {
-            raw: message,
-            cleaned: cleanedMessage,
-            parsed,
-            usage,
-        });
-
-        // Check if it's multiple transactions
-        if (parsed?.isMultiple && parsed.transactions && Array.isArray(parsed.transactions)) {
-            await useCase.saveMultipleGroupTransactionsWithConfirmation(
-                ctx,
-                parsed.transactions,
-                usage,
-                userAccount.userId,
-                group.id,
-                cleanedMessage,
-                parsed.message ?? ""
-            );
-            return;
-        }
-
-        const trx = parsed?.transactions?.[0];
-        if (!trx) {
-            throw new Error("No transaction data found");
-        }
-
-        // Handle single transaction (existing logic)
-        if (trx.type === "other") {
-            await ctx.reply(trx.description, { reply_to_message_id: ctx.message?.message_id });
-            return;
-        }
-
-        // Check if amount needs confirmation (under 1000)
-        if (trx.needsConfirmation && trx.suggestedAmount) {
-            const { text, keyboard } = TransactionFormatter.formatAmountConfirmation(cleanedMessage, trx);
-            await ctx.reply(text, {
-                parse_mode: "Markdown",
-                reply_markup: keyboard,
-                reply_to_message_id: ctx.message?.message_id
-            });
-            return;
-        }
-
-        // Check if transaction needs confirmation due to low confidence
-        if (trx.confidence < 0.9) {
-            // Store pending transaction
-            ctx.session.pendingTransactions.push({
-                parsed: trx,
-                usage,
-                userId: userAccount.userId,
-                groupId: group.id,
-                rawMessage: cleanedMessage
-            });
-
-            // Build and send confirmation message
-            const messageText = TransactionFormatter.formatLowConfidenceTransaction(
-                trx,
-                cleanedMessage,
-                parsed?.message ?? ""
-            );
-            const keyboard = TransactionFormatter.getSingleTransactionKeyboard();
-
-            const fullMessage = trx.confidence < 0.7 ?
-                messageText + `\n\n💡 Jika bingung, coba /help` : messageText;
-
-            await ctx.reply(fullMessage, {
-                parse_mode: "Markdown",
-                reply_markup: keyboard,
-                reply_to_message_id: ctx.message?.message_id
-            });
-            return;
-        }
-
-        // High confidence - save immediately
-        await useCase.saveGroupTransactionWithConfirmation(
-            ctx, trx, usage, userAccount.userId, group.id, cleanedMessage
-        );
-
+        await ctx.reply("Fitur family masih sedang dibangun...");
+        return
     } catch (error) {
         logger.error("Failed to parse group transaction:", error);
 

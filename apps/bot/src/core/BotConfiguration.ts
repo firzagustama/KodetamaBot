@@ -47,7 +47,7 @@ export class BotConfiguration {
                     registrationData: null,
                     onboardingData: null,
                     lastTransactionIds: [],
-                    pendingTransactions: [],
+                    pendingTransactions: null,
                 }),
             })
         );

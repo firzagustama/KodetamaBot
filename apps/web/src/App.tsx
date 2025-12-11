@@ -1,23 +1,33 @@
 import { useAuth } from "./hooks/useAuth";
-import { useTelegram } from "./hooks/useTelegram";
 import { useStore } from "./stores/useStore";
 import { useKeyboardOpen } from "./hooks/useKeyboardOpen";
 import Dashboard from "./components/Dashboard";
 import BudgetManager from "./components/BudgetManager";
 import TransactionList from "./components/TransactionList";
 import GoogleIntegration from "./components/GoogleIntegration";
-import { setupSwipeBehavior } from "./utils/telegramBridge";
 import { useEffect, useState, useRef } from "react";
 import { StartBotInfo } from "./components/StartBotInfo";
 import { NavButton } from "./components/NavButton";
+import {
+    miniApp,
+    viewport,
+    themeParams,
+    swipeBehavior,
+    useLaunchParams,
+    useSignal,
+} from "@tma.js/sdk-react";
 
 type Tab = "dashboard" | "budget" | "transactions" | "google";
 
 const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME;
 
 function App() {
-    const { ready, expand, webApp, requestFullscreen, initDataRaw } = useTelegram();
-    const { token, authenticated, loading: authLoading } = useAuth();
+    const lp = useLaunchParams();
+
+    // Use signals to track component state
+    const isExpanded = useSignal(viewport.isExpanded);
+
+    const { token, authenticated, loading: authLoading, authenticate } = useAuth();
     const { budget } = useStore();
     const isKeyboardOpen = useKeyboardOpen();
 
@@ -30,43 +40,52 @@ function App() {
     const [uiReady, setUiReady] = useState(false);
     const [isMiniApp, setIsMiniApp] = useState(false);
 
-    const hasExpanded = useRef(false);
+    const hasInitialized = useRef(false);
     const hasFetched = useRef(false);
-    const hasRequestedFullscreen = useRef(false); // ✅ Prevent infinite loop
 
     // Check if running inside Telegram Mini App
     useEffect(() => {
-        const isInTelegram = !!webApp;
+        const isInTelegram = lp && lp.platform !== "unknown";
         setIsMiniApp(isInTelegram);
         console.log("Running in Telegram Mini App:", isInTelegram);
-    }, [webApp]);
+        console.log("Platform:", lp?.platform);
+        console.log("Version:", lp?.version);
+    }, [lp]);
 
-    // ✅ Initialize Mini App (only once)
+    // ✅ Initialize Mini App components (only once)
     useEffect(() => {
-        if (isMiniApp && ready && !hasExpanded.current) {
-            hasExpanded.current = true;
+        if (isMiniApp && !hasInitialized.current) {
+            hasInitialized.current = true;
 
             setTimeout(() => {
-                // Expand viewport
-                expand?.();
+                try {
+                    // Mount components before using them
+                    miniApp.mount();
+                    viewport.mount();
+                    themeParams.mount();
+                    swipeBehavior.mount();
 
-                // Disable vertical swipe to prevent app closing on scroll
-                setupSwipeBehavior(false);
-                console.log("✅ Disabled vertical swipe behavior");
+                    // Expand viewport to full height
+                    if (!isExpanded) {
+                        viewport.requestFullscreen(); // change here for expanded or fullscreen
+                    }
 
-                // Request fullscreen ONCE (optional - remove if you don't want auto-fullscreen)
-                if (!hasRequestedFullscreen.current) {
-                    hasRequestedFullscreen.current = true;
-                    // Uncomment if you want auto-fullscreen:
-                    requestFullscreen();
+                    // Disable vertical swipe to prevent app closing on scroll
+                    swipeBehavior.disableVertical();
+
+                    // Set closing behavior
+                    miniApp.ready();
+
+                    setUiReady(true);
+                } catch (error) {
+                    console.error("Error initializing Mini App:", error);
+                    setUiReady(true);
                 }
-
-                setUiReady(true);
             }, 150);
         } else if (!isMiniApp) {
             setUiReady(true);
         }
-    }, [isMiniApp, ready, expand, requestFullscreen]);
+    }, [isMiniApp, isExpanded]);
 
     // ✅ Set token in store when authenticated
     useEffect(() => {
@@ -77,48 +96,8 @@ function App() {
 
     // ✅ Set up 401 handler for seamless token renewal
     useEffect(() => {
-        const handle401 = async (): Promise<string | null> => {
-            if (!initDataRaw) {
-                console.log('[401] No Telegram initData available for re-auth');
-                return null;
-            }
-
-            try {
-                console.log('[401] Attempting re-authentication with Telegram...');
-
-                const response = await fetch('/api/auth/telegram', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ initData: initDataRaw }),
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    console.error('[401] Re-auth failed:', data.error);
-                    return null;
-                }
-
-                console.log('[401] Re-auth successful, got new token');
-                const newToken = data.token;
-
-                if (newToken) {
-                    setToken(newToken);
-                    localStorage.setItem('auth_token', newToken);
-                    return newToken;
-                }
-
-                return null;
-            } catch (error) {
-                console.error('[401] Re-auth error:', error);
-                return null;
-            }
-        };
-
-        setOn401Handler(handle401);
-    }, [initDataRaw, setToken, setOn401Handler]);
+        setOn401Handler(authenticate);
+    }, [lp, setToken, setOn401Handler]);
 
     // ✅ Fetch budget/transactions in background
     useEffect(() => {
@@ -147,10 +126,7 @@ function App() {
     if (!authenticated) {
         return (
             <div className="max-h-screen bg-base-100 text-base-content antialiased selection:bg-primary selection:text-primary-content font-sans">
-                <StartBotInfo
-                    botUsername={BOT_USERNAME}
-                    isMiniApp={isMiniApp}
-                />
+                <StartBotInfo botUsername={BOT_USERNAME} isMiniApp={isMiniApp} />
             </div>
         );
     }

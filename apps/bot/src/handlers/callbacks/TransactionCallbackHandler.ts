@@ -19,11 +19,9 @@ export class TransactionCallbackHandler {
         if (!ctx.callbackQuery?.data) return false;
 
         const data = ctx.callbackQuery.data;
-        return data === "confirm_transaction" ||
-               data === "reject_transaction" ||
-               data === "confirm_multiple_transactions" ||
-               data === "reject_multiple_transactions" ||
-               data.startsWith("confirm_amount_");
+        return data === "reject_transaction" ||
+            data === "confirm_multiple_transactions" ||
+            data === "reject_multiple_transactions";
     }
 
     /**
@@ -36,9 +34,6 @@ export class TransactionCallbackHandler {
 
         try {
             switch (data) {
-                case "confirm_transaction":
-                    await this.handleSingleTransactionConfirmation(ctx);
-                    break;
                 case "reject_transaction":
                     await this.handleSingleTransactionRejection(ctx);
                     break;
@@ -48,21 +43,10 @@ export class TransactionCallbackHandler {
                 case "reject_multiple_transactions":
                     await this.handleMultipleTransactionsRejection(ctx);
                     break;
-                default:
-                    if (data.startsWith("confirm_amount_")) {
-                        await this.handleAmountConfirmation(ctx, data);
-                    }
             }
         } catch (error) {
             console.error("Error handling transaction callback:", error);
             await ctx.answerCallbackQuery("❌ Terjadi kesalahan saat memproses permintaan.");
-        }
-    }
-
-    private async handleSingleTransactionConfirmation(ctx: BotContext): Promise<void> {
-        const result = await this.transactionUseCase.confirmSinglePendingTransaction(ctx);
-        if (result.success) {
-            await ctx.answerCallbackQuery("✅ Transaksi dikonfirmasi!");
         }
     }
 
@@ -81,29 +65,5 @@ export class TransactionCallbackHandler {
     private async handleMultipleTransactionsRejection(ctx: BotContext): Promise<void> {
         await this.transactionUseCase.rejectPendingTransactions(ctx);
         await ctx.answerCallbackQuery("Transaksi dibatalkan.");
-    }
-
-    private async handleAmountConfirmation(ctx: BotContext, data: string): Promise<void> {
-        // Extract amount from callback data
-        const amountStr = data.replace("confirm_amount_", "");
-        const amount = parseInt(amountStr);
-
-        if (isNaN(amount)) {
-            await ctx.answerCallbackQuery("❌ Jumlah tidak valid.");
-            return;
-        }
-
-        // Update the pending transaction with confirmed amount
-        if (ctx.session.pendingTransactions && ctx.session.pendingTransactions[0]) {
-            ctx.session.pendingTransactions[0].parsed.amount = amount;
-            ctx.session.pendingTransactions[0].parsed.needsConfirmation = false;
-            delete ctx.session.pendingTransactions[0].parsed.suggestedAmount;
-        }
-
-        // Confirm the transaction with updated amount
-        const result = await this.transactionUseCase.confirmSinglePendingTransaction(ctx);
-        if (result.success) {
-            await ctx.answerCallbackQuery("✅ Jumlah dikonfirmasi!");
-        }
     }
 }

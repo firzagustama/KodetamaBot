@@ -17,11 +17,11 @@ export class TransactionFormatter {
      */
     static formatTransactionConfirmation(transaction: any): string {
         return `*Transaksi Tercatat!*\n\n` +
-               `📝 *${transaction.description}*\n` +
-               `💰 Jumlah: ${formatRupiah(transaction.amount)}\n` +
-               `📂 Kategori: ${transaction.category}\n` +
-               `${this.bucketEmoji[transaction.bucket] ?? "📦"} Bucket: ${transaction.bucket}\n` +
-               `_Ketik /undo untuk membatalkan_`;
+            `📝 *${transaction.description}*\n` +
+            `💰 Jumlah: ${formatRupiah(transaction.amount)}\n` +
+            `📂 Kategori: ${transaction.category}\n` +
+            `${this.bucketEmoji[transaction.bucket] ?? "📦"} Bucket: ${transaction.bucket}\n` +
+            `_Ketik /undo untuk membatalkan_`;
     }
 
     /**
@@ -29,12 +29,12 @@ export class TransactionFormatter {
      */
     static formatTransactionConfirmationForEdit(transaction: any): string {
         return `*Transaksi Tercatat!*\n\n` +
-               `📝 *${transaction.description}*\n` +
-               `💰 Jumlah: ${formatRupiah(transaction.amount)}\n` +
-               `📂 Kategori: ${transaction.category}\n` +
-               `${this.bucketEmoji[transaction.bucket] ?? "📦"} Bucket: ${transaction.bucket}\n` +
-               `_Ketik /undo untuk membatalkan_\n\n` +
-               `${transaction.message}`;
+            `📝 *${transaction.description}*\n` +
+            `💰 Jumlah: ${formatRupiah(transaction.amount)}\n` +
+            `📂 Kategori: ${transaction.category}\n` +
+            `${this.bucketEmoji[transaction.bucket] ?? "📦"} Bucket: ${transaction.bucket}\n` +
+            `_Ketik /undo untuk membatalkan_\n\n` +
+            `${transaction.message}`;
     }
 
     /**
@@ -42,22 +42,20 @@ export class TransactionFormatter {
      */
     static formatMultipleTransactionsConfirmation(
         transactions: any[],
-        rawMessage: string
     ): string {
         let message = `⚠️ *Konfirmasi ${transactions.length} Transaksi*\n\n`;
-        message += `Kamu menulis:\n"${rawMessage}"\n\n`;
-        message += `Hasil parsing:\n`;
 
-        transactions.forEach((t, idx) => {
+        transactions.forEach((t) => {
             const typeEmoji = t.type === "income" ? "📥" : "📤";
             const confidenceWarning = t.confidence < 0.9 ? " ⚠️" : "";
+            t.amount = t.suggestedAmount;
 
-            message += `\n${idx + 1}. ${typeEmoji} *${t.description}*${confidenceWarning}\n`;
-            message += `   💰 ${formatRupiah(t.amount)}\n`;
-            message += `   📂 ${t.category} ${this.bucketEmoji[t.bucket] ?? "📦"}\n`;
+            message += `\n${typeEmoji} *${t.description}*${confidenceWarning}\n`;
+            message += `💰 ${formatRupiah(t.amount)}${t.confidence < 0.9 ? "?" : ""}\n`;
+            message += `📂 ${t.category} ${this.bucketEmoji[t.bucket] ?? "📦"}\n`;
         });
 
-        message += `\nSemua benar?`;
+        message += `\nBener?`;
         return message;
     }
 
@@ -66,7 +64,7 @@ export class TransactionFormatter {
      */
     static getMultipleTransactionsKeyboard(): InlineKeyboard {
         return new InlineKeyboard()
-            .text("✅ Ya, Simpan Semua", "confirm_multiple_transactions")
+            .text("✅ Simpan", "confirm_multiple_transactions")
             .row()
             .text("❌ Batal", "reject_multiple_transactions");
     }
@@ -149,11 +147,11 @@ export class TransactionFormatter {
             );
 
         const text = `🤔 *Konfirmasi Jumlah*\n\n` +
-                    `Kamu menulis: "${message}"\n\n` +
-                    `Maksudnya:\n` +
-                    `• ${formatRupiah(transaction.suggestedAmount!)} (${(transaction.suggestedAmount! / 1000).toFixed(0)}rb)?\n` +
-                    `• ${formatRupiah(transaction.amount)}?\n\n` +
-                    `Pilih yang benar:`;
+            `Kamu menulis: "${message}"\n\n` +
+            `Maksudnya:\n` +
+            `• ${formatRupiah(transaction.suggestedAmount!)} (${(transaction.suggestedAmount! / 1000).toFixed(0)}rb)?\n` +
+            `• ${formatRupiah(transaction.amount)}?\n\n` +
+            `Pilih yang benar:`;
 
         return { text, keyboard };
     }

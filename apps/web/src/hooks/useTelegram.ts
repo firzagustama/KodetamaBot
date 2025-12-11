@@ -89,7 +89,6 @@ export function useTelegram() {
 
     useEffect(() => {
         isMountedRef.current = true;
-
         const initWebApp = async () => {
             if (webApp) {
                 try {
