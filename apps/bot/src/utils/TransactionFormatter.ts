@@ -16,24 +16,24 @@ export class TransactionFormatter {
      * Format a single transaction confirmation message
      */
     static formatTransactionConfirmation(transaction: any): string {
-        return `*Transaksi Tercatat!*\n\n` +
+        return `*Udah, kecatet.* 😐\n\n` +
             `📝 *${transaction.description}*\n` +
-            `💰 Jumlah: ${formatRupiah(transaction.amount)}\n` +
-            `📂 Kategori: ${transaction.category}\n` +
-            `${this.bucketEmoji[transaction.bucket] ?? "📦"} Bucket: ${transaction.bucket}\n` +
-            `_Ketik /undo untuk membatalkan_`;
+            `💸 Duit: ${formatRupiah(transaction.amount)}\n` +
+            `📂 Buat: ${transaction.category}\n` +
+            `${this.bucketEmoji[transaction.bucket] ?? "📦"} Pos: ${transaction.bucket}\n` +
+            `_Salah ketik? /undo aja cepetan._`;
     }
 
     /**
      * Format a single transaction confirmation message (edited version for callbacks)
      */
     static formatTransactionConfirmationForEdit(transaction: any): string {
-        return `*Transaksi Tercatat!*\n\n` +
+        return `*Udah, kecatet.* 😐\n\n` +
             `📝 *${transaction.description}*\n` +
-            `💰 Jumlah: ${formatRupiah(transaction.amount)}\n` +
-            `📂 Kategori: ${transaction.category}\n` +
-            `${this.bucketEmoji[transaction.bucket] ?? "📦"} Bucket: ${transaction.bucket}\n` +
-            `_Ketik /undo untuk membatalkan_\n\n` +
+            `💸 Duit: ${formatRupiah(transaction.amount)}\n` +
+            `📂 Buat: ${transaction.category}\n` +
+            `${this.bucketEmoji[transaction.bucket] ?? "📦"} Pos: ${transaction.bucket}\n` +
+            `_Salah ketik? /undo aja cepetan._\n\n` +
             `${transaction.message}`;
     }
 
@@ -43,19 +43,19 @@ export class TransactionFormatter {
     static formatMultipleTransactionsConfirmation(
         transactions: any[],
     ): string {
-        let message = `⚠️ *Konfirmasi ${transactions.length} Transaksi*\n\n`;
+        let message = `⚠️ *Cek dulu, bener gak nih?* (${transactions.length} item)\n\n`;
 
         transactions.forEach((t) => {
             const typeEmoji = t.type === "income" ? "📥" : "📤";
-            const confidenceWarning = t.confidence < 0.9 ? " ⚠️" : "";
+            const confidenceWarning = t.confidence < 0.9 ? " 🤨" : "";
             t.amount = t.suggestedAmount;
 
             message += `\n${typeEmoji} *${t.description}*${confidenceWarning}\n`;
-            message += `💰 ${formatRupiah(t.amount)}${t.confidence < 0.9 ? "?" : ""}\n`;
+            message += `💸 ${formatRupiah(t.amount)}${t.confidence < 0.9 ? "?" : ""}\n`;
             message += `📂 ${t.category} ${this.bucketEmoji[t.bucket] ?? "📦"}\n`;
         });
 
-        message += `\nBener?`;
+        message += `\nGimana? Bungkus?`;
         return message;
     }
 
@@ -64,16 +64,16 @@ export class TransactionFormatter {
      */
     static getMultipleTransactionsKeyboard(): InlineKeyboard {
         return new InlineKeyboard()
-            .text("✅ Simpan", "confirm_multiple_transactions")
+            .text("👊 Sikat", "confirm_multiple_transactions")
             .row()
-            .text("❌ Batal", "reject_multiple_transactions");
+            .text("✋ Gak jadi", "reject_multiple_transactions");
     }
 
     /**
      * Format multiple transactions success summary
      */
     static formatMultipleTransactionsSuccess(transactions: any[]): string {
-        let summary = `✅ *${transactions.length} Transaksi Tersimpan!*\n\n`;
+        let summary = `✅ *Beres. ${transactions.length} data masuk.* 💨\n\n`;
 
         // Group by type for summary
         const income = transactions.filter(t => t.type === "income");
@@ -96,7 +96,7 @@ export class TransactionFormatter {
             });
         }
 
-        summary += `\n_Ketik /undo untuk membatalkan semua_`;
+        summary += `\n_Mau batalin semua? /undo_`;
         return summary;
     }
 
@@ -106,18 +106,20 @@ export class TransactionFormatter {
     static formatLowConfidenceTransaction(transaction: any, rawMessage: string, aiMessage: string): string {
         const confidenceLabel = transaction.confidence >= 0.7 ? "⚠️" : "❓";
 
-        let message = `${confidenceLabel} *Konfirmasi Transaksi*\n\n`;
-        message += `Kamu menulis: "${rawMessage}"\n\n`;
+        // Saitama style: Confused but trying to help
+        let message = `${confidenceLabel} *Hah? Maksudnya gini?* 🤨\n\n`;
+        message += `Tadi nulis: "${rawMessage}"\n\n`;
+        message += `Mungkin maksudnya:\n`;
         message += `💝 *${transaction.description}*\n`;
-        message += `💰 Jumlah: ${formatRupiah(transaction.amount)}\n`;
-        message += `📂 Kategori: ${transaction.category}\n`;
-        message += `${this.bucketEmoji[transaction.bucket] ?? "📦"} Bucket: ${transaction.bucket}\n`;
+        message += `💸 Duit: ${formatRupiah(transaction.amount)}\n`;
+        message += `📂 Buat: ${transaction.category}\n`;
+        message += `${this.bucketEmoji[transaction.bucket] ?? "📦"} Pos: ${transaction.bucket}\n`;
         if (aiMessage) {
-            message += `${aiMessage}\n\n`;
+            message += `\nKata AI: ${aiMessage}\n\n`;
         } else {
             message += `\n`;
         }
-        message += `Boleh?`;
+        message += `Bener gak?`;
 
         return message;
     }
@@ -127,8 +129,8 @@ export class TransactionFormatter {
      */
     static getSingleTransactionKeyboard(): InlineKeyboard {
         return new InlineKeyboard()
-            .text("Ok", "confirm_transaction")
-            .text("Bukan", "reject_transaction");
+            .text("Yoi, bener", "confirm_transaction")
+            .text("Ngaco", "reject_transaction");
     }
 
     /**
@@ -146,12 +148,13 @@ export class TransactionFormatter {
                 `confirm_amount_${transaction.amount}`
             );
 
-        const text = `🤔 *Konfirmasi Jumlah*\n\n` +
-            `Kamu menulis: "${message}"\n\n` +
-            `Maksudnya:\n` +
+        // Saitama style: Annoyed by ambiguity
+        const text = `🤔 *Nulis angka yang jelas napa...*\n\n` +
+            `Tadi nulis: "${message}"\n\n` +
+            `Yang mana nih:\n` +
             `• ${formatRupiah(transaction.suggestedAmount!)} (${(transaction.suggestedAmount! / 1000).toFixed(0)}rb)?\n` +
             `• ${formatRupiah(transaction.amount)}?\n\n` +
-            `Pilih yang benar:`;
+            `Pencet yang bener:`;
 
         return { text, keyboard };
     }
@@ -160,6 +163,7 @@ export class TransactionFormatter {
      * Format rejection message
      */
     static formatRejectionMessage(originalText?: string): string {
-        return `${originalText ?? "Konfirmasi Transaksi"}\n\n❌ *Transaksi Dibatalkan*\n\nSilakan ulangi dengan pesan yang lebih jelas.`;
+        // Saitama style: Indifferent rejection
+        return `${originalText ?? "Konfirmasi Transaksi"}\n\n❌ *Yaudah, batal.*\n\nCoba tulis lagi yang bener.`;
     }
 }

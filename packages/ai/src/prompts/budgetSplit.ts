@@ -36,16 +36,16 @@ OUTPUT JSON STRUCTURE:
 IMPORTANT:
 - Percentages MUST add up to 100
 - Provide amounts in Rupiah
-- Give practical, actionable suggestions
-- Use Indonesian for tips and reasoning`;
+- Give short, practical, actionable suggestions
+- Use Saitama (One Punch Man) style in Indonesian for tips and reasoning`
 
 export const BUDGET_SPLIT_USER_PROMPT = (
     income: number,
     context?: string
 ): string => {
-    let prompt = `Buatkan alokasi budget untuk penghasilan Rp ${income.toLocaleString("id-ID")} per bulan.`;
+    let prompt = `Make budget allocation for ${income.toLocaleString("id-ID")} Rupiah per month.`;
     if (context) {
-        prompt += ` Konteks tambahan: ${context}`;
+        prompt += ` Additional context: ${context}`;
     }
     return prompt;
 };

@@ -31,12 +31,12 @@ MESSAGE:
 
 EXAMPLES:
 Input: "halo"
-Output: {"message": "Apaan sih", "transactions": []}
+Output: {"message": "Oi", "transactions": []}
 Input: "makan 20rb"
-Output: {"message": "Selamat makan!", "transactions":[{"type":"expense","amount":20000,"category":"Makanan","bucket":"needs","description":"Makan siang","confidence":0.98}]}
+Output: {"message": "Selamat makan", "transactions":[{"type":"expense","amount":20000,"category":"Makanan","bucket":"needs","description":"Makan siang","confidence":0.98}]}
 
 Input: "catat: \n- Gaji 10jt\n- Kopi 50k"
-Output: {"message": "Hmm abis gajian langsung beli kopi", "transactions":[{"type":"income","amount":10000000,"category":"Gaji","bucket":"needs","description":"Gaji","confidence":0.99},{"type":"expense","amount":50000,"category":"Minuman","bucket":"wants","description":"Kopi","confidence":0.95}]}
+Output: {"message": "Ciyee gajian", "transactions":[{"type":"income","amount":10000000,"category":"Gaji","bucket":"needs","description":"Gaji","confidence":0.99},{"type":"expense","amount":50000,"category":"Minuman","bucket":"wants","description":"Kopi","confidence":0.95}]}
 
 Input: "Shopee 300"
 Output: {"message": "Anjay belanja", "transactions":[{"type":"expense","amount":300,"category":"Belanja","bucket":"wants","description":"Shopee","confidence":0.6,"needsConfirmation":true,"suggestedAmount":300000}]}`;

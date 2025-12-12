@@ -54,7 +54,7 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
         };
     }>("/", {
         preHandler: [authenticate, loggingMiddleware],
-    }, async (request) => {
+    }, async (request, reply) => {
         const payload = request.user as { id: string; targetId: string; targetType: "user" | "group" };
         const { periodId: rawPeriodId, page = "1", pageSize = "20" } = request.query;
 
@@ -66,17 +66,9 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
 
         // If no periodId provided, return empty list
         if (!periodId) {
-            logger.warn("Transaction list requested with no default period", {
-                targetId: payload.targetId,
-                targetType: payload.targetType,
+            return reply.status(403).send({
+                message: "No default period found",
             });
-            return {
-                days: [],
-                total: 0,
-                page: pageNum,
-                pageSize: pageSizeNum,
-                hasMore: false,
-            };
         }
 
         try {

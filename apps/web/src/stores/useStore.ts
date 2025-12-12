@@ -53,6 +53,7 @@ interface State {
     // Auth
     token: string | null;
     on401Handler: (() => Promise<string | null>) | null;
+    on403Handler: (() => Promise<void>) | null;
 
     // Data
     budget: Budget | null;
@@ -66,6 +67,7 @@ interface State {
     // Actions
     setToken: (token: string | null) => void;
     setOn401Handler: (handler: () => Promise<string | null>) => void;
+    setOn403Handler: (handler: () => Promise<void>) => void;
     fetchBudget: () => Promise<void>;
     fetchTransactions: () => Promise<void>;
     fetchSummary: () => Promise<void>;
@@ -77,6 +79,7 @@ interface State {
 export const useStore = create<State>((set, get) => ({
     token: null,
     on401Handler: null,
+    on403Handler: null,
     budget: null,
     transactions: [],
     summary: null,
@@ -89,12 +92,14 @@ export const useStore = create<State>((set, get) => ({
 
     setOn401Handler: (handler) => set({ on401Handler: handler }),
 
+    setOn403Handler: (handler) => set({ on403Handler: handler }),
+
     fetchBudget: async () => {
-        const { token, on401Handler } = get();
+        const { token, on401Handler, on403Handler } = get();
         set({ loading: true, error: null });
 
         try {
-            const res = await authFetch(`/budgets/current`, token, {}, on401Handler || undefined);
+            const res = await authFetch(`/budgets/current`, token, {}, on401Handler || undefined, on403Handler || undefined);
 
             if (!res.ok) {
                 if (res.status === 401) {
@@ -129,7 +134,7 @@ export const useStore = create<State>((set, get) => ({
     },
 
     fetchTransactions: async () => {
-        const { token, budget, on401Handler } = get();
+        const { token, budget, on401Handler, on403Handler } = get();
         set({ loading: true, error: null });
 
         try {
@@ -139,7 +144,7 @@ export const useStore = create<State>((set, get) => ({
                 ? `/transactions?periodId=${periodId}`
                 : `/transactions`;
 
-            const res = await authFetch(url, token, {}, on401Handler || undefined);
+            const res = await authFetch(url, token, {}, on401Handler || undefined, on403Handler || undefined);
 
             if (!res.ok) {
                 if (res.status === 401) {
@@ -206,12 +211,12 @@ export const useStore = create<State>((set, get) => ({
     },
 
     fetchGoogleData: async () => {
-        const { token, on401Handler } = get();
+        const { token, on401Handler, on403Handler } = get();
 
         try {
             const [sheetRes, folderRes] = await Promise.all([
-                authFetch(`/google/sheets/current`, token, {}, on401Handler || undefined),
-                authFetch(`/google/drive/folder`, token, {}, on401Handler || undefined),
+                authFetch(`/google/sheets/current`, token, {}, on401Handler || undefined, on403Handler || undefined),
+                authFetch(`/google/drive/folder`, token, {}, on401Handler || undefined, on403Handler || undefined),
             ]);
 
             if (sheetRes.ok) {
@@ -229,14 +234,14 @@ export const useStore = create<State>((set, get) => ({
     },
 
     updateBudget: async (data) => {
-        const { budget, token, on401Handler } = get();
+        const { budget, token, on401Handler, on403Handler } = get();
         if (!budget) return;
 
         try {
             const res = await authFetch(`/budgets/${budget.period.id}`, token, {
                 method: "PUT",
                 body: JSON.stringify(data),
-            }, on401Handler || undefined);
+            }, on401Handler || undefined, on403Handler || undefined);
 
             if (!res.ok) {
                 throw new Error("Failed to update budget");

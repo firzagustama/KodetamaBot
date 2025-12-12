@@ -52,18 +52,145 @@ export interface UsageStats {
 }
 
 // =============================================================================
+// DEVELOPMENT MOCKS
+// =============================================================================
+
+/**
+ * Get mock parsed transaction based on message
+ */
+function getMockParsedTransaction(message: string): { result: ParsedTransaction; usage: UsageStats } {
+    return {
+        result: {
+            message,
+            transactions: [
+                {
+                    type: "expense",
+                    amount: 25000, // Rp 25,000
+                    category: "Makanan",
+                    bucket: "needs",
+                    description: `Biaya ${message.toLowerCase()}`,
+                    confidence: 0.95,
+                    needsConfirmation: false
+                }
+            ]
+        },
+        usage: {
+            inputTokens: 50,
+            outputTokens: 150,
+            model: "dev-mock"
+        }
+    };
+}
+
+/**
+ * Get mock budget split based on income
+ */
+function getMockBudgetSplit(income: number): { result: BudgetSplitResult; usage: UsageStats } {
+    return {
+        result: {
+            needsPercentage: 50,
+            wantsPercentage: 30,
+            savingsPercentage: 20,
+            needsAmount: income * 0.5,
+            wantsAmount: income * 0.3,
+            savingsAmount: income * 0.2,
+            suggestions: [
+                "Prioritaskan kebutuhan pokok seperti makanan dan transportasi",
+                "Alokasikan 30% untuk keinginan yang wajar",
+                "Simpan minimal 20% untuk darurat dan investasi"
+            ],
+            reasoning: "Berdasarkan analisis umum untuk pendapatan Rp " + income.toLocaleString('id-ID') +
+                ", proporsi 50:30:20 adalah rekomendasi standar untuk Zero-Based Budgeting yang balance."
+        },
+        usage: {
+            inputTokens: 75,
+            outputTokens: 200,
+            model: "dev-mock"
+        }
+    };
+}
+
+/**
+ * Get mock monthly summary
+ */
+function getMockMonthlySummary(periodName: string): { result: MonthlySummaryResult; usage: UsageStats } {
+    return {
+        result: {
+            summary: {
+                totalIncome: 5000000, // Rp 5,000,000
+                totalExpenses: 3500000, // Rp 3,500,000
+                totalSavings: 1500000, // Rp 1,500,000
+                netCashflow: 1500000   // Rp 1,500,000
+            },
+            topCategories: [
+                { name: "Makanan", amount: 800000, percentage: 22.9 },
+                { name: "Transportasi", amount: 600000, percentage: 17.1 },
+                { name: "Belanja", amount: 500000, percentage: 14.3 },
+                { name: "Hiburan", amount: 400000, percentage: 11.4 },
+                { name: "Lainnya", amount: 1200000, percentage: 34.3 }
+            ],
+            insights: [
+                "Pengeluaran Anda bulan ini 70% dari total pendapatan",
+                "Kategori Makanan merupakan pengeluaran terbesar",
+                "Anda berhasil menabung sesuai target budget"
+            ],
+            achievements: [
+                "Berhasil menabung 30% dari pendapatan",
+                "Pengeluaran kebutuhan di bawah 50%",
+                "Tidak ada pengeluaran impulsif besar"
+            ],
+            suggestions: [
+                "Pertimbangkan mengurangi pengeluaran makanan di luar rumah",
+                "Coba gunakan transportasi umum lebih sering untuk hemat biaya",
+                "Lanjutkan pola menabung yang baik ini"
+            ],
+            overallScore: 85,
+            narrative: `Ringkasan keuangan untuk ${periodName} menunjukkan kinerja yang baik dengan skor 85/100. Total pendapatan Rp 5.000.000 dengan pengeluaran Rp 3.500.000, menghasilkan tabungan Rp 1.500.000. Pola pengeluaran Anda cukup sehat dengan fokus pada kebutuhan primer.`
+        },
+        usage: {
+            inputTokens: 200,
+            outputTokens: 400,
+            model: "dev-mock"
+        }
+    };
+}
+
+/**
+ * Get mock streaming response
+ */
+async function* getMockStreamResponse(userMessage: string): AsyncGenerator<string, void, unknown> {
+    const mockResponse = `Terima kasih atas pertanyaan Anda tentang "${userMessage}". Ini adalah respons contoh dari sistem development yang mensimulasikan AI assistant untuk manajemen keuangan. Dalam mode production, sistem ini akan memberikan analisis yang lebih detail dan personal berdasarkan data keuangan Anda.`;
+
+    const words = mockResponse.split(' ');
+    for (const word of words) {
+        yield word + ' ';
+        // Simulate realistic typing delay
+        await new Promise(resolve => setTimeout(resolve, 50));
+    }
+}
+
+// =============================================================================
 // AI ORCHESTRATOR
 // =============================================================================
 
 export class AIOrchestrator {
-    private client: OpenAI;
+    private client: OpenAI | undefined;
     private model: string;
+    private isDevMode: boolean;
 
     constructor(config: AIConfig) {
-        this.client = new OpenAI({
-            apiKey: config.apiKey,
-            baseURL: config.baseURL ?? "https://openrouter.ai/api/v1",
-        });
+        // Check if we're in development mode (API key not set or is placeholder)
+        const apiKey = config.apiKey;
+        this.isDevMode = !apiKey ||
+            apiKey === "your_openrouter_api_key_here" ||
+            !apiKey.startsWith("sk-"); // OpenRouter keys start with sk-
+
+        if (!this.isDevMode) {
+            this.client = new OpenAI({
+                apiKey: config.apiKey,
+                baseURL: config.baseURL ?? "https://openrouter.ai/api/v1",
+            });
+        }
         this.model = config.model ?? "openai/gpt-4-turbo";
     }
 
@@ -73,6 +200,16 @@ export class AIOrchestrator {
     async parseTransaction(
         message: string
     ): Promise<{ result: ParsedTransaction; usage: UsageStats }> {
+        if (this.isDevMode) {
+            // Simulate processing delay
+            await new Promise(resolve => setTimeout(resolve, 100));
+            return getMockParsedTransaction(message);
+        }
+
+        if (!this.client) {
+            throw new Error("OpenAI client not initialized");
+        }
+
         const response = await this.client.chat.completions.create({
             model: this.model,
             messages: [
@@ -103,6 +240,16 @@ export class AIOrchestrator {
         income: number,
         context?: string
     ): Promise<{ result: BudgetSplitResult; usage: UsageStats }> {
+        if (this.isDevMode) {
+            // Simulate processing delay
+            await new Promise(resolve => setTimeout(resolve, 200));
+            return getMockBudgetSplit(income);
+        }
+
+        if (!this.client) {
+            throw new Error("OpenAI client not initialized");
+        }
+
         const response = await this.client.chat.completions.create({
             model: this.model,
             messages: [
@@ -134,6 +281,16 @@ export class AIOrchestrator {
         transactions: object[],
         budget: object
     ): Promise<{ result: MonthlySummaryResult; usage: UsageStats }> {
+        if (this.isDevMode) {
+            // Simulate processing delay
+            await new Promise(resolve => setTimeout(resolve, 300));
+            return getMockMonthlySummary(periodName);
+        }
+
+        if (!this.client) {
+            throw new Error("OpenAI client not initialized");
+        }
+
         const response = await this.client.chat.completions.create({
             model: this.model,
             messages: [
@@ -171,6 +328,15 @@ export class AIOrchestrator {
         systemPrompt: string,
         userMessage: string
     ): AsyncGenerator<string, void, unknown> {
+        if (this.isDevMode) {
+            yield* getMockStreamResponse(userMessage);
+            return;
+        }
+
+        if (!this.client) {
+            throw new Error("OpenAI client not initialized");
+        }
+
         const stream = await this.client.chat.completions.create({
             model: this.model,
             messages: [

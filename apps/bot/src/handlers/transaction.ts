@@ -49,8 +49,9 @@ export async function handleTransaction(ctx: BotContext): Promise<void> {
         // Get user from DB
         const account = await getUserByTelegramId(user.id);
         if (!account) {
+            // SAITAMA: Direct rejection.
             await ctx.reply(
-                "Kamu belum terdaftar. Ketik /start untuk mendaftar terlebih dahulu."
+                "Woy, belum daftar kok main nyelonong? Ketik /start dulu sana."
             );
             return;
         }
@@ -58,7 +59,8 @@ export async function handleTransaction(ctx: BotContext): Promise<void> {
         // Ensure period exists
         const periodId = await resolvePeriodId(account.userId);
         if (!periodId) {
-            await ctx.reply("Transaksi belum tercatat... Kamu belum mengatur budget. Mari kita setup dulu!");
+            // SAITAMA: Annoyed but helpful.
+            await ctx.reply("Duh, budget belum diatur. Ribet nih. Setup dulu gih biar bisa dicatet.");
             await ctx.conversation.enter("onboardingConversation");
             return;
         }
@@ -97,14 +99,17 @@ export async function handleTransaction(ctx: BotContext): Promise<void> {
     } catch (error) {
         logger.error("Failed to parse transaction:", error);
 
+        // SAITAMA: Brutally honest instruction. 
+        // "Salah tuh" instead of "Error parsing".
         await ctx.reply(
-            "*Tch, baca dong format nya.* 🤷‍♂️\n\n" +
-            "Coba kayak gini:\n" +
+            "*Salah tuh formatnya.* 😑\n" +
+            "Ngetik gini aja susah amat:\n\n" +
             "• `makan 20rb`\n" +
             "• `gaji 8jt`\n" +
             "• `bensin 150rb`\n\n" +
-            "Atau batch:\n" +
-            "```\ncatat\n* gaji 8jt\n* kopi 20rb\n* makan 20rb```",
+            "Atau kalo mau banyak:\n" +
+            "```\ncatat\n* gaji 8jt\n* kopi 20rb\n* makan 20rb```\n\n" +
+            "Udah, gitu doang.",
             { parse_mode: "Markdown" }
         );
     }

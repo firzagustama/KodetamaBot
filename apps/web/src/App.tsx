@@ -33,12 +33,14 @@ function App() {
 
     const setToken = useStore((state) => state.setToken);
     const setOn401Handler = useStore((state) => state.setOn401Handler);
+    const setOn403Handler = useStore((state) => state.setOn403Handler);
     const fetchBudget = useStore((state) => state.fetchBudget);
     const fetchTransactions = useStore((state) => state.fetchTransactions);
 
     const [activeTab, setActiveTab] = useState<Tab>("dashboard");
     const [uiReady, setUiReady] = useState(false);
     const [isMiniApp, setIsMiniApp] = useState(false);
+    const [forbidden, setForbidden] = useState(false);
 
     const hasInitialized = useRef(false);
     const hasFetched = useRef(false);
@@ -99,6 +101,15 @@ function App() {
         setOn401Handler(authenticate);
     }, [lp, setToken, setOn401Handler]);
 
+    // ✅ Set up 403 handler for user trigger /start
+    useEffect(() => {
+        setOn403Handler(async () => {
+            console.log("403 detected - proceeding with 403 response");
+            setForbidden(true);
+            return;
+        });
+    }, [setOn403Handler]);
+
     // ✅ Fetch budget/transactions in background
     useEffect(() => {
         if (authenticated && !hasFetched.current) {
@@ -123,7 +134,7 @@ function App() {
     }
 
     // Not authenticated - Show login page
-    if (!authenticated) {
+    if (!authenticated || forbidden) {
         return (
             <div className="max-h-screen bg-base-100 text-base-content antialiased selection:bg-primary selection:text-primary-content font-sans">
                 <StartBotInfo botUsername={BOT_USERNAME} isMiniApp={isMiniApp} />

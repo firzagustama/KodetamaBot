@@ -52,7 +52,8 @@ export class TransactionUseCase {
             // Ensure period exists
             const periodId = await resolvePeriodId(userId);
             if (!periodId) {
-                await ctx.reply("Transaksi belum tercatat... Kamu belum mengatur budget. Mari kita setup dulu!");
+                // SAITAMA UX: Lazy instruction
+                await ctx.reply("Budget belum diatur. Setup dulu, baru balik lagi.");
                 await ctx.conversation.enter("onboardingConversation");
                 return { success: false, error: new Error("No active period") };
             }
@@ -149,7 +150,8 @@ export class TransactionUseCase {
         try {
             const periodId = await resolvePeriodId(account.userId);
             if (!periodId) {
-                await ctx.reply("❌ Gagal menyimpan. Period tidak ditemukan.");
+                // SAITAMA UX: Blunt error
+                await ctx.reply("❌ Gagal. Periodenya ilang entah kemana.");
                 return { success: false, error: new Error("No active period") };
             }
 
@@ -182,7 +184,8 @@ export class TransactionUseCase {
             return { success: true, message };
         } catch (error) {
             logger.error("Failed to save confirmed transactions:", error);
-            await ctx.editMessageText("❌ Gagal menyimpan transaksi.");
+            // SAITAMA UX: Serious Series Error
+            await ctx.editMessageText("❌ Mode Serius: Gagal Simpen Data.");
             return { success: false, error: error as Error };
         }
     }
@@ -210,8 +213,8 @@ export class TransactionUseCase {
         const transactionIds = ctx.session.lastTransactionIds;
 
         if (!transactionIds || transactionIds.length === 0) {
-            await ctx.reply("Tidak ada transaksi yang bisa dibatalkan. 📝\n\n" +
-                "Hanya transaksi yang baru dicatat saja yang bisa di-undo ya!");
+            // SAITAMA UX: Confused/Bored
+            await ctx.reply("Hah? Gak ada yang bisa di-undo. Jangan ngigo.");
             return { success: true };
         }
 
@@ -231,16 +234,18 @@ export class TransactionUseCase {
             }
 
             if (!success) {
-                await ctx.reply("⚠️ Beberapa transaksi gagal dibatalkan, tapi sebagian berhasil.");
+                // SAITAMA UX: Partial failure
+                await ctx.reply("⚠️ Setengah beres, setengah error. Aneh banget dah.");
             } else {
                 // Clear session on successful deletion
                 ctx.session.lastTransactionIds = [];
 
                 // Send success message
+                // SAITAMA UX: Minimalist success
                 const count = transactionIds.length;
                 const message = count === 1
-                    ? "✅ Transaksi berhasil dibatalkan!\n\nKamu bisa catat transaksi yang benar sekarang. 💰"
-                    : `✅ ${count} transaksi berhasil dibatalkan!\n\nKamu bisa catat transaksi yang benar sekarang. 💰`;
+                    ? "✅ Udah di-undo. Anggap aja gak pernah kejadian."
+                    : `✅ ${count} transaksi udah di-undo. Kelar.`;
 
                 await ctx.reply(message);
             }
@@ -248,7 +253,7 @@ export class TransactionUseCase {
             return { success };
         } catch (error) {
             logger.error("Failed to undo transactions:", error);
-            await ctx.reply("❌ Gagal membatalkan transaksi. Silakan coba lagi.");
+            await ctx.reply("❌ Gagal undo. Eror nih.");
             return { success: false, error: error as Error };
         }
     }
@@ -323,7 +328,8 @@ export class TransactionUseCase {
             // Ensure group period exists
             const periodId = await resolveGroupPeriodId(groupId, userId);
             if (!periodId) {
-                await ctx.reply("❌ Gagal membuat periode untuk grup ini.", {
+                // SAITAMA UX: Blunt Group Error
+                await ctx.reply("❌ Gagal bikin periode grup. Bug kali ya?", {
                     reply_to_message_id: ctx.message?.message_id
                 });
                 return { success: false, error: new Error("No active group period") };
@@ -383,7 +389,7 @@ export class TransactionUseCase {
             // Ensure group period exists
             const periodId = await resolveGroupPeriodId(groupId, userId);
             if (!periodId) {
-                await ctx.reply("❌ Gagal membuat periode untuk grup ini.", {
+                await ctx.reply("❌ Gagal bikin periode grup. Bug kali ya?", {
                     reply_to_message_id: ctx.message?.message_id
                 });
                 return { success: false, error: new Error("No active group period") };

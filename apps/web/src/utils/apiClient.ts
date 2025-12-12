@@ -5,6 +5,7 @@ export interface ApiClientOptions {
     token: string | null;
     options?: RequestInit;
     on401?: () => Promise<string | null>; // Callback to handle 401 and return new token
+    on403?: () => Promise<void>; // Callback to handle 403
 }
 
 /**
@@ -17,7 +18,8 @@ export async function apiFetch({
     url,
     token,
     options = {},
-    on401
+    on401,
+    on403
 }: ApiClientOptions): Promise<Response> {
     const startTime = Date.now();
     const method = options.method || 'GET';
@@ -73,6 +75,10 @@ export async function apiFetch({
         }
     }
 
+    if (response.status === 403 && on403) {
+        await on403();
+    }
+
     return response;
 }
 
@@ -84,7 +90,8 @@ export async function authFetch(
     url: string,
     token: string | null,
     options: RequestInit = {},
-    on401?: () => Promise<string | null>
+    on401?: () => Promise<string | null>,
+    on403?: () => Promise<void>
 ): Promise<Response> {
-    return apiFetch({ url, token, options, on401 });
+    return apiFetch({ url, token, options, on401, on403 });
 }
