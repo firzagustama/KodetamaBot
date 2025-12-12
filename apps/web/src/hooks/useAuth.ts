@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { initData, useSignal } from "@tma.js/sdk-react";
 
 export function useAuth() {
@@ -45,6 +45,10 @@ export function useAuth() {
         };
     }, [initDataRaw]);
 
-    authenticate();
+    useEffect(() => {
+        if (initDataRaw) {
+            authenticate();
+        }
+    }, [initDataRaw])
     return { token, authenticated, loading, authenticate };
 }
