@@ -1,0 +1,1 @@
+ALTER TYPE "tier" ADD VALUE 'family_member';

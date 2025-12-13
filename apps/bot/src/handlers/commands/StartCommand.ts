@@ -2,6 +2,7 @@ import type { BotContext } from "../../types.js";
 import { CommandHandler, CommandExecutionResult, getTargetContext } from "../../core/index.js";
 import {
     isUserRegistered,
+    registerFamilyMember,
 } from "../../services/index.js";
 
 /**
@@ -14,6 +15,25 @@ export class StartCommand extends CommandHandler {
         const user = ctx.from;
         if (!user) {
             return { success: false, error: new Error("No user information") };
+        }
+
+        // ✅ Extract payload safely (Grammy)
+        const text = ctx.message?.text ?? "";
+        const payload = text.split(" ").slice(1).join(" ") || null;
+
+        if (payload) {
+            if (payload.startsWith("join_")) {
+                await registerFamilyMember({
+                    telegramId: user.id,
+                    groupId: payload.split("_")[1],
+                    username: user.username,
+                    firstName: user.first_name,
+                    lastName: user.last_name,
+                });
+
+                await ctx.reply("Berhasil bergabung ke keluarga! Langsung aja catat keuangan di group sambil mention gue ya!");
+                return { success: true };
+            }
         }
 
         // Check if user is already registered

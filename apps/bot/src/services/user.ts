@@ -15,7 +15,7 @@ export class UserService implements IUserService {
     constructor(
         private userRepository: IUserRepository,
         private registrationRepository: IPendingRegistrationRepository
-    ) {}
+    ) { }
 
     /**
      * Get user for registration flow
@@ -161,7 +161,7 @@ export class UserService implements IUserService {
 import type { Tier } from "@kodetama/shared";
 import { UserRepository } from "../infrastructure/repositories/index.js";
 import { db } from "@kodetama/db";
-import { pendingRegistrations } from "@kodetama/db/schema";
+import { familyMembers, pendingRegistrations, telegramAccounts } from "@kodetama/db/schema";
 import { eq, and } from "drizzle-orm";
 
 // Create singleton instances for backward compatibility
@@ -222,6 +222,50 @@ export async function getUserByTelegramId(telegramId: number) {
     }
 
     return null;
+}
+
+export async function registerFamilyMember(telegramData: {
+    telegramId: number;
+    groupId: string;
+    username?: string;
+    firstName?: string;
+    lastName?: string;
+}): Promise<void> {
+    const service = getLegacyUserService();
+    const account = await db.query.telegramAccounts.findFirst({
+        where: eq(telegramAccounts.telegramId, telegramData.telegramId),
+    });
+
+    let userId: string;
+    if (!account) {
+        const user = await service.registerNewUser({
+            telegramId: telegramData.telegramId,
+            username: telegramData.username,
+            firstName: telegramData.firstName,
+            lastName: telegramData.lastName,
+            tier: "family_member",
+        });
+        userId = user.data!;
+    } else {
+        userId = account.userId;
+    }
+
+    const existInGroup = await db.query.familyMembers.findFirst({
+        where: and(
+            eq(familyMembers.userId, userId),
+            eq(familyMembers.groupId, telegramData.groupId)
+        ),
+    });
+
+    if (existInGroup) {
+        return;
+    }
+
+    await db.insert(familyMembers).values({
+        userId,
+        groupId: telegramData.groupId,
+        role: "member"
+    });
 }
 
 /**

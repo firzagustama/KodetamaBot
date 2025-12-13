@@ -11,7 +11,7 @@ import {
 } from "./core/index.js";
 
 // Command handlers
-import { StartCommand, HelpCommand, BudgetCommand, DashboardCommand, LinkFamilyCommand, UndoCommand } from "./handlers/commands/index.js";
+import { StartCommand, HelpCommand, BudgetCommand, DashboardCommand, JoinFamilyCommand, LinkFamilyCommand, UndoCommand } from "./handlers/commands/index.js";
 
 // Event handlers
 import { handleAdminCallback } from "./handlers/admin.js";
@@ -48,6 +48,7 @@ async function createBotApplication() {
     commandRegistry.register(new HelpCommand());
     commandRegistry.register(new BudgetCommand());
     commandRegistry.register(new DashboardCommand());
+    commandRegistry.register(new JoinFamilyCommand());
     commandRegistry.register(new LinkFamilyCommand());
     commandRegistry.register(new UndoCommand());
 

@@ -4,7 +4,7 @@ import { z } from "zod";
 // ENUMS & CONSTANTS
 // =============================================================================
 
-export const TIERS = ["standard", "pro", "family"] as const;
+export const TIERS = ["standard", "pro", "family", "family_member"] as const;
 export type Tier = (typeof TIERS)[number];
 
 export const TX_TYPES = ["income", "expense", "transfer", "adjustment"] as const;

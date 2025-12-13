@@ -302,7 +302,9 @@ export async function onboardingConversation(
                     await ctx.reply("Group tidak terdaftar, mungkin sudah dihapus?")
                     return;
                 }
-                finalKeyboard.url("Buka Dashboard", `https://t.me/${process.env.BOT_USERNAME}?startapp=${group.id}`);
+                const botInfo = ctx.me;
+                // finalKeyboard.url("Buka Dashboard", `https://t.me/${botInfo?.username}?startapp=${group.id}`);
+                finalKeyboard.url("Join Group", `https://t.me/${botInfo?.username}?start=join_${group.id}`)
             } else {
                 finalKeyboard.webApp("Buka Dashboard", process.env.WEB_APP_URL);
             }
@@ -323,7 +325,8 @@ export async function onboardingConversation(
             "• `makan 20rb`\n" +
             "• `gaji 8jt`\n" +
             "• `bensin 15rb`\n\n" +
-            "Dah, sana lanjut aktivitas.",
+            "Dah, sana lanjut aktivitas." +
+            `${isGroup ? "\n\nBuat member, klik tombol Join di bawah!" : ""}`,
             { parse_mode: "Markdown", reply_markup: finalKeyboard }
         );
 

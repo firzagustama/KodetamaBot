@@ -18,7 +18,7 @@ import { relations } from "drizzle-orm";
 // ENUMS
 // =============================================================================
 
-export const tierEnum = pgEnum("tier", ["standard", "pro", "family"]);
+export const tierEnum = pgEnum("tier", ["standard", "pro", "family", "family_member"]);
 export const txTypeEnum = pgEnum("tx_type", ["income", "expense", "transfer", "adjustment"]);
 export const registrationStatusEnum = pgEnum("registration_status", ["pending", "approved", "rejected"]);
 

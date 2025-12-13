@@ -110,6 +110,7 @@ export async function registrationConversation(
         standard: "📊 Standard",
         pro: "⭐ Pro",
         family: "👨‍👩‍👧‍👦 Family",
+        family_member: "👨‍👩‍👧‍👦 Family Member",
     };
 
     try {
