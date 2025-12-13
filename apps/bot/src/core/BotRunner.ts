@@ -46,11 +46,13 @@ export class BotRunner {
         await this.bot.api.setMyCommands([
             { command: "start", description: "Mulai atau registrasi" },
             { command: "help", description: "Bantuan penggunaan" },
-            { command: "budget", description: "Lihat budget bulan ini" },
-            { command: "summary", description: "Ringkasan transaksi" },
+            { command: "dashboard", description: "Dashboard" },
+            // { command: "budget", description: "Lihat budget bulan ini" },
+            // { command: "summary", description: "Ringkasan transaksi" },
             { command: "undo", description: "Batalkan transaksi terakhir" },
-            { command: "wallet", description: "Lihat saldo wallet" },
-            { command: "export", description: "Export ke Google Sheets" },
+            // { command: "wallet", description: "Lihat saldo wallet" },
+            // { command: "export", description: "Export ke Google Sheets" },
+            { command: "link_family", description: "Hubungkan grup telegram" },
             { command: "cancel", description: "Batalkan percakapan" },
         ]);
 

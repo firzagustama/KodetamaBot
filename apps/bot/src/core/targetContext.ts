@@ -1,9 +1,6 @@
 import type { BotContext } from "../types.js";
 import { GroupRepository } from "../infrastructure/repositories/index.js";
 import { getUserByTelegramId } from "../services/index.js";
-import { db } from "@kodetama/db";
-import { groups, users, familyMembers } from "@kodetama/db/schema";
-import { eq } from "drizzle-orm";
 
 export interface TargetContext {
     isGroup: boolean;
@@ -25,7 +22,7 @@ export async function getTargetContext(ctx: BotContext): Promise<TargetContext> 
 
     const account = await getUserByTelegramId(user.id);
     if (!account) {
-        throw new Error("User not registered");
+        throw new Error("Kamu belum terdaftar, ketik /start untuk memulai");
     }
 
     // Check if this is a group chat
@@ -45,31 +42,7 @@ export async function getTargetContext(ctx: BotContext): Promise<TargetContext> 
     let group = await groupRepo.findByTelegramId(ctx.chat!.id);
 
     if (!group) {
-        // Check if user can register this group (Family tier)
-        const userRecord = await db.query.users.findFirst({
-            where: eq(users.id, account.userId),
-        });
-
-        if (userRecord?.tier === "family") {
-            // Auto-create group for Family tier user
-            const [newGroup] = await db.insert(groups).values({
-                telegramGroupId: ctx.chat!.id,
-                name: ctx.chat!.title || `Group ${ctx.chat!.id}`,
-                ownerId: account.userId,
-                isActive: true,
-            }).returning();
-
-            group = newGroup;
-
-            // Add owner as family member
-            await db.insert(familyMembers).values({
-                groupId: newGroup.id,
-                userId: account.userId,
-                role: "owner",
-            });
-        } else {
-            throw new Error("Grup ini belum terdaftar untuk fitur keluarga. Hubungi owner grup atau upgrade ke tier Family!");
-        }
+        throw new Error("Grup ini belum terdaftar, ketika /link_family untuk mengaktifkan grup ini.");
     }
 
     const isMember = await groupRepo.isUserMember(account.userId, group.id);
