@@ -32,8 +32,8 @@ export const users = pgTable("users", {
     isActive: boolean("is_active").notNull().default(true),
     incomeDate: integer("income_date").default(1),
     isIncomeUncertain: boolean("is_income_uncertain").default(false),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const telegramAccounts = pgTable("telegram_accounts", {
@@ -44,7 +44,7 @@ export const telegramAccounts = pgTable("telegram_accounts", {
     firstName: varchar("first_name", { length: 255 }),
     lastName: varchar("last_name", { length: 255 }),
     languageCode: varchar("language_code", { length: 10 }),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
     telegramIdIdx: index("telegram_accounts_telegram_id_idx").on(table.telegramId),
 }));
@@ -59,7 +59,7 @@ export const groups = pgTable("groups", {
     name: varchar("name", { length: 255 }).notNull(),
     ownerId: uuid("owner_id").notNull().references(() => users.id),
     isActive: boolean("is_active").notNull().default(true),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const familyMembers = pgTable("family_members", {
@@ -67,7 +67,7 @@ export const familyMembers = pgTable("family_members", {
     groupId: uuid("group_id").notNull().references(() => groups.id, { onDelete: "cascade" }),
     userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     role: varchar("role", { length: 50 }).notNull().default("member"), // owner, admin, member
-    joinedAt: timestamp("joined_at").notNull().defaultNow(),
+    joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 // =============================================================================
@@ -79,10 +79,10 @@ export const datePeriods = pgTable("date_periods", {
     userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
     groupId: uuid("group_id").references(() => groups.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 100 }).notNull(), // e.g., "Januari 2025"
-    startDate: timestamp("start_date").notNull(),
-    endDate: timestamp("end_date").notNull(),
+    startDate: timestamp("start_date", { withTimezone: true }).notNull(),
+    endDate: timestamp("end_date", { withTimezone: true }).notNull(),
     isCurrent: boolean("is_current").notNull().default(false),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
     userPeriodIdx: index("date_periods_user_id_idx").on(table.userId),
     groupPeriodIdx: index("date_periods_group_id_idx").on(table.groupId),
@@ -102,8 +102,8 @@ export const budgets = pgTable("budgets", {
     needsPercentage: decimal("needs_percentage", { precision: 5, scale: 2 }).notNull().default("50"),
     wantsPercentage: decimal("wants_percentage", { precision: 5, scale: 2 }).notNull().default("30"),
     savingsPercentage: decimal("savings_percentage", { precision: 5, scale: 2 }).notNull().default("20"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 // =============================================================================
@@ -118,7 +118,7 @@ export const categories = pgTable("categories", {
     icon: varchar("icon", { length: 50 }),
     bucket: varchar("bucket", { length: 50 }), // free text: needs, wants, savings, or custom
     isDefault: boolean("is_default").notNull().default(false),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 // =============================================================================
@@ -139,8 +139,8 @@ export const transactions = pgTable("transactions", {
     aiConfidence: decimal("ai_confidence", { precision: 3, scale: 2 }), // 0.00 - 1.00
     fileId: uuid("file_id").references(() => files.id),
     voiceTranscriptId: uuid("voice_transcript_id").references(() => voiceTranscripts.id),
-    transactionDate: timestamp("transaction_date").notNull().defaultNow(),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    transactionDate: timestamp("transaction_date", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
     userPeriodIdx: index("transactions_user_period_idx").on(table.userId, table.periodId),
     groupPeriodIdx: index("transactions_group_period_idx").on(table.groupId, table.periodId),
@@ -160,7 +160,7 @@ export const files = pgTable("files", {
     telegramFileId: varchar("telegram_file_id", { length: 255 }),
     googleDriveId: varchar("google_drive_id", { length: 255 }),
     googleDriveUrl: text("google_drive_url"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 // =============================================================================
@@ -174,7 +174,7 @@ export const voiceTranscripts = pgTable("voice_transcripts", {
     duration: integer("duration"), // in seconds
     transcript: text("transcript"),
     parsedData: jsonb("parsed_data"), // parsed transaction data from transcript
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 // =============================================================================
@@ -189,7 +189,7 @@ export const aiUsage = pgTable("ai_usage", {
     inputTokens: integer("input_tokens").notNull(),
     outputTokens: integer("output_tokens").notNull(),
     cost: decimal("cost", { precision: 10, scale: 6 }),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 // =============================================================================
@@ -204,9 +204,9 @@ export const pendingRegistrations = pgTable("pending_registrations", {
     requestedTier: tierEnum("requested_tier").notNull(),
     status: registrationStatusEnum("status").notNull().default("pending"),
     adminMessageId: integer("admin_message_id"), // to update the message later
-    processedAt: timestamp("processed_at"),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
     processedBy: bigint("processed_by", { mode: "number" }), // admin telegram id
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 // =============================================================================
@@ -218,10 +218,10 @@ export const googleTokens = pgTable("google_tokens", {
     userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
     accessToken: text("access_token").notNull(),
     refreshToken: text("refresh_token"),
-    expiresAt: timestamp("expires_at"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
     scope: text("scope"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const googleSheets = pgTable("google_sheets", {
@@ -231,8 +231,8 @@ export const googleSheets = pgTable("google_sheets", {
     periodId: uuid("period_id").notNull().references(() => datePeriods.id),
     spreadsheetId: varchar("spreadsheet_id", { length: 255 }).notNull(),
     spreadsheetUrl: text("spreadsheet_url").notNull(),
-    lastSyncAt: timestamp("last_sync_at"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const googleDriveFolders = pgTable("google_drive_folders", {
@@ -242,7 +242,7 @@ export const googleDriveFolders = pgTable("google_drive_folders", {
     periodId: uuid("period_id").notNull().references(() => datePeriods.id),
     folderId: varchar("folder_id", { length: 255 }).notNull(),
     folderUrl: text("folder_url").notNull(),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 // =============================================================================
