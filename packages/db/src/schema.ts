@@ -96,15 +96,20 @@ export const budgets = pgTable("budgets", {
     id: uuid("id").primaryKey().defaultRandom(),
     periodId: uuid("period_id").notNull().references(() => datePeriods.id, { onDelete: "cascade" }),
     estimatedIncome: decimal("estimated_income", { precision: 15, scale: 2 }).notNull(),
-    needsAmount: decimal("needs_amount", { precision: 15, scale: 2 }).notNull(),
-    wantsAmount: decimal("wants_amount", { precision: 15, scale: 2 }).notNull(),
-    savingsAmount: decimal("savings_amount", { precision: 15, scale: 2 }).notNull(),
-    needsPercentage: decimal("needs_percentage", { precision: 5, scale: 2 }).notNull().default("50"),
-    wantsPercentage: decimal("wants_percentage", { precision: 5, scale: 2 }).notNull().default("30"),
-    savingsPercentage: decimal("savings_percentage", { precision: 5, scale: 2 }).notNull().default("20"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const buckets = pgTable("buckets", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    budgetId: uuid("budget_id").notNull().references(() => budgets.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 100 }).notNull(),
+    description: varchar("description", { length: 255 }),
+    amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+    icon: varchar("icon", { length: 50 }).default("Wallet"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+})
 
 // =============================================================================
 // CATEGORIES
@@ -296,6 +301,21 @@ export const datePeriodsRelations = relations(datePeriods, ({ one, many }) => ({
         references: [budgets.periodId],
     }),
     transactions: many(transactions),
+}));
+
+export const budgetRelations = relations(budgets, ({ one, many }) => ({
+    period: one(datePeriods, {
+        fields: [budgets.periodId],
+        references: [datePeriods.id],
+    }),
+    buckets: many(buckets),
+}));
+
+export const bucketRelations = relations(buckets, ({ one }) => ({
+    budget: one(budgets, {
+        fields: [buckets.budgetId],
+        references: [budgets.id],
+    }),
 }));
 
 export const transactionsRelations = relations(transactions, ({ one }) => ({

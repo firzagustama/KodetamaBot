@@ -1,14 +1,7 @@
 import { useStore } from "../stores/useStore";
 import { useEffect } from "react";
-import {
-    Wallet,
-    Target,
-    ShoppingBag,
-    Home,
-    PiggyBank,
-    ArrowUpRight,
-    ArrowDownRight
-} from "lucide-react";
+import { DynamicIcon } from "../utils/dynamicIcon";
+import { ArrowDownRight, ArrowUpRight, Target, Wallet } from "lucide-react";
 
 // Helper for currency formatting
 function formatRupiah(amount: number): string {
@@ -91,30 +84,17 @@ export default function Dashboard() {
 
             {/* 2. THE BIG THREE: Buckets */}
             <div className="grid grid-cols-3 gap-3">
-                <BucketCard
-                    icon={<Home size={18} />}
-                    label="Needs"
-                    allocated={byBucket.needs.allocated}
-                    spent={byBucket.needs.spent}
-                    colorClass="text-emerald-500 bg-emerald-500/10 border-emerald-500/20"
-                    barClass="progress-success"
-                />
-                <BucketCard
-                    icon={<ShoppingBag size={18} />}
-                    label="Wants"
-                    allocated={byBucket.wants.allocated}
-                    spent={byBucket.wants.spent}
-                    colorClass="text-amber-500 bg-amber-500/10 border-amber-500/20"
-                    barClass="progress-warning"
-                />
-                <BucketCard
-                    icon={<PiggyBank size={18} />}
-                    label="Savings"
-                    allocated={byBucket.savings.allocated}
-                    spent={byBucket.savings.spent}
-                    colorClass="text-blue-500 bg-blue-500/10 border-blue-500/20"
-                    barClass="progress-info"
-                />
+                {byBucket.map((bucket) => (
+                    <BucketCard
+                        key={bucket.id}
+                        icon={<DynamicIcon name={bucket.icon} size={18} />}
+                        label={bucket.name}
+                        allocated={bucket.allocated}
+                        spent={bucket.spent}
+                        colorClass="text-secondary bg-secondary/10 border-secondary/20"
+                        barClass="progress-secondary"
+                    />
+                ))}
             </div>
 
             {/* 3. DETAILED BREAKDOWN */}
@@ -127,24 +107,14 @@ export default function Dashboard() {
                 </div>
 
                 <div className="p-4 space-y-5">
-                    <BucketRow
-                        label="Needs (Kebutuhan)"
-                        spent={byBucket.needs.spent}
-                        allocated={byBucket.needs.allocated}
-                        color="success"
-                    />
-                    <BucketRow
-                        label="Wants (Keinginan)"
-                        spent={byBucket.wants.spent}
-                        allocated={byBucket.wants.allocated}
-                        color="warning"
-                    />
-                    <BucketRow
-                        label="Savings (Tabungan)"
-                        spent={byBucket.savings.spent}
-                        allocated={byBucket.savings.allocated}
-                        color="info"
-                    />
+                    {byBucket.map((bucket) => (
+                        <BucketRow
+                            key={bucket.id}
+                            label={bucket.name}
+                            spent={bucket.spent}
+                            allocated={bucket.allocated}
+                        />
+                    ))}
                 </div>
             </div>
 
@@ -202,9 +172,10 @@ function BucketCard({ icon, label, allocated, spent, colorClass }: any) {
     );
 }
 
-function BucketRow({ label, spent, allocated, color }: any) {
+function BucketRow({ label, spent, allocated }: any) {
     const percent = getPercent(spent, allocated);
     const isOver = spent > allocated;
+    const color = spent / allocated > 0.8 ? "warning" : "success";
 
     return (
         <div className="space-y-1.5">

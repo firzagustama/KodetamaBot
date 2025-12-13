@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { db } from "@kodetama/db";
-import { budgets, datePeriods } from "@kodetama/db/schema";
+import { buckets, budgets, datePeriods } from "@kodetama/db/schema";
 import { eq, and } from "drizzle-orm";
 
 import { authenticate } from "../middleware/auth.js";
@@ -40,15 +40,14 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
             return reply.status(403).send({ error: "Budget not found" });
         }
 
+        const bucket = await db.query.buckets.findMany({
+            where: eq(buckets.budgetId, budget.id),
+        });
+
         return {
             id: budget.id,
             estimatedIncome: budget.estimatedIncome,
-            needsAmount: budget.needsAmount,
-            wantsAmount: budget.wantsAmount,
-            savingsAmount: budget.savingsAmount,
-            needsPercentage: budget.needsPercentage,
-            wantsPercentage: budget.wantsPercentage,
-            savingsPercentage: budget.savingsPercentage,
+            buckets: bucket,
             period: {
                 id: currentPeriod.id,
                 name: currentPeriod.name,
@@ -85,15 +84,14 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
             return reply.status(404).send({ error: "Budget not found" });
         }
 
+        const bucket = await db.query.buckets.findMany({
+            where: eq(buckets.budgetId, budget.id),
+        });
+
         return {
             id: budget.id,
             estimatedIncome: budget.estimatedIncome,
-            needsAmount: budget.needsAmount,
-            wantsAmount: budget.wantsAmount,
-            savingsAmount: budget.savingsAmount,
-            needsPercentage: budget.needsPercentage,
-            wantsPercentage: budget.wantsPercentage,
-            savingsPercentage: budget.savingsPercentage,
+            buckets: bucket,
             period: {
                 id: period.id,
                 name: period.name,
@@ -181,12 +179,12 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
             .values({
                 periodId,
                 estimatedIncome,
-                needsAmount: (income * needsPercentage / 100).toFixed(2),
-                wantsAmount: (income * wantsPercentage / 100).toFixed(2),
-                savingsAmount: (income * savingsPercentage / 100).toFixed(2),
-                needsPercentage: needsPercentage.toString(),
-                wantsPercentage: wantsPercentage.toString(),
-                savingsPercentage: savingsPercentage.toString(),
+                // needsAmount: (income * needsPercentage / 100).toFixed(2),
+                // wantsAmount: (income * wantsPercentage / 100).toFixed(2),
+                // savingsAmount: (income * savingsPercentage / 100).toFixed(2),
+                // needsPercentage: needsPercentage.toString(),
+                // wantsPercentage: wantsPercentage.toString(),
+                // savingsPercentage: savingsPercentage.toString(),
             })
             .returning();
 

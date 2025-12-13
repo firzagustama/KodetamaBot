@@ -1,5 +1,5 @@
 import { db } from "@kodetama/db";
-import { budgets, transactions } from "@kodetama/db/schema";
+import { buckets, budgets, transactions } from "@kodetama/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 
 /**
@@ -47,19 +47,15 @@ export async function getBudgetSummary(targetId: string, periodId: string, isGro
     const wantsSpent = spending.find(s => s.bucket === "wants")?.total ?? 0;
     const savingsSpent = spending.find(s => s.bucket === "savings")?.total ?? 0;
 
-    const needsBudget = parseFloat(budget.needsAmount);
-    const wantsBudget = parseFloat(budget.wantsAmount);
-    const savingsBudget = parseFloat(budget.savingsAmount);
-
     return {
         budget: {
             estimatedIncome: parseFloat(budget.estimatedIncome),
-            needs: needsBudget,
-            wants: wantsBudget,
-            savings: savingsBudget,
-            needsPercent: budget.needsPercentage,
-            wantsPercent: budget.wantsPercentage,
-            savingsPercent: budget.savingsPercentage,
+            // needs: needsBudget,
+            // wants: wantsBudget,
+            // savings: savingsBudget,
+            // needsPercent: budget.needsPercentage,
+            // wantsPercent: budget.wantsPercentage,
+            // savingsPercent: budget.savingsPercentage,
         },
         spent: {
             needs: needsSpent,
@@ -68,14 +64,14 @@ export async function getBudgetSummary(targetId: string, periodId: string, isGro
             total: needsSpent + wantsSpent + savingsSpent,
         },
         remaining: {
-            needs: needsBudget - needsSpent,
-            wants: wantsBudget - wantsSpent,
-            savings: savingsBudget - savingsSpent,
+            // needs: needsBudget - needsSpent,
+            // wants: wantsBudget - wantsSpent,
+            // savings: savingsBudget - savingsSpent,
         },
         percentage: {
-            needs: needsBudget > 0 ? Math.round((needsSpent / needsBudget) * 100) : 0,
-            wants: wantsBudget > 0 ? Math.round((wantsSpent / wantsBudget) * 100) : 0,
-            savings: savingsBudget > 0 ? Math.round((savingsSpent / savingsBudget) * 100) : 0,
+            // needs: needsBudget > 0 ? Math.round((needsSpent / needsBudget) * 100) : 0,
+            // wants: wantsBudget > 0 ? Math.round((wantsSpent / wantsBudget) * 100) : 0,
+            // savings: savingsBudget > 0 ? Math.round((savingsSpent / savingsBudget) * 100) : 0,
         },
     };
 }
@@ -100,29 +96,45 @@ export async function upsertBudget(data: {
         await db.update(budgets)
             .set({
                 estimatedIncome: data.estimatedIncome.toString(),
-                needsAmount: needsAmount.toString(),
-                wantsAmount: wantsAmount.toString(),
-                savingsAmount: savingsAmount.toString(),
-                needsPercentage: data.needsPercent.toString(),
-                wantsPercentage: data.wantsPercent.toString(),
-                savingsPercentage: data.savingsPercent.toString(),
                 updatedAt: new Date(),
             })
             .where(eq(budgets.id, existing.id));
 
+        await createBucket(existing.id, needsAmount, wantsAmount, savingsAmount);
         return existing.id;
     }
 
     const [newBudget] = await db.insert(budgets).values({
         periodId: data.periodId,
         estimatedIncome: data.estimatedIncome.toString(),
-        needsAmount: needsAmount.toString(),
-        wantsAmount: wantsAmount.toString(),
-        savingsAmount: savingsAmount.toString(),
-        needsPercentage: data.needsPercent.toString(),
-        wantsPercentage: data.wantsPercent.toString(),
-        savingsPercentage: data.savingsPercent.toString(),
     }).returning({ id: budgets.id });
 
+    await createBucket(newBudget.id, needsAmount, wantsAmount, savingsAmount);
     return newBudget.id;
+}
+
+async function createBucket(budgetId: string, needsAmount: number, wantsAmount: number, savingsAmount: number) {
+    await db.insert(buckets).values({
+        budgetId: budgetId,
+        name: "Needs",
+        description: "Essentials like rent, food, and utilities",
+        icon: "Home",
+        amount: needsAmount.toString(),
+    });
+
+    await db.insert(buckets).values({
+        budgetId: budgetId,
+        name: "Wants",
+        description: "Non-essential expenses like entertainment and shopping",
+        icon: "ShoppingBag",
+        amount: wantsAmount.toString(),
+    });
+
+    await db.insert(buckets).values({
+        budgetId: budgetId,
+        name: "Savings",
+        description: "Money set aside for future expenses",
+        icon: "PiggyBank",
+        amount: savingsAmount.toString(),
+    });
 }

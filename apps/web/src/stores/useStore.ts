@@ -4,12 +4,14 @@ import { authFetch } from "../utils/apiClient";
 interface Budget {
     id: string;
     estimatedIncome: number;
-    needsAmount: number;
-    wantsAmount: number;
-    savingsAmount: number;
-    needsPercentage: number;
-    wantsPercentage: number;
-    savingsPercentage: number;
+    buckets: Array<{
+        id: string;
+        icon: string;
+        name: string;
+        amount: number;
+        spent: number;
+        remaining: number;
+    }>,
     period: {
         id: string;
         name: string;
@@ -32,11 +34,14 @@ interface Summary {
     totalIncome: number;
     totalExpenses: number;
     totalSavings: number;
-    byBucket: {
-        needs: { allocated: number; spent: number; remaining: number };
-        wants: { allocated: number; spent: number; remaining: number };
-        savings: { allocated: number; spent: number; remaining: number };
-    };
+    byBucket: Array<{
+        id: string;
+        icon: string;
+        name: string;
+        allocated: number;
+        spent: number;
+        remaining: number;
+    }>,
     topCategories: { name: string; amount: number; percentage: number }[];
 }
 

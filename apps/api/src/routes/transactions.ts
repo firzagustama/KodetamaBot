@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { db } from "@kodetama/db";
-import { transactions, budgets, datePeriods } from "@kodetama/db/schema";
+import { transactions, budgets, datePeriods, buckets } from "@kodetama/db/schema";
 import { eq, desc, sql, and } from "drizzle-orm";
 
 import { authenticate } from "../middleware/auth.js";
@@ -327,6 +327,7 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
         // Get budget for period
         const budget = await db.query.budgets.findFirst({
             where: eq(budgets.periodId, periodId),
+            with: { buckets: true },
         });
 
         // Get all transactions for period
@@ -338,7 +339,7 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
         // Calculate totals
         let totalIncome = 0;
         let totalExpenses = 0;
-        const bucketSpending: Record<string, number> = { needs: 0, wants: 0, savings: 0 };
+        const bucketSpending: Record<string, number> = {};
         const categorySpending: Record<string, number> = {};
 
         for (const tx of txs) {
@@ -354,6 +355,7 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
                 categorySpending[catName] = (categorySpending[catName] ?? 0) + amount;
             }
         }
+        console.log(bucketSpending)
 
         // Build top categories
         const sortedCategories = Object.entries(categorySpending)
@@ -365,32 +367,21 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
                 percentage: totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0,
             }));
 
-        const needsAllocated = budget ? parseFloat(budget.needsAmount) : 0;
-        const wantsAllocated = budget ? parseFloat(budget.wantsAmount) : 0;
-        const savingsAllocated = budget ? parseFloat(budget.savingsAmount) : 0;
+        const byBucket = budget?.buckets.map((bucket) => ({
+            id: bucket.id,
+            name: bucket.name,
+            icon: bucket.icon,
+            allocated: parseFloat(bucket.amount),
+            spent: bucketSpending[bucket.name.toLowerCase()] ?? 0,
+            remaining: parseFloat(bucket.amount) - (bucketSpending[bucket.name.toLowerCase()] ?? 0),
+        })) ?? [];
 
-        return {
+        const res = {
             totalIncome,
             totalExpenses,
-            totalSavings: savingsAllocated,
-            byBucket: {
-                needs: {
-                    allocated: needsAllocated,
-                    spent: bucketSpending.needs ?? 0,
-                    remaining: needsAllocated - (bucketSpending.needs ?? 0),
-                },
-                wants: {
-                    allocated: wantsAllocated,
-                    spent: bucketSpending.wants ?? 0,
-                    remaining: wantsAllocated - (bucketSpending.wants ?? 0),
-                },
-                savings: {
-                    allocated: savingsAllocated,
-                    spent: bucketSpending.savings ?? 0,
-                    remaining: savingsAllocated - (bucketSpending.savings ?? 0),
-                },
-            },
+            byBucket,
             topCategories: sortedCategories,
         };
+        return res;
     });
 }

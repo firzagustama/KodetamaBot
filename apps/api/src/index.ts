@@ -34,6 +34,12 @@ const fastify = Fastify({
 // Add custom logger to fastify instance
 fastify.decorate('customLogger', logger);
 
+// Fallback error
+fastify.setErrorHandler((error, _request_, reply) => {
+    console.log(error);
+    reply.status(500).send({ error: "Internal Server Error" });
+});
+
 // Plugins
 await fastify.register(cors, {
     origin: true, // Allow all origins for Mini App

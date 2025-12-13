@@ -4,11 +4,35 @@ import {
     Save,
     Edit2,
     Wallet,
-    Home,
-    ShoppingBag,
-    PiggyBank,
     AlertCircle
 } from "lucide-react";
+import { DynamicIcon } from "../utils/dynamicIcon";
+
+// --- Types ---
+interface CurrencyInputProps {
+    label: string;
+    value: number;
+    onChange: (value: number) => void;
+    color: 'primary' | 'success' | 'warning' | 'info';
+    icon: React.ReactNode;
+    maxLimit?: number;
+}
+
+interface ReadOnlyRowProps {
+    label: string;
+    amount: number;
+    color: string;
+    icon: React.ReactNode;
+}
+
+interface BudgetBucket {
+    id: string;
+    name: string;
+    icon: string;
+    amount: number;
+    spent?: number;
+    remaining?: number;
+}
 
 // --- Utility: Format Currency ---
 function formatRupiah(amount: number): string {
@@ -21,13 +45,26 @@ function formatRupiah(amount: number): string {
 }
 
 // --- Component: Currency Input ---
-// Handles the "Type numbers, see Rupiah" logic
-function CurrencyInput({ label, value, onChange, color, icon, maxLimit }: any) {
+function CurrencyInput({
+    label,
+    value,
+    onChange,
+    color,
+    icon,
+    maxLimit
+}: CurrencyInputProps) {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        // Remove non-numeric characters to get raw number
         const rawValue = e.target.value.replace(/\D/g, "");
         onChange(Number(rawValue));
     };
+
+    // Map color to Tailwind classes (static for purging)
+    const borderColorClass = {
+        primary: 'focus:border-primary focus:ring-primary',
+        success: 'focus:border-success focus:ring-success',
+        warning: 'focus:border-warning focus:ring-warning',
+        info: 'focus:border-info focus:ring-info',
+    }[color];
 
     return (
         <div className="form-control w-full">
@@ -41,10 +78,10 @@ function CurrencyInput({ label, value, onChange, color, icon, maxLimit }: any) {
                     Rp
                 </span>
                 <input
-                    type="tel" // Triggers numeric keypad on mobile
+                    type="tel"
                     value={value === 0 ? "" : new Intl.NumberFormat("id-ID").format(value)}
                     onChange={handleChange}
-                    className={`input input-bordered w-full pl-10 font-mono font-bold focus:outline-none focus:border-${color} focus:ring-1 focus:ring-${color}`}
+                    className={`input input-bordered w-full pl-10 font-mono font-bold focus:outline-none focus:ring-1 ${borderColorClass}`}
                     placeholder="0"
                 />
             </div>
@@ -59,74 +96,113 @@ function CurrencyInput({ label, value, onChange, color, icon, maxLimit }: any) {
     );
 }
 
+// --- Component: Read-only Row ---
+function ReadOnlyRow({ label, amount, color, icon }: ReadOnlyRowProps) {
+    return (
+        <div className="flex items-center justify-between group">
+            <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-full bg-base-200 ${color} bg-opacity-10`}>
+                    {icon}
+                </div>
+                <div>
+                    <p className="text-xs text-base-content/60 font-medium">{label}</p>
+                    <p className="font-bold text-lg">{formatRupiah(amount)}</p>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// --- Main Component ---
 export default function BudgetManager() {
     const { budget, updateBudget } = useStore();
     const [editing, setEditing] = useState(false);
 
-    // Local State for Form
+    // Local state for form
     const [income, setIncome] = useState(0);
-    const [needs, setNeeds] = useState(0);
-    const [wants, setWants] = useState(0);
-
     const [beforeIncome, setBeforeIncome] = useState(0);
-    const [beforeNeeds, setBeforeNeeds] = useState(0);
-    const [beforeWants, setBeforeWants] = useState(0);
+    const [buckets, setBuckets] = useState<BudgetBucket[]>([]);
+    const [beforeBuckets, setBeforeBuckets] = useState<BudgetBucket[]>([]);
 
     // Sync state when budget loads
     useEffect(() => {
         if (budget) {
-            setIncome(budget.estimatedIncome);
-            // Calculate nominals based on percentage if nominals aren't saved (fallback), 
-            // or use stored nominals if your backend supports it.
-            // Assuming store has 'needsAmount' or we derive from %
-            setNeeds(budget.needsAmount || Math.round(budget.estimatedIncome * (budget.needsPercentage / 100)));
-            setWants(budget.wantsAmount || Math.round(budget.estimatedIncome * (budget.wantsPercentage / 100)));
+            setIncome(budget.estimatedIncome || 0);
+
+            // Ensure byBucket is an array
+            if (Array.isArray(budget.buckets)) {
+                setBuckets(budget.buckets);
+            } else if (budget.buckets) {
+                // If it's a single object, wrap it in an array
+                setBuckets([budget.buckets as any]);
+            } else {
+                // Provide default buckets if none exist
+                setBuckets([]);
+            }
         }
     }, [budget]);
 
+    // Loading state
     if (!budget) {
-        return <div className="animate-pulse h-64 bg-base-200 rounded-3xl" />;
+        return (
+            <div className="space-y-6 pb-20">
+                <div className="animate-pulse h-64 bg-base-200 rounded-3xl" />
+            </div>
+        );
+    }
+
+    // Error state - no buckets
+    if (!buckets || buckets.length === 0) {
+        return (
+            <div className="space-y-6 pb-20">
+                <div className="alert alert-warning">
+                    <AlertCircle size={20} />
+                    <span>Tidak ada kategori budget. Silakan setup budget terlebih dahulu.</span>
+                </div>
+            </div>
+        );
     }
 
     // Calculations
-    const totalAllocated = needs + wants;
+    const totalAllocated = buckets.reduce((sum, bucket) => sum + Number(bucket.amount || 0), 0);
     const savings = income - totalAllocated;
     const isOverBudget = savings < 0;
 
-    // Edit Handler
+    // Handlers
     const handleEdit = () => {
         setBeforeIncome(income);
-        setBeforeNeeds(needs);
-        setBeforeWants(wants);
+        setBeforeBuckets([...buckets]);
         setEditing(true);
     };
 
-    // Save Handler
-    const handleSave = async () => {
-        if (isOverBudget) return; // Prevent saving invalid budget
-
-        // Convert back to percentages for data consistency
-        const needsPct = income > 0 ? (needs / income) * 100 : 0;
-        const wantsPct = income > 0 ? (wants / income) * 100 : 0;
-        const savingsPct = income > 0 ? (savings / income) * 100 : 0;
-
-        await updateBudget({
-            estimatedIncome: income,
-            needsAmount: needs,
-            wantsAmount: wants,
-            savingsAmount: savings,
-            needsPercentage: needsPct,
-            wantsPercentage: wantsPct,
-            savingsPercentage: savingsPct,
-        });
-        setEditing(false);
+    const handleBucketChange = (id: string, value: number) => {
+        setBuckets(prev =>
+            prev.map(bucket =>
+                bucket.id === id
+                    ? { ...bucket, allocated: value }
+                    : bucket
+            )
+        );
     };
 
-    // Cancel Handler
+    const handleSave = async () => {
+        if (isOverBudget || income === 0) return;
+
+        try {
+            await updateBudget({
+                estimatedIncome: income,
+                buckets: buckets as any,
+            });
+            setEditing(false);
+        } catch (error) {
+            console.error('Failed to save budget:', error);
+            alert('Gagal menyimpan budget. Silakan coba lagi.');
+        }
+    };
+
     const handleCancel = () => {
         setIncome(beforeIncome);
-        setNeeds(beforeNeeds);
-        setWants(beforeWants);
+        setBuckets(beforeBuckets);
         setEditing(false);
     };
 
@@ -137,7 +213,9 @@ export default function BudgetManager() {
             <div className="flex items-center justify-between px-1">
                 <div>
                     <h2 className="font-bold text-lg">Atur Budget</h2>
-                    <p className="text-xs text-base-content/60">{budget.period.name}</p>
+                    <p className="text-xs text-base-content/60">
+                        {budget.period?.name || 'Current Period'}
+                    </p>
                 </div>
                 {!editing && (
                     <button
@@ -164,7 +242,9 @@ export default function BudgetManager() {
                         />
                     ) : (
                         <div className="text-center py-2">
-                            <span className="text-sm text-base-content/60 block mb-1">Pemasukan Total</span>
+                            <span className="text-sm text-base-content/60 block mb-1">
+                                Pemasukan Total
+                            </span>
                             <span className="text-3xl font-black text-primary tracking-tight">
                                 {formatRupiah(income)}
                             </span>
@@ -174,70 +254,66 @@ export default function BudgetManager() {
 
                 {/* 2. ALLOCATION INPUTS */}
                 <div className="p-5 space-y-5">
-
-                    {/* Needs */}
-                    <div className="relative">
-                        {editing ? (
-                            <CurrencyInput
-                                label="Kebutuhan (Needs)"
-                                icon={<Home size={16} className="text-success" />}
-                                value={needs}
-                                onChange={setNeeds}
-                                color="success"
-                            />
-                        ) : (
-                            <ReadOnlyRow
-                                label="Kebutuhan (Needs)"
-                                amount={needs}
-                                color="text-success"
-                                icon={<Home size={18} />}
-                            />
-                        )}
-                        {/* Percentage Badge */}
-                        <div className="absolute top-0 right-0 text-xs font-bold text-base-content/40 bg-base-200 px-2 py-0.5 rounded-md">
-                            {income > 0 ? Math.round((needs / income) * 100) : 0}%
+                    {buckets.map((bucket) => (
+                        <div key={bucket.id} className="relative">
+                            {editing ? (
+                                <CurrencyInput
+                                    label={bucket.name}
+                                    icon={
+                                        bucket.icon ? (
+                                            <DynamicIcon name={bucket.icon} size={16} />
+                                        ) : (
+                                            <Wallet size={16} />
+                                        )
+                                    }
+                                    value={bucket.amount || 0}
+                                    onChange={(value) => handleBucketChange(bucket.id, value)}
+                                    color="primary"
+                                    maxLimit={income}
+                                />
+                            ) : (
+                                <ReadOnlyRow
+                                    label={bucket.name}
+                                    amount={bucket.amount || 0}
+                                    color="text-primary"
+                                    icon={
+                                        bucket.icon ? (
+                                            <DynamicIcon name={bucket.icon} size={18} />
+                                        ) : (
+                                            <Wallet size={18} />
+                                        )
+                                    }
+                                />
+                            )}
+                            <div className="absolute top-0 right-0 text-xs font-bold text-base-content/40 bg-base-200 px-2 py-0.5 rounded-md">
+                                {income > 0 ? Math.round(((bucket.amount || 0) / income) * 100) : 0}%
+                            </div>
                         </div>
-                    </div>
-
-                    {/* Wants */}
-                    <div className="relative">
-                        {editing ? (
-                            <CurrencyInput
-                                label="Keinginan (Wants)"
-                                icon={<ShoppingBag size={16} className="text-warning" />}
-                                value={wants}
-                                onChange={setWants}
-                                color="warning"
-                            />
-                        ) : (
-                            <ReadOnlyRow
-                                label="Keinginan (Wants)"
-                                amount={wants}
-                                color="text-warning"
-                                icon={<ShoppingBag size={18} />}
-                            />
-                        )}
-                        <div className="absolute top-0 right-0 text-xs font-bold text-base-content/40 bg-base-200 px-2 py-0.5 rounded-md">
-                            {income > 0 ? Math.round((wants / income) * 100) : 0}%
-                        </div>
-                    </div>
+                    ))}
 
                     {/* Divider */}
                     <div className="divider my-0"></div>
 
                     {/* Savings (Calculated) */}
-                    <div className={`rounded-xl p-4 transition-colors ${isOverBudget ? 'bg-error/10 border border-error/20' : 'bg-info/10 border border-info/20'}`}>
+                    <div className={`rounded-xl p-4 transition-colors ${isOverBudget
+                        ? 'bg-error/10 border border-error/20'
+                        : 'bg-warning/10 border border-warning/20'
+                        }`}>
                         <div className="flex justify-between items-center mb-1">
                             <div className="flex items-center gap-2 font-semibold">
-                                <PiggyBank size={18} className={isOverBudget ? "text-error" : "text-info"} />
-                                <span>Tabungan (Sisa)</span>
+                                <Wallet
+                                    size={18}
+                                    className={isOverBudget ? "text-error" : "text-warning"}
+                                />
+                                <span>Unallocated</span>
                             </div>
                             <span className="text-xs font-bold opacity-50">
                                 {income > 0 ? Math.round((savings / income) * 100) : 0}%
                             </span>
                         </div>
 
-                        <div className={`text-2xl font-bold ${isOverBudget ? "text-error" : "text-info"}`}>
+                        <div className={`text-2xl font-bold ${isOverBudget ? "text-error" : "text-warning"
+                            }`}>
                             {savings < 0 ? "-" : ""}{formatRupiah(Math.abs(savings))}
                         </div>
 
@@ -250,12 +326,32 @@ export default function BudgetManager() {
 
                 </div>
 
-                {/* 3. VISUAL BAR (Only in Edit Mode or Always? Let's keep it clean) */}
-                <div className="w-full h-2 flex bg-base-300">
-                    <div style={{ width: `${Math.min((needs / income) * 100, 100)}%` }} className="h-full bg-success"></div>
-                    <div style={{ width: `${Math.min((wants / income) * 100, 100)}%` }} className="h-full bg-warning"></div>
-                    {savings > 0 && <div style={{ width: `${(savings / income) * 100}%` }} className="h-full bg-info"></div>}
-                </div>
+                {/* 3. VISUAL BAR */}
+                {!isOverBudget && income > 0 && (
+                    <div className="w-full h-2 flex bg-base-300">
+                        {buckets.map((bucket, index) => {
+                            const percentage = Math.min(((bucket.amount || 0) / income) * 100, 100);
+                            const colorClass =
+                                index === 0 ? 'bg-success' :
+                                    index === 1 ? 'bg-warning' :
+                                        'bg-primary';
+
+                            return percentage > 0 ? (
+                                <div
+                                    key={bucket.id}
+                                    style={{ width: `${percentage}%` }}
+                                    className={`h-full ${colorClass}`}
+                                />
+                            ) : null;
+                        })}
+                        {savings > 0 && (
+                            <div
+                                style={{ width: `${(savings / income) * 100}%` }}
+                                className="h-full bg-info"
+                            />
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Action Buttons */}
@@ -276,23 +372,6 @@ export default function BudgetManager() {
                     </button>
                 </div>
             )}
-        </div>
-    );
-}
-
-// Sub-component for Read-only view
-function ReadOnlyRow({ label, amount, color, icon }: any) {
-    return (
-        <div className="flex items-center justify-between group">
-            <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-full bg-base-200 ${color} bg-opacity-10`}>
-                    {icon}
-                </div>
-                <div>
-                    <p className="text-xs text-base-content/60 font-medium">{label}</p>
-                    <p className="font-bold text-lg">{formatRupiah(amount)}</p>
-                </div>
-            </div>
         </div>
     );
 }

@@ -87,9 +87,9 @@ export class DevelopmentOrchestrator {
             transactions: [
                 {
                     type: "expense",
-                    amount: 25000, // Rp 25,000
+                    amount: 2500000, // Rp 2,500,000
                     category: "Makanan",
-                    bucket: "needs",
+                    bucket: "Needs",
                     description: `Biaya ${message.toLowerCase()}`,
                     confidence: 0.95,
                     needsConfirmation: false
