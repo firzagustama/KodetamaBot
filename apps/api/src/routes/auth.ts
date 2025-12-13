@@ -181,11 +181,11 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
      * Validate Telegram WebApp initData (Mini App) and return JWT
      */
     fastify.post<{
-        Body: { initData: string };
+        Body: { initData: string; startParam: string };
     }>("/telegram", {
         preHandler: [loggingMiddleware],
     }, async (request, reply) => {
-        const { initData } = request.body;
+        const { initData, startParam } = request.body;
 
         if (!initData) {
             return reply.status(400).send({ error: "initData is required" });
@@ -221,10 +221,10 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
             let targetId = userId;
             let targetType: "user" | "group" = "user";
 
-            if (telegramChat && (telegramChat.type === "group" || telegramChat.type === "supergroup")) {
+            if (startParam) {
                 // Check if group exists and user is member
                 const group = await db.query.groups.findFirst({
-                    where: eq(groups.telegramGroupId, telegramChat.id),
+                    where: eq(groups.id, startParam),
                 });
 
                 if (group) {
@@ -241,19 +241,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
                     if (isMember) {
                         targetId = group.id;
                         targetType = "group";
-                        logger.info("Authenticating for group context", {
-                            userId,
-                            groupId: group.id,
-                            telegramGroupId: telegramChat.id
-                        });
-                    } else {
-                        logger.warn("User not member of group", {
-                            userId,
-                            telegramGroupId: telegramChat.id
-                        });
                     }
-                } else {
-                    logger.warn("Group not found", { telegramGroupId: telegramChat.id });
                 }
             }
 

@@ -1,10 +1,14 @@
-import type { BotContext } from "../types.js";
+import type { BotContext, TransactionData } from "../types.js";
 import { GroupRepository } from "../infrastructure/repositories/index.js";
-import { getUserByTelegramId } from "../services/index.js";
+import { getUserByTelegramId, resolveGroupPeriodId } from "../services/index.js";
 import { logger } from "../utils/logger.js";
+import { TransactionUseCase } from "../useCases/TransactionUseCase.js";
+import { AIOrchestrator } from "@kodetama/ai";
 
 // Initialize shared instances
 let groupRepo: GroupRepository | null = null;
+let ai: AIOrchestrator | null = null;
+let transactionUseCase: TransactionUseCase | null = null;
 
 /**
  * Get or create group repository (singleton pattern)
@@ -14,6 +18,30 @@ function getGroupRepository(): GroupRepository {
         groupRepo = new GroupRepository();
     }
     return groupRepo;
+}
+
+/**
+ * Get or create AI orchestrator (singleton pattern)
+ */
+function getAiOrchestrator(): AIOrchestrator {
+    if (!ai) {
+        ai = new AIOrchestrator({
+            apiKey: process.env.OPENROUTER_API_KEY ?? "",
+            model: process.env.OPENROUTER_MODEL,
+        });
+    }
+    return ai;
+}
+
+/**
+ * Get or create transaction use case (singleton pattern)
+ */
+function getTransactionUseCase(): TransactionUseCase {
+    if (!transactionUseCase) {
+        const aiOrchestrator = getAiOrchestrator();
+        transactionUseCase = new TransactionUseCase(aiOrchestrator);
+    }
+    return transactionUseCase;
 }
 
 /**
@@ -45,7 +73,7 @@ export async function handleGroupMessage(ctx: BotContext): Promise<void> {
 
     if (!cleanedMessage) {
         await ctx.reply(
-            "*Tch.* Mau catat transaksi? Mention gue dulu.\n\n" +
+            "Mau catat transaksi? Mention gue dulu.\n\n" +
             `Contoh: @${botUsername} makan siang 50rb 💪`,
             { reply_to_message_id: ctx.message?.message_id }
         );
@@ -66,7 +94,7 @@ export async function handleGroupMessage(ctx: BotContext): Promise<void> {
         const group = await groupRepo.findByTelegramId(ctx.chat.id);
         if (!group) {
             await ctx.reply(
-                "*Tch.* Grup ini belum terdaftar untuk fitur keluarga.\n\n" +
+                "Grup ini belum terdaftar untuk fitur keluarga.\n\n" +
                 "Minta owner grup untuk setup dulu ya! 🤷‍♂️",
                 { reply_to_message_id: ctx.message?.message_id }
             );
@@ -77,7 +105,7 @@ export async function handleGroupMessage(ctx: BotContext): Promise<void> {
         const userAccount = await getUserByTelegramId(ctx.from.id);
         if (!userAccount) {
             await ctx.reply(
-                "*Tch.* Kamu belum terdaftar. Ketik /start untuk mendaftar terlebih dahulu.",
+                "Kamu belum terdaftar. Ketik /start untuk mendaftar terlebih dahulu.",
                 { reply_to_message_id: ctx.message?.message_id }
             );
             return;
@@ -87,23 +115,62 @@ export async function handleGroupMessage(ctx: BotContext): Promise<void> {
         const isMember = await groupRepo.isUserMember(userAccount.userId, group.id);
         if (!isMember) {
             await ctx.reply(
-                "*Tch.* Kamu bukan anggota grup keluarga ini.\n\n" +
+                "Kamu bukan anggota grup keluarga ini.\n\n" +
                 "Minta owner grup untuk invite kamu dulu ya! 👨‍👩‍👧‍👦",
                 { reply_to_message_id: ctx.message?.message_id }
             );
             return;
         }
 
+        // Ensure period exists
+        const periodId = await resolveGroupPeriodId(group.id);
+        if (!periodId) {
+            // SAITAMA: Annoyed but helpful.
+            await ctx.reply("Duh, budget belum diatur. Ribet nih. Setup dulu gih biar bisa dicatet.");
+            await ctx.conversation.enter("onboardingConversation");
+            return;
+        }
+
         // Skip commands - these are handled by CommandRegistry regardless of group context
         if (cleanedMessage.startsWith("/")) return;
 
-        await ctx.reply("Fitur family masih sedang dibangun...");
-        return
+        // Get use case instance
+        const useCase = getTransactionUseCase();
+
+        // Parse transaction using AI
+        const parseResult = await useCase.parseTransaction(message);
+        if (!parseResult.success || !parseResult.parsed) {
+            throw new Error("Failed to parse transaction");
+        }
+
+        const { parsed, usage } = parseResult;
+
+        // User just sent a message, not a transaction
+        if (parsed.transactions.length === 0) {
+            ctx.reply(parsed.message);
+            return;
+        }
+
+        const transactionData: TransactionData = {
+            account: {
+                userId: userAccount.userId,
+                groupId: group.id,
+                periodId: periodId
+            },
+            parsed,
+            usage,
+            rawMessage: message
+        }
+        await useCase.saveMultipleTransactionsWithConfirmation(
+            ctx,
+            transactionData
+        )
+        return;
     } catch (error) {
         logger.error("Failed to parse group transaction:", error);
 
         await ctx.reply(
-            "*Tch, baca juga dong format nya.* 🤷‍♂️\n\n" +
+            "*Baca dong format nya.* 🤷‍♂️\n\n" +
             "Coba kayak gini:\n" +
             "• `makan 20rb`\n" +
             "• `gaji 8jt`\n" +

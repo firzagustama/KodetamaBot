@@ -3,6 +3,7 @@ import { initData, useSignal } from "@tma.js/sdk-react";
 
 export function useAuth() {
     const initDataRaw = useSignal(initData.raw);
+    const initDataStartParam = useSignal(initData.startParam);
     const [token, setToken] = useState<string>("");
     const [authenticated, setAuthenticated] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -18,7 +19,7 @@ export function useAuth() {
                         headers: {
                             "Content-Type": "application/json",
                         },
-                        body: JSON.stringify({ initData: initDataRaw }),
+                        body: JSON.stringify({ initData: initDataRaw, startParam: initDataStartParam }),
                     });
 
                     const data = await response.json();
@@ -43,12 +44,12 @@ export function useAuth() {
                 setLoading(false);
             }
         };
-    }, [initDataRaw]);
+    }, [initDataRaw, initDataStartParam]);
 
     useEffect(() => {
         if (initDataRaw) {
             authenticate();
         }
-    }, [initDataRaw])
+    }, [initDataRaw, initDataStartParam])
     return { token, authenticated, loading, authenticate };
 }

@@ -192,6 +192,12 @@ export interface IGroupRepository {
     findByTelegramId(telegramGroupId: number): Promise<Group | null>;
     findMembers(groupId: string): Promise<FamilyMember[]>;
     isUserMember(userId: string, groupId: string): Promise<boolean>;
+    save(group: Omit<Group, "id" | "createdAt">): Promise<string>;
+    addMember(familyMember: Omit<FamilyMember, "id" | "joinedAt">): Promise<string>;
+    removeMember(groupId: string, userId: string): Promise<boolean>;
+    updateMemberRole(groupId: string, userId: string, role: string): Promise<void>;
+    findWithOwner(groupId: string): Promise<(Group & { owner: { telegramAccount: { telegramId: number; username?: string; firstName?: string } } }) | null>;
+    findByOwner(ownerId: string): Promise<Group[]>;
 }
 
 // =============================================================================
@@ -222,4 +228,25 @@ export interface IUserService {
 export interface IBudgetCalculationService {
     calculateBudgetAllocation(income: number, needsPct: number, wantsPct: number, savingsPct: number): BudgetAllocation;
     validateBudgetPercentages(percentages: BudgetPercentages): boolean;
+}
+
+export interface IGroupService {
+    createGroup(ownerData: {
+        telegramGroupId: number;
+        name: string;
+        ownerId: string;
+    }): Promise<DomainResult<string>>;
+    inviteMember(
+        telegramId: number,
+        groupId: string,
+        role: "member" | "admin",
+        inviterId: string
+    ): Promise<DomainResult>;
+    removeMemberFromGroup(
+        memberUserId: string,
+        groupId: string,
+        requesterId: string
+    ): Promise<DomainResult>;
+    getGroupWithMembers(groupId: string): Promise<DomainResult<Group & { members: FamilyMember[] }>>;
+    getUserGroups(userId: string): Promise<DomainResult<Group[]>>;
 }

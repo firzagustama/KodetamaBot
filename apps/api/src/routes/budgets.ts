@@ -26,6 +26,7 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
                 eq(datePeriods.isCurrent, true)
             ),
         });
+        console.log(payload)
 
         if (!currentPeriod) {
             return reply.status(403).send({ error: "Current period not found" });

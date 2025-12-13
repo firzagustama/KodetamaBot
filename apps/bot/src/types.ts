@@ -39,6 +39,7 @@ export interface PendingTransactionData {
 export interface TransactionData {
     account: {
         userId: string,
+        groupId?: string,
         periodId: string
     },
     parsed: ParsedTransaction,

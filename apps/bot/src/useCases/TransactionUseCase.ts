@@ -121,7 +121,7 @@ export class TransactionUseCase {
             }
 
             // All high confidence - save all immediately
-            const savedIds = await this.saveTransactionsToDatabase(account.userId, account.periodId, transactions, rawMessage);
+            const savedIds = await this.saveTransactionsToDatabase(account.userId, account.periodId, transactions, rawMessage, account.groupId);
 
             // Store last batch transaction IDs for bulk undo
             ctx.session.lastTransactionIds = savedIds;
@@ -160,7 +160,8 @@ export class TransactionUseCase {
                 account.userId,
                 periodId,
                 parsed.transactions,
-                rawMessage
+                rawMessage,
+                account.groupId
             );
 
             ctx.session.lastTransactionIds = savedIds;
@@ -281,7 +282,8 @@ export class TransactionUseCase {
         userId: string,
         periodId: string,
         transactions: any[],
-        rawMessage: string
+        rawMessage: string,
+        groupId: string | undefined,
     ): Promise<string[]> {
         const savedIds: string[] = [];
 
@@ -290,7 +292,8 @@ export class TransactionUseCase {
                 userId,
                 periodId,
                 transaction,
-                rawMessage
+                rawMessage,
+                groupId
             });
             savedIds.push(transactionId);
         }
@@ -326,7 +329,7 @@ export class TransactionUseCase {
             }
 
             // Ensure group period exists
-            const periodId = await resolveGroupPeriodId(groupId, userId);
+            const periodId = await resolveGroupPeriodId(groupId);
             if (!periodId) {
                 // SAITAMA UX: Blunt Group Error
                 await ctx.reply("❌ Gagal bikin periode grup. Bug kali ya?", {
@@ -387,7 +390,7 @@ export class TransactionUseCase {
             }
 
             // Ensure group period exists
-            const periodId = await resolveGroupPeriodId(groupId, userId);
+            const periodId = await resolveGroupPeriodId(groupId);
             if (!periodId) {
                 await ctx.reply("❌ Gagal bikin periode grup. Bug kali ya?", {
                     reply_to_message_id: ctx.message?.message_id

@@ -15,6 +15,8 @@ import {
     ensurePeriodExists,
     upsertBudget,
     updateUserIncomeSettings,
+    ensureGroupPeriodExists,
+    findGroupByTelegramId,
 } from "../services/index.js";
 
 /**
@@ -288,10 +290,22 @@ export async function onboardingConversation(
         const finalIsIncomeUncertain = conversation.session.onboardingData.isIncomeUncertain ?? false;
         const incomeDateText = finalIsIncomeUncertain ? "Gak Tentu" : `Tgl ${finalIncomeDate}`;
 
+        // Check if group
+        const isGroup = ctx.chat!.type === "supergroup" || ctx.chat!.type === "group";
+
         // Create keyboard with Dashboard button
         const finalKeyboard = new InlineKeyboard();
         if (process.env.WEB_APP_URL) {
-            finalKeyboard.webApp("Buka Dashboard", process.env.WEB_APP_URL);
+            if (isGroup) {
+                const group = await findGroupByTelegramId(ctx.chat!.id);
+                if (!group) {
+                    await ctx.reply("Group tidak terdaftar, mungkin sudah dihapus?")
+                    return;
+                }
+                finalKeyboard.url("Buka Dashboard", `https://t.me/${process.env.BOT_USERNAME}?startapp=${group.id}`);
+            } else {
+                finalKeyboard.webApp("Buka Dashboard", process.env.WEB_APP_URL);
+            }
         }
 
         await ctx.reply(
@@ -315,31 +329,58 @@ export async function onboardingConversation(
 
         // Save to database
         try {
-            const account = await getUserByTelegramId(user.id);
-            if (account) {
-                await updateUserIncomeSettings(account.userId, finalIncomeDate, finalIsIncomeUncertain);
+            if (isGroup) {
+                const groupId = ctx.chat!.id;
+                const group = await findGroupByTelegramId(groupId);
+                if (!group) {
+                    await ctx.reply("Group tidak terdaftar, mungkin sudah dihapus?")
+                    return;
+                }
 
                 const periodDate = new Date(
                     conversation.session.onboardingData.periodYear!,
                     conversation.session.onboardingData.periodMonth!,
                     1
-                );
+                )
 
-                const periodId = await ensurePeriodExists(account.userId, periodDate, finalIncomeDate);
+                const periodId = await ensureGroupPeriodExists(group.id, periodDate, finalIncomeDate);
 
                 await upsertBudget({
                     periodId,
-                    estimatedIncome: estimatedIncome!,
+                    estimatedIncome,
                     needsPercent,
                     wantsPercent,
                     savingsPercent,
                 });
 
-                logger.info(`Onboarding completed for user ${user.id}`, {
-                    income: estimatedIncome,
-                    incomeDate: finalIncomeDate,
-                    isIncomeUncertain: finalIsIncomeUncertain,
-                });
+                logger.info(`Onboarding completed fro group ${group.id}`)
+            } else {
+                const account = await getUserByTelegramId(user.id);
+                if (account) {
+                    await updateUserIncomeSettings(account.userId, finalIncomeDate, finalIsIncomeUncertain);
+
+                    const periodDate = new Date(
+                        conversation.session.onboardingData.periodYear!,
+                        conversation.session.onboardingData.periodMonth!,
+                        1
+                    );
+
+                    const periodId = await ensurePeriodExists(account.userId, periodDate, finalIncomeDate);
+
+                    await upsertBudget({
+                        periodId,
+                        estimatedIncome: estimatedIncome!,
+                        needsPercent,
+                        wantsPercent,
+                        savingsPercent,
+                    });
+
+                    logger.info(`Onboarding completed for user ${user.id}`, {
+                        income: estimatedIncome,
+                        incomeDate: finalIncomeDate,
+                        isIncomeUncertain: finalIsIncomeUncertain,
+                    });
+                }
             }
         } catch (error) {
             logger.error("Failed to save onboarding data:", error);

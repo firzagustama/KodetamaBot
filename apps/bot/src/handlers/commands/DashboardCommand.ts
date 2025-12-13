@@ -15,12 +15,12 @@ export class DashboardCommand extends CommandHandler {
         try {
             target = await getTargetContext(ctx);
         } catch (error) {
-            await ctx.reply(error.message);
+            await ctx.reply(error instanceof Error ? error.message : "Unknown error");
             return { success: true };
         }
 
         const period = target.isGroup ?
-            await getCurrentGroupPeriod(target.targetId, target.userId) :
+            await getCurrentGroupPeriod(target.targetId) :
             await getCurrentPeriod(target.targetId);
 
         if (!period) {
@@ -29,6 +29,7 @@ export class DashboardCommand extends CommandHandler {
             return { success: true };
         }
 
+        console.log("target", target);
         if (target.isGroup) {
             const botInfo = ctx.me;
             await ctx.reply("Buka dashboard di sini ya 😐", {

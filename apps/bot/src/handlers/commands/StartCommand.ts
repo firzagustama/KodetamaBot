@@ -33,7 +33,6 @@ export class StartCommand extends CommandHandler {
 
         // Get target context for period resolution
         const target = await getTargetContext(ctx);
-        console.log("target", target);
         const currentPeriod = await this.resolvePeriodId(target);
         if (!currentPeriod) {
             // Start onboarding - use context-appropriate message
@@ -88,7 +87,7 @@ export class StartCommand extends CommandHandler {
         // Import here to avoid circular dependency
         const { getCurrentPeriod, getCurrentGroupPeriod } = await import("../../services/index.js");
         const period = target.isGroup
-            ? await getCurrentGroupPeriod(target.targetId, target.userId)
+            ? await getCurrentGroupPeriod(target.targetId)
             : await getCurrentPeriod(target.targetId);
         return period?.id ?? null;
     }

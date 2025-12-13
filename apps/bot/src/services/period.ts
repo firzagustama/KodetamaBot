@@ -1,5 +1,5 @@
 import { db } from "@kodetama/db";
-import { datePeriods, telegramAccounts } from "@kodetama/db/schema";
+import { datePeriods } from "@kodetama/db/schema";
 import { eq, and } from "drizzle-orm";
 import { formatPeriodName, getMonthlyPeriodDates, getCustomPeriodDates } from "@kodetama/shared";
 
@@ -85,15 +85,15 @@ export async function getUserPeriods(userId: string) {
 /**
  * Get current periodId for group
  */
-export async function resolveGroupPeriodId(groupId: string, userId?: string) {
-    const currentPeriod = await getCurrentGroupPeriod(groupId, userId);
+export async function resolveGroupPeriodId(groupId: string) {
+    const currentPeriod = await getCurrentGroupPeriod(groupId);
     return currentPeriod?.id;
 }
 
 /**
  * Get current period for group, optionally checking user's income settings
  */
-export async function getCurrentGroupPeriod(groupId: string, userId?: string) {
+export async function getCurrentGroupPeriod(groupId: string) {
     // First try to find existing current group period
     const currentPeriod = await db.query.datePeriods.findFirst({
         where: and(
@@ -102,26 +102,7 @@ export async function getCurrentGroupPeriod(groupId: string, userId?: string) {
         ),
     });
 
-    if (currentPeriod) {
-        return currentPeriod;
-    }
-
-    // If no current period, create one using group owner's or provided user's settings
-    // Get the first available user's income settings for period calculation
-    const ownerUser = userId ? await db.query.telegramAccounts.findFirst({
-        where: eq(telegramAccounts.userId, userId),
-        with: {
-            user: true
-        }
-    }) : null;
-
-    const incomeDate = ownerUser?.user?.incomeDate ?? 1;
-
-    // Create period for current date
-    const periodId = await ensureGroupPeriodExists(groupId, new Date(), incomeDate);
-    return await db.query.datePeriods.findFirst({
-        where: eq(datePeriods.id, periodId),
-    });
+    return currentPeriod;
 }
 
 /**

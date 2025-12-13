@@ -41,4 +41,64 @@ export class GroupRepository implements IGroupRepository {
 
         return member !== undefined;
     }
+
+    async save(group: Omit<Group, "id" | "createdAt">): Promise<string> {
+        const [savedGroup] = await db.insert(groups).values(group).returning({ id: groups.id });
+        return savedGroup.id;
+    }
+
+    async addMember(familyMember: Omit<FamilyMember, "id" | "joinedAt">): Promise<string> {
+        const [savedMember] = await db.insert(familyMembers).values(familyMember).returning({ id: familyMembers.id });
+        return savedMember.id;
+    }
+
+    async removeMember(groupId: string, userId: string): Promise<boolean> {
+        const result = await db.delete(familyMembers)
+            .where(and(
+                eq(familyMembers.groupId, groupId),
+                eq(familyMembers.userId, userId)
+            ))
+            .returning({ id: familyMembers.id });
+
+        return result.length > 0;
+    }
+
+    async updateMemberRole(groupId: string, userId: string, role: string): Promise<void> {
+        await db.update(familyMembers)
+            .set({ role })
+            .where(and(
+                eq(familyMembers.groupId, groupId),
+                eq(familyMembers.userId, userId)
+            ));
+    }
+
+    async findWithOwner(groupId: string): Promise<(Group & { owner: { telegramAccount: { telegramId: number; username?: string; firstName?: string } } }) | null> {
+        const result = await db.query.groups.findFirst({
+            where: eq(groups.id, groupId),
+            with: {
+                owner: {
+                    with: {
+                        telegramAccount: {
+                            columns: {
+                                telegramId: true,
+                                username: true,
+                                firstName: true,
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        return result as any || null;
+    }
+
+    async findByOwner(ownerId: string): Promise<Group[]> {
+        return await db.query.groups.findMany({
+            where: and(
+                eq(groups.ownerId, ownerId),
+                eq(groups.isActive, true)
+            ),
+        });
+    }
 }

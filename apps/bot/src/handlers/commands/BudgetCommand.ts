@@ -20,7 +20,7 @@ export class BudgetCommand extends CommandHandler {
             const target = await getTargetContext(ctx);
 
             const period = target.isGroup
-                ? await getCurrentGroupPeriod(target.targetId, target.userId)
+                ? await getCurrentGroupPeriod(target.targetId)
                 : await getCurrentPeriod(target.targetId);
 
             if (!period) {
