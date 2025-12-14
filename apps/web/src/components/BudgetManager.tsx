@@ -1,4 +1,3 @@
-import { useStore } from "../stores/useStore";
 import { useState, useEffect } from "react";
 import {
     Save,
@@ -7,9 +6,10 @@ import {
     AlertCircle,
     Plus,
     Trash2,
-    Wand2
+    Wand2,
 } from "lucide-react";
-import { DynamicIcon } from "../utils/dynamicIcon";
+import { DynamicIcon } from "../utils/dynamicIcon"
+import { useStore } from "../stores/useStore";
 
 // --- Types ---
 interface CurrencyInputProps {
@@ -17,7 +17,7 @@ interface CurrencyInputProps {
     value: number;
     onChange: (value: number) => void;
     color: 'primary' | 'success' | 'warning' | 'info' | 'secondary' | 'accent' | 'neutral';
-    icon: React.ReactNode;
+    icon?: React.ReactNode;
     maxLimit?: number;
 }
 
@@ -25,7 +25,6 @@ interface ReadOnlyRowProps {
     label: string;
     amount: number;
     color: string;
-    icon: React.ReactNode;
 }
 
 interface BudgetBucket {
@@ -36,6 +35,8 @@ interface BudgetBucket {
     amount: number;
     spent?: number;
     remaining?: number;
+    category?: string;
+    isSystem?: boolean;
 }
 
 // --- Utility: Format Currency ---
@@ -104,13 +105,11 @@ function CurrencyInput({
 }
 
 // --- Component: Read-only Row ---
-// --- Component: Read-only Row ---
-function ReadOnlyRow({ label, description, amount, color, icon, percentage }: ReadOnlyRowProps & { description?: string, percentage?: number }) {
+function ReadOnlyRow({ label, description, amount, color, percentage }: ReadOnlyRowProps & { description?: string, percentage?: number }) {
     return (
         <div className="flex items-center justify-between group py-2">
             <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-full bg-base-200 ${color} bg-opacity-10`}>
-                    {icon}
                 </div>
                 <div>
                     <p className="text-sm font-bold">{label}</p>
@@ -123,6 +122,183 @@ function ReadOnlyRow({ label, description, amount, color, icon, percentage }: Re
                 <p className="font-bold text-lg">{formatRupiah(amount)}</p>
                 {percentage !== undefined && (
                     <p className="text-xs text-base-content/40 font-bold">{percentage}%</p>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// --- Component: Bucket Item ---
+function BucketItem({
+    bucket,
+    editing,
+    income,
+    onChange,
+    onDelete,
+    onGenerateDescription,
+    generatingId
+}: {
+    bucket: BudgetBucket;
+    editing: boolean;
+    income: number;
+    onChange: (id: string, field: keyof BudgetBucket, value: any) => void;
+    onDelete: (id: string) => void;
+    onGenerateDescription: (id: string, name: string) => void;
+    generatingId: string | null;
+}) {
+    const percentage = income > 0 ? ((bucket.amount || 0) / income) * 100 : 0;
+    const colorKey = bucket.category === 'needs' ? 'primary' :
+        bucket.category === 'wants' ? 'secondary' :
+            bucket.category === 'savings' ? 'success' : 'neutral';
+
+    const colorTextClass = bucket.category === 'needs' ? 'text-blue-500' :
+        bucket.category === 'wants' ? 'text-purple-500' :
+            bucket.category === 'savings' ? 'text-green-500' : 'text-base-content/50';
+
+    const colorBgClass = bucket.category === 'needs' ? 'bg-blue-500' :
+        bucket.category === 'wants' ? 'bg-purple-500' :
+            bucket.category === 'savings' ? 'bg-green-500' : 'bg-base-content/20';
+
+    const focusClass = bucket.category === 'needs' ? 'focus-within:border-blue-500 focus-within:ring-blue-500/20' :
+        bucket.category === 'wants' ? 'focus-within:border-purple-500 focus-within:ring-purple-500/20' :
+            bucket.category === 'savings' ? 'focus-within:border-green-500 focus-within:ring-green-500/20' :
+                'focus-within:border-base-content/20';
+
+    if (editing && !bucket.isSystem) {
+        return (
+            <div className={`p-4 bg-base-100 rounded-2xl border border-base-200 shadow-sm space-y-4 focus-within:ring-1 transition-all ${focusClass}`}>
+                <div className="flex justify-between items-start gap-3">
+                    <div className="flex-1 space-y-2">
+                        <input
+                            id={`bucket-name-${bucket.id}`}
+                            type="text"
+                            value={bucket.name}
+                            onChange={(e) => onChange(bucket.id, "name", e.target.value)}
+                            className="w-full bg-transparent border-none p-0 text-lg font-bold focus:ring-0 placeholder:text-base-content/30"
+                            placeholder="Nama Kategori"
+                            autoComplete="off"
+                        />
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={bucket.description || ""}
+                                onChange={(e) => onChange(bucket.id, "description", e.target.value)}
+                                className="input input-xs input-bordered w-full bg-base-200/50 focus:bg-base-100"
+                                placeholder="Deskripsi (opsional)"
+                            />
+                            <button
+                                className={`btn btn-xs btn-square ${generatingId === bucket.id ? 'btn-disabled' : `btn-ghost ${colorTextClass}`}`}
+                                onClick={() => onGenerateDescription(bucket.id, bucket.name)}
+                                disabled={generatingId === bucket.id || !bucket.name}
+                                title="Generate description with AI"
+                            >
+                                {generatingId === bucket.id ? (
+                                    <span className="loading loading-spinner loading-xs"></span>
+                                ) : (
+                                    <Wand2 size={14} />
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                    <button
+                        className="btn btn-sm btn-square btn-ghost text-base-content/30 hover:text-error hover:bg-error/10 transition-colors"
+                        onClick={() => onDelete(bucket.id)}
+                        title="Hapus Kategori"
+                    >
+                        <Trash2 size={18} />
+                    </button>
+                </div>
+
+                <div className="pt-2 border-t border-base-200/50">
+                    <CurrencyInput
+                        label="Alokasi"
+                        value={bucket.amount || 0}
+                        onChange={(value) => onChange(bucket.id, "amount", value)}
+                        color={colorKey as any}
+                        maxLimit={income}
+                    />
+                    {/* Mini Progress Bar in Edit Mode */}
+                    <div className="mt-2 w-full bg-base-200 rounded-full h-1.5 overflow-hidden">
+                        <div
+                            className={`${colorBgClass} h-full transition-all duration-500`}
+                            style={{ width: `${Math.min(percentage, 100)}%` }}
+                        />
+                    </div>
+                    <div className="text-right text-[10px] text-base-content/40 mt-1 font-medium">
+                        {Math.round(percentage)}% dari total
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <ReadOnlyRow
+            label={bucket.name}
+            description={bucket.description}
+            amount={bucket.amount || 0}
+            color={colorTextClass}
+            percentage={Math.round(percentage)}
+        />
+    );
+}
+
+// --- Component: Bucket Section (Simplified) ---
+function BucketSection({
+    title,
+    icon,
+    colorClass,
+    btnHoverClass,
+    categoryBuckets,
+    editing,
+    income,
+    onChange,
+    onDelete,
+    onGenerateDescription,
+    generatingId,
+    onAddBucket
+}: {
+    title: string;
+    icon: React.ReactNode;
+    colorClass: string;
+    btnHoverClass: string;
+    categoryBuckets: BudgetBucket[];
+    editing: boolean;
+    income: number;
+    onChange: (id: string, field: keyof BudgetBucket, value: any) => void;
+    onDelete: (bucketId: string) => void;
+    onGenerateDescription: (bucketId: string, bucketName: string) => void;
+    generatingId: string | null;
+    onAddBucket: () => void;
+}) {
+    // Don't render section if no buckets and not editing
+    if (categoryBuckets.length === 0 && !editing) return null;
+
+    return (
+        <div className="mb-6">
+            <h3 className={`font-bold text-sm ${colorClass} mb-3 flex items-center gap-2 uppercase tracking-wider opacity-80`}>
+                {icon} {title}
+            </h3>
+            <div className="space-y-3">
+                {categoryBuckets.map((bucket) => (
+                    <BucketItem
+                        key={bucket.id}
+                        bucket={bucket}
+                        editing={editing}
+                        income={income}
+                        onChange={onChange}
+                        onDelete={onDelete}
+                        onGenerateDescription={onGenerateDescription}
+                        generatingId={generatingId}
+                    />
+                ))}
+                {editing && (
+                    <button
+                        className={`btn btn-outline btn-block btn-sm border-dashed border-base-300 ${btnHoverClass} hover:text-white transition-all h-10 rounded-xl gap-2 opacity-60 hover:opacity-100`}
+                        onClick={onAddBucket}
+                    >
+                        <Plus size={14} /> Add {title.split(' ')[0]}
+                    </button>
                 )}
             </div>
         </div>
@@ -145,17 +321,7 @@ export default function BudgetManager() {
     useEffect(() => {
         if (budget) {
             setIncome(budget.estimatedIncome || 0);
-
-            // Ensure byBucket is an array
-            if (Array.isArray(budget.buckets)) {
-                setBuckets(budget.buckets);
-            } else if (budget.buckets) {
-                // If it's a single object, wrap it in an array
-                setBuckets([budget.buckets as any]);
-            } else {
-                // Provide default buckets if none exist
-                setBuckets([]);
-            }
+            setBuckets(budget.buckets);
         }
     }, [budget]);
 
@@ -180,17 +346,23 @@ export default function BudgetManager() {
                 (element as HTMLInputElement).select();
             }
         }
-    }, [buckets.length, editing]);
+    }, [buckets.length, editing, beforeBuckets.length]);
 
     // Calculations
     const totalAllocated = buckets.reduce((sum, bucket) => sum + Number(bucket.amount || 0), 0);
     const savings = income - totalAllocated;
     const isOverBudget = savings < 0;
 
+    // Filter buckets by category
+    const needsBuckets = buckets.filter(b => b.category === 'needs' && !b.isSystem);
+    const wantsBuckets = buckets.filter(b => b.category === 'wants' && !b.isSystem);
+    const savingsBuckets = buckets.filter(b => b.category === 'savings' && !b.isSystem);
+    const systemBuckets = buckets.filter(b => b.isSystem);
+
     // Handlers
     const handleEdit = () => {
         setBeforeIncome(income);
-        setBeforeBuckets(JSON.parse(JSON.stringify(buckets))); // Deep copy
+        setBeforeBuckets(buckets);
         setEditing(true);
     };
 
@@ -204,20 +376,20 @@ export default function BudgetManager() {
         );
     };
 
-    const handleAddBucket = () => {
+    const handleAddBucket = (category: string) => {
         const newBucket: BudgetBucket = {
             id: `temp-${Date.now()}`,
             name: "Kategori Baru",
             description: "",
             icon: "Wallet",
             amount: 0,
+            category,
+            isSystem: false,
         };
         setBuckets([...buckets, newBucket]);
     };
 
     const handleDeleteBucket = (id: string) => {
-        // Optional: Add confirmation or "undo" toast here if needed
-        // For now, just smooth removal
         setBuckets(prev => prev.filter(b => b.id !== id));
     };
 
@@ -234,10 +406,22 @@ export default function BudgetManager() {
         if (isOverBudget || income === 0) return;
 
         try {
+            // Transform flat array to API format
+            const bucketsPayload = buckets.map(bucket => ({
+                id: bucket.id,
+                name: bucket.name,
+                description: bucket.description || "",
+                amount: bucket.amount,
+                icon: bucket.icon,
+                category: bucket.category,
+                isSystem: bucket.isSystem || false,
+            }));
+
             await updateBudget({
                 estimatedIncome: income,
-                buckets: buckets as any,
+                buckets: bucketsPayload as any,
             });
+
             setEditing(false);
         } catch (error) {
             console.error('Failed to save budget:', error);
@@ -307,121 +491,75 @@ export default function BudgetManager() {
                         </div>
                     )}
 
-                    {buckets.map((bucket, index) => {
-                        const percentage = income > 0 ? ((bucket.amount || 0) / income) * 100 : 0;
-                        const colorKey = ['primary', 'secondary', 'accent', 'neutral'][index % 4] as 'primary' | 'secondary' | 'accent' | 'neutral';
-                        const colorTextClass = `text-${colorKey}`;
-                        const colorBgClass = `bg-${colorKey}`;
+                    {/* Needs Section */}
+                    <BucketSection
+                        title="Needs (Kebutuhan)"
+                        icon={<DynamicIcon name="Home" size={16} />}
+                        colorClass="text-blue-500"
+                        btnHoverClass="hover:border-blue-500 hover:bg-blue-500"
+                        categoryBuckets={needsBuckets}
+                        editing={editing}
+                        income={income}
+                        onChange={handleBucketChange}
+                        onDelete={handleDeleteBucket}
+                        onGenerateDescription={handleGenerateDescription}
+                        generatingId={generatingId}
+                        onAddBucket={() => handleAddBucket('needs')}
+                    />
 
-                        const focusClass = {
-                            primary: 'focus-within:border-primary focus-within:ring-primary/20',
-                            secondary: 'focus-within:border-secondary focus-within:ring-secondary/20',
-                            accent: 'focus-within:border-accent focus-within:ring-accent/20',
-                            neutral: 'focus-within:border-neutral focus-within:ring-neutral/20',
-                        }[colorKey];
+                    {/* Wants Section */}
+                    <BucketSection
+                        title="Wants (Keinginan)"
+                        icon={<DynamicIcon name="ShoppingBag" size={16} />}
+                        colorClass="text-purple-500"
+                        btnHoverClass="hover:border-purple-500 hover:bg-purple-500"
+                        categoryBuckets={wantsBuckets}
+                        editing={editing}
+                        income={income}
+                        onChange={handleBucketChange}
+                        onDelete={handleDeleteBucket}
+                        onGenerateDescription={handleGenerateDescription}
+                        generatingId={generatingId}
+                        onAddBucket={() => handleAddBucket('wants')}
+                    />
 
-                        return (
-                            <div key={bucket.id} className="relative group transition-all duration-300 ease-in-out">
-                                {editing ? (
-                                    <div className={`p-4 bg-base-100 rounded-2xl border border-base-200 shadow-sm space-y-4 focus-within:ring-1 transition-all ${focusClass}`}>
-                                        <div className="flex justify-between items-start gap-3">
-                                            <div className="flex-1 space-y-2">
-                                                <input
-                                                    id={`bucket-name-${bucket.id}`}
-                                                    type="text"
-                                                    value={bucket.name}
-                                                    onChange={(e) => handleBucketChange(bucket.id, "name", e.target.value)}
-                                                    className="w-full bg-transparent border-none p-0 text-lg font-bold focus:ring-0 placeholder:text-base-content/30"
-                                                    placeholder="Nama Kategori"
-                                                    autoComplete="off"
-                                                />
-                                                <div className="flex gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={bucket.description || ""}
-                                                        onChange={(e) => handleBucketChange(bucket.id, "description", e.target.value)}
-                                                        className="input input-xs input-bordered w-full bg-base-200/50 focus:bg-base-100"
-                                                        placeholder="Deskripsi (opsional)"
-                                                    />
-                                                    <button
-                                                        className={`btn btn-xs btn-square ${generatingId === bucket.id ? 'btn-disabled' : `btn-ghost ${colorTextClass}`}`}
-                                                        onClick={() => handleGenerateDescription(bucket.id, bucket.name)}
-                                                        disabled={generatingId === bucket.id || !bucket.name}
-                                                        title="Generate description with AI"
-                                                    >
-                                                        {generatingId === bucket.id ? (
-                                                            <span className="loading loading-spinner loading-xs"></span>
-                                                        ) : (
-                                                            <Wand2 size={14} />
-                                                        )}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <button
-                                                className="btn btn-sm btn-square btn-ghost text-base-content/30 hover:text-error hover:bg-error/10 transition-colors"
-                                                onClick={() => handleDeleteBucket(bucket.id)}
-                                                title="Hapus Kategori"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        </div>
+                    {/* Savings Section */}
+                    <BucketSection
+                        title="Savings (Tabungan)"
+                        icon={<DynamicIcon name="PiggyBank" size={16} />}
+                        colorClass="text-green-500"
+                        btnHoverClass="hover:border-green-500 hover:bg-green-500"
+                        categoryBuckets={savingsBuckets}
+                        editing={editing}
+                        income={income}
+                        onChange={handleBucketChange}
+                        onDelete={handleDeleteBucket}
+                        onGenerateDescription={handleGenerateDescription}
+                        generatingId={generatingId}
+                        onAddBucket={() => handleAddBucket('savings')}
+                    />
 
-                                        <div className="pt-2 border-t border-base-200/50">
-                                            <CurrencyInput
-                                                label="Alokasi"
-                                                icon={
-                                                    <span className={colorTextClass}>
-                                                        {bucket.icon ? (
-                                                            <DynamicIcon name={bucket.icon} size={16} />
-                                                        ) : (
-                                                            <Wallet size={16} />
-                                                        )}
-                                                    </span>
-                                                }
-                                                value={bucket.amount || 0}
-                                                onChange={(value) => handleBucketChange(bucket.id, "amount", value)}
-                                                color={colorKey}
-                                                maxLimit={income}
-                                            />
-                                            {/* Mini Progress Bar in Edit Mode */}
-                                            <div className="mt-2 w-full bg-base-200 rounded-full h-1.5 overflow-hidden">
-                                                <div
-                                                    className={`${colorBgClass} h-full transition-all duration-500`}
-                                                    style={{ width: `${Math.min(percentage, 100)}%` }}
-                                                />
-                                            </div>
-                                            <div className="text-right text-[10px] text-base-content/40 mt-1 font-medium">
-                                                {Math.round(percentage)}% dari total
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <ReadOnlyRow
-                                        label={bucket.name}
-                                        description={bucket.description}
-                                        amount={bucket.amount || 0}
-                                        color={colorTextClass}
-                                        icon={
-                                            bucket.icon ? (
-                                                <DynamicIcon name={bucket.icon} size={18} />
-                                            ) : (
-                                                <Wallet size={18} />
-                                            )
-                                        }
-                                        percentage={Math.round(percentage)}
+                    {/* System / Unallocated */}
+                    {systemBuckets.length > 0 && (
+                        <div className="mb-6">
+                            <h3 className="font-bold text-sm text-base-content/50 mb-3 flex items-center gap-2 uppercase tracking-wider">
+                                <Wallet size={16} /> System
+                            </h3>
+                            <div className="space-y-3">
+                                {systemBuckets.map((bucket) => (
+                                    <BucketItem
+                                        key={bucket.id}
+                                        bucket={bucket}
+                                        editing={editing}
+                                        income={income}
+                                        onChange={handleBucketChange}
+                                        onDelete={handleDeleteBucket}
+                                        onGenerateDescription={handleGenerateDescription}
+                                        generatingId={generatingId}
                                     />
-                                )}
+                                ))}
                             </div>
-                        )
-                    })}
-
-                    {editing && (
-                        <button
-                            className="btn btn-outline btn-block btn-sm border-dashed border-base-300 hover:border-primary hover:bg-primary hover:text-white transition-all h-12 rounded-xl gap-2"
-                            onClick={handleAddBucket}
-                        >
-                            <Plus size={18} /> Tambah Kategori
-                        </button>
+                        </div>
                     )}
 
                     {/* Divider */}
@@ -463,13 +601,12 @@ export default function BudgetManager() {
                 {/* 3. VISUAL BAR */}
                 {!isOverBudget && income > 0 && (
                     <div className="w-full h-3 flex bg-base-200">
-                        {buckets.map((bucket, index) => {
+                        {buckets.map((bucket) => {
                             const percentage = Math.min(((bucket.amount || 0) / income) * 100, 100);
-                            const colorClass =
-                                index === 0 ? 'bg-primary' :
-                                    index === 1 ? 'bg-secondary' :
-                                        index === 2 ? 'bg-accent' :
-                                            'bg-neutral';
+                            const colorClass = bucket.category === 'needs' ? 'bg-blue-500' :
+                                bucket.category === 'wants' ? 'bg-purple-500' :
+                                    bucket.category === 'savings' ? 'bg-green-500' :
+                                        'bg-yellow-500';
 
                             return percentage > 0 ? (
                                 <div

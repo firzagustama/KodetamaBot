@@ -115,6 +115,16 @@ export async function upsertBudget(data: {
     return newBudget.id;
 }
 
+export async function getBuckets(periodId: string) {
+    const budget = await getBudget(periodId);
+    if (!budget) {
+        return null;
+    }
+    return await db.query.buckets.findMany({
+        where: eq(buckets.budgetId, budget.id),
+    });
+}
+
 async function createSplitBuckets(budgetId: string, needsAmount: number, wantsAmount: number, savingsAmount: number) {
     await db.insert(buckets).values({
         budgetId: budgetId,
@@ -122,6 +132,8 @@ async function createSplitBuckets(budgetId: string, needsAmount: number, wantsAm
         description: "Essentials like rent, food, and utilities",
         icon: "Home",
         amount: needsAmount.toString(),
+        category: "needs",
+        isSystem: false,
     });
 
     await db.insert(buckets).values({
@@ -130,6 +142,8 @@ async function createSplitBuckets(budgetId: string, needsAmount: number, wantsAm
         description: "Non-essential expenses like entertainment and shopping",
         icon: "ShoppingBag",
         amount: wantsAmount.toString(),
+        category: "wants",
+        isSystem: false,
     });
 
     await db.insert(buckets).values({
@@ -138,6 +152,8 @@ async function createSplitBuckets(budgetId: string, needsAmount: number, wantsAm
         description: "Money set aside for future expenses",
         icon: "PiggyBank",
         amount: savingsAmount.toString(),
+        category: "savings",
+        isSystem: false,
     });
 }
 
@@ -148,5 +164,7 @@ async function createUnallocatedBucket(budgetId: string, amount: number) {
         description: "Dana belum dialokasikan",
         icon: "Wallet", // Using Wallet icon for unallocated
         amount: amount.toString(),
+        category: null,
+        isSystem: true,
     });
 }

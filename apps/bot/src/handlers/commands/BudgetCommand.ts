@@ -5,6 +5,7 @@ import {
     getCurrentPeriod,
     getCurrentGroupPeriod,
     getBudgetSummary,
+    getBuckets,
 } from "../../services/index.js";
 import { logger } from "../../utils/logger.js";
 
@@ -28,6 +29,12 @@ export class BudgetCommand extends CommandHandler {
                     "Belum ada budget yang diatur.\n" +
                     "Buka Dashboard untuk mengatur budget bulan ini."
                 );
+                return { success: true };
+            }
+
+            const buckets = await getBuckets(period.id);
+            if (!buckets || buckets.length === 1) {
+                await ctx.conversation.enter("setupbudget");
                 return { success: true };
             }
 

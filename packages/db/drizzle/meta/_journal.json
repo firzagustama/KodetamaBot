@@ -43,6 +43,13 @@
       "when": 1765644668295,
       "tag": "0005_crazy_skrulls",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1765718717627,
+      "tag": "0006_stiff_psynapse",
+      "breakpoints": true
     }
   ]
 }

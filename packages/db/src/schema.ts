@@ -107,6 +107,8 @@ export const buckets = pgTable("buckets", {
     description: varchar("description", { length: 255 }),
     amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
     icon: varchar("icon", { length: 50 }).default("Wallet"),
+    category: varchar("category", { length: 50 }), // needs, wants, savings
+    isSystem: boolean("is_system").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 })

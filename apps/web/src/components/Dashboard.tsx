@@ -24,7 +24,6 @@ export default function Dashboard() {
 
     useEffect(() => {
         if (!budget) return;
-        console.log("fetchSummary")
         fetchSummary();
     }, [budget]);
 
@@ -32,12 +31,11 @@ export default function Dashboard() {
         return <DashboardSkeleton />;
     }
 
-    const { byBucket, totalExpenses, totalIncome } = summary;
+    const { byBucket, totalExpenses, totalIncome, big3 } = summary;
     const remainingBudget = (budget.estimatedIncome || totalIncome) - totalExpenses;
     const spendingPercentage = getPercent(totalExpenses, budget.estimatedIncome || totalIncome);
-    const topThree = byBucket
-        .sort((a, b) => (b.spent / b.allocated) - (a.spent / a.allocated))
-        .slice(0, 3);
+
+    const unallocatedBucket = byBucket.find(b => b.name === "Unallocated");
 
     return (
         <div className="space-y-6 pb-6 animate-fade-in">
@@ -85,20 +83,44 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* 2. THE BIG THREE: Buckets */}
-            <div className="grid grid-cols-3 gap-3">
-                {topThree.map((bucket) => (
-                    <BucketCard
-                        key={bucket.id}
-                        icon={<DynamicIcon name={bucket.icon} size={18} />}
-                        label={bucket.name}
-                        allocated={bucket.allocated}
-                        spent={bucket.spent}
-                        colorClass="text-secondary bg-secondary/10 border-secondary/20"
-                        barClass="progress-secondary"
-                    />
-                ))}
-            </div>
+            {/* 2. THE BIG THREE: Categories */}
+            {!unallocatedBucket && <div className="grid grid-cols-3 gap-3">
+                <BucketCard
+                    key="needs"
+                    icon={<DynamicIcon name="Home" size={18} />}
+                    label="Needs"
+                    allocated={big3.needs.allocated}
+                    spent={big3.needs.spent}
+                    colorClass="text-blue-500 bg-blue-500/10 border-blue-500/20"
+                />
+                <BucketCard
+                    key="wants"
+                    icon={<DynamicIcon name="ShoppingBag" size={18} />}
+                    label="Wants"
+                    allocated={big3.wants.allocated}
+                    spent={big3.wants.spent}
+                    colorClass="text-purple-500 bg-purple-500/10 border-purple-500/20"
+                />
+                <BucketCard
+                    key="savings"
+                    icon={<DynamicIcon name="PiggyBank" size={18} />}
+                    label="Savings"
+                    allocated={big3.savings.allocated}
+                    spent={big3.savings.spent}
+                    colorClass="text-green-500 bg-green-500/10 border-green-500/20"
+                />
+            </div>}
+
+            {/* Unallocated Warning */}
+            {unallocatedBucket && (
+                <div role="alert" className="alert bg-yellow-500/10 border-yellow-500/20 text-yellow-500 shadow-sm py-3">
+                    <Wallet size={18} />
+                    <div className="flex-1">
+                        <h3 className="font-bold text-xs">Unallocated</h3>
+                        <div className="text-xs">{formatRupiah(unallocatedBucket.remaining)}</div>
+                    </div>
+                </div>
+            )}
 
             {/* 3. DETAILED BREAKDOWN */}
             <div className="bg-base-100 rounded-3xl border border-base-200 shadow-sm overflow-hidden">

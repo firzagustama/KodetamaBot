@@ -114,6 +114,19 @@ function setupEventHandlers(
             return;
         }
 
+        // Education callbacks
+        if (data === "setup_budget") {
+            await ctx.answerCallbackQuery();
+            await ctx.reply("Oke, ayo atur budget! Ketik /budget untuk mulai.");
+            return;
+        }
+
+        if (data === "dismiss_education") {
+            await ctx.answerCallbackQuery("Oke, nanti aja.");
+            await ctx.deleteMessage();
+            return;
+        }
+
         await ctx.answerCallbackQuery();
     });
 

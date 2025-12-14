@@ -5,6 +5,7 @@ import { sequentialize } from "@grammyjs/runner";
 import type { BotContext, SessionData } from "../types.js";
 import { registrationConversation } from "../conversations/registration.js";
 import { onboardingConversation } from "../conversations/onboarding.js";
+import { setupbudget } from "../conversations/setupbudget.js";
 
 /**
  * Configuration class for bot setup
@@ -60,6 +61,7 @@ export class BotConfiguration {
         this.bot.use(conversations());
         this.bot.use(createConversation(registrationConversation));
         this.bot.use(createConversation(onboardingConversation));
+        this.bot.use(createConversation(setupbudget));
     }
 
     /**

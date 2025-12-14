@@ -1,5 +1,5 @@
 import { db } from "@kodetama/db";
-import { transactions, categories, aiUsage } from "@kodetama/db/schema";
+import { transactions, categories, aiUsage, budgets } from "@kodetama/db/schema";
 import { eq, and, desc, sql, ilike } from "drizzle-orm";
 import type { TxType } from "@kodetama/shared";
 
@@ -198,4 +198,30 @@ export async function trackAiUsage(data: {
         outputTokens: data.outputTokens,
         cost: data.cost?.toString(),
     });
+}
+
+/**
+ * Get total transaction count for a user in a period
+ */
+export async function getTransactionCount(userId: string, periodId: string): Promise<number> {
+    const result = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(transactions)
+        .where(and(eq(transactions.userId, userId), eq(transactions.periodId, periodId)));
+
+    return Number(result[0]?.count ?? 0);
+}
+
+/**
+ * Recommend to setup buckets
+ */
+export async function recommendSetupBuckets(userId: string, periodId: string): Promise<boolean> {
+    const txCount = await getTransactionCount(userId, periodId);
+    const budget = await db.query.budgets.findFirst({
+        where: eq(budgets.periodId, periodId),
+        with: {
+            buckets: true,
+        },
+    });
+    return (!budget || budget.buckets.length === 1) && txCount >= 5;
 }

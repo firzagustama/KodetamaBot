@@ -11,6 +11,8 @@ interface Budget {
         amount: number;
         spent: number;
         remaining: number;
+        category?: string;
+        isSystem?: boolean;
     }>,
     period: {
         id: string;
@@ -43,6 +45,11 @@ interface Summary {
         remaining: number;
     }>,
     topCategories: { name: string; amount: number; percentage: number }[];
+    big3: {
+        needs: { allocated: number; spent: number; remaining: number };
+        wants: { allocated: number; spent: number; remaining: number };
+        savings: { allocated: number; spent: number; remaining: number };
+    };
 }
 
 interface GoogleSheet {

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { db } from "@kodetama/db";
 import { transactions, budgets, datePeriods, buckets } from "@kodetama/db/schema";
-import { eq, desc, sql, and } from "drizzle-orm";
+import { eq, desc, sql, and, inArray } from "drizzle-orm";
 
 import { authenticate } from "../middleware/auth.js";
 import { logger } from "../utils/logger.js";
@@ -314,8 +314,8 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
             return {
                 totalIncome: 0,
                 totalExpenses: 0,
-                totalSavings: 0,
-                byBucket: {
+                byBucket: [],
+                big3: {
                     needs: { allocated: 0, spent: 0, remaining: 0 },
                     wants: { allocated: 0, spent: 0, remaining: 0 },
                     savings: { allocated: 0, spent: 0, remaining: 0 },
@@ -375,12 +375,74 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
             remaining: parseFloat(bucket.amount) - (bucketSpending[bucket.name.toLowerCase()] ?? 0),
         })) ?? [];
 
+        // Calculate Big 3
+        const big3 = {
+            needs: { allocated: 0, spent: 0, remaining: 0 },
+            wants: { allocated: 0, spent: 0, remaining: 0 },
+            savings: { allocated: 0, spent: 0, remaining: 0 },
+        };
+
+        for (const bucket of budget?.buckets ?? []) {
+            if (bucket.isSystem) continue;
+            const category = (bucket.category || 'needs') as 'needs' | 'wants' | 'savings';
+            if (big3[category]) {
+                const allocated = parseFloat(bucket.amount);
+                const spent = bucketSpending[bucket.name.toLowerCase()] ?? 0;
+                big3[category].allocated += allocated;
+                big3[category].spent += spent;
+                big3[category].remaining += (allocated - spent);
+            }
+        }
+
         const res = {
             totalIncome,
             totalExpenses,
             byBucket,
+            big3,
             topCategories: sortedCategories,
         };
         return res;
+    });
+
+    /**
+     * POST /transactions/reassign
+     * Reassign transactions to a different bucket
+     */
+    fastify.post<{
+        Body: {
+            transactionIds: string[];
+            bucket: string;
+        };
+    }>("/reassign", {
+        preHandler: [authenticate, loggingMiddleware],
+    }, async (request, reply) => {
+        const { transactionIds, bucket } = request.body;
+        const payload = request.user as { id: string; targetId: string; targetType: "user" | "group" };
+
+        if (!transactionIds || transactionIds.length === 0) {
+            return reply.status(400).send({ error: "No transaction IDs provided" });
+        }
+
+        try {
+            const condition = payload.targetType === 'group'
+                ? eq(transactions.groupId, payload.targetId)
+                : eq(transactions.userId, payload.targetId);
+
+            const updated = await db
+                .update(transactions)
+                .set({ bucket })
+                .where(and(
+                    inArray(transactions.id, transactionIds),
+                    condition
+                ))
+                .returning();
+
+            return { updated: updated.length };
+        } catch (err) {
+            logger.error("Failed to reassign transactions", {
+                error: err instanceof Error ? err.message : 'Unknown error'
+            });
+            throw err;
+        }
     });
 }

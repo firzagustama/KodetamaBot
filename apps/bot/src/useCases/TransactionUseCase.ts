@@ -7,7 +7,10 @@ import {
     resolvePeriodId,
     resolveGroupPeriodId,
     trackAiUsage,
+    getTransactionCount,
+    recommendSetupBuckets,
 } from "../services/index.js";
+import { InlineKeyboard } from "grammy";
 
 interface TransactionResult {
     success: boolean;
@@ -74,6 +77,21 @@ export class TransactionUseCase {
 
             await ctx.reply(message, { parse_mode: "Markdown" });
 
+            // Check for education trigger
+            const txCount = await getTransactionCount(userId, periodId);
+            console.log(txCount)
+            if (txCount === 5) {
+                const educationMessage =
+                    "Keren lo udah rajin catat pengeluaran 👍\n" +
+                    "Mau lebih rapih? Organisir pengeluaran menjadi Needs, Wants, dan Savings?";
+
+                const keyboard = new InlineKeyboard()
+                    .text("Gas", "setup_budget")
+                    .text("Nanti dulu", "dismiss_education");
+
+                await ctx.reply(educationMessage, { reply_markup: keyboard });
+            }
+
             return { success: true, message };
         } catch (error) {
             logger.error("Failed to save transaction:", error);
@@ -129,6 +147,20 @@ export class TransactionUseCase {
             // Send success message
             const message = TransactionFormatter.formatMultipleTransactionsSuccess(transactions) + `\n\n${parsed.message}`;
             await ctx.reply(message, { parse_mode: "Markdown" });
+
+            // Check for education trigger
+            const educationTrigger = await recommendSetupBuckets(account.userId, account.periodId);
+            if (educationTrigger) {
+                const educationMessage =
+                    "Keren lo udah rajin catat pengeluaran 👍\n\n" +
+                    "Mau lebih rapih? Organisir pengeluaran menjadi Needs, Wants, dan Savings?";
+
+                const keyboard = new InlineKeyboard()
+                    .text("Gas", "setup_budget")
+                    .text("Nanti dulu", "dismiss_education");
+
+                await ctx.reply(educationMessage, { reply_markup: keyboard });
+            }
 
             return { success: true, message };
         } catch (error) {
@@ -281,6 +313,24 @@ export class TransactionUseCase {
             }
 
             const { result: parsed, usage } = await this.ai.parseTransaction(message, budgetContext);
+
+            // Post-process transactions to ensure bucket is set
+            if (parsed && parsed.transactions) {
+                for (const tx of parsed.transactions) {
+                    // Default to Unallocated if no bucket
+                    if (!tx.bucket) {
+                        tx.bucket = "Unallocated";
+                    }
+
+                    // If bucket is set but not in budgetContext, use Unallocated
+                    if (budgetContext && budgetContext.buckets) {
+                        const bucketExists = budgetContext.buckets.some(b => b.name.toLowerCase() === tx.bucket?.toLowerCase());
+                        if (!bucketExists && tx.bucket.toLowerCase() !== "unallocated") {
+                            tx.bucket = "Unallocated";
+                        }
+                    }
+                }
+            }
 
             logger.info("Transaction parsed", { raw: message, parsed, usage, budgetContext });
 

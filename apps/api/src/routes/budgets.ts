@@ -7,6 +7,20 @@ import { AIOrchestrator } from "@kodetama/ai";
 import { authenticate } from "../middleware/auth.js";
 import { loggingMiddleware } from "../middleware/loggingMiddleware.js";
 
+const groupBuckets = (buckets: any[]) => {
+    const system = buckets.filter(b => b.isSystem);
+    const unallocated = system.find(b => b.name === 'Unallocated');
+
+    return {
+        system: {
+            unallocated: unallocated ? { id: unallocated.id, total: unallocated.amount } : null
+        },
+        needs: buckets.filter(b => !b.isSystem && (b.category === 'needs' || !b.category)),
+        wants: buckets.filter(b => !b.isSystem && b.category === 'wants'),
+        savings: buckets.filter(b => !b.isSystem && b.category === 'savings'),
+    };
+};
+
 export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
 
     /**
@@ -47,7 +61,7 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
         return {
             id: budget.id,
             estimatedIncome: budget.estimatedIncome,
-            buckets: bucket,
+            buckets: groupBuckets(bucket),
             period: {
                 id: currentPeriod.id,
                 name: currentPeriod.name,
@@ -113,7 +127,9 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
                 id: string;
                 amount: number;
                 name?: string;
+                description?: string;
                 icon?: string;
+                category?: string;
             }>;
         };
     }>("/:periodId", {
@@ -166,8 +182,11 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
                     id: crypto.randomUUID(), // Generate real ID
                     budgetId: budget.id,
                     name: bucket.name || 'Unnamed Bucket',
+                    description: bucket.description || '',
                     amount: bucket.amount.toString(),
                     icon: bucket.icon || 'Wallet',
+                    category: bucket.category || 'needs',
+                    isSystem: false,
                     createdAt: new Date(),
                     updatedAt: new Date(),
                 });
@@ -176,12 +195,17 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
             // UPDATE: Update existing buckets
             const existingBucketUpdates = bucketUpdates.filter(b => !b.id.startsWith('temp'));
             for (const bucket of existingBucketUpdates) {
+                const existingBucket = existingBuckets.find(b => b.id === bucket.id);
+                if (existingBucket?.isSystem) continue;
+
                 await db
                     .update(buckets)
                     .set({
                         amount: bucket.amount.toString(),
                         ...(bucket.name ? { name: bucket.name } : {}),
+                        ...(bucket.description ? { description: bucket.description } : {}),
                         ...(bucket.icon ? { icon: bucket.icon } : {}),
+                        ...(bucket.category ? { category: bucket.category } : {}),
                         updatedAt: new Date(),
                     })
                     .where(eq(buckets.id, bucket.id));
@@ -192,11 +216,13 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
                 b => !incomingBucketIds.has(b.id)
             );
             for (const bucket of bucketsToDelete) {
+                if (bucket.isSystem) continue;
                 await db.delete(buckets).where(eq(buckets.id, bucket.id));
             }
         } else {
             // If no buckets provided, delete all existing buckets
-            await db.delete(buckets).where(eq(buckets.budgetId, budget.id));
+            // If no buckets provided, delete all existing buckets (except system ones)
+            await db.delete(buckets).where(and(eq(buckets.budgetId, budget.id), eq(buckets.isSystem, false)));
         }
 
         // Fetch updated data to return
@@ -210,7 +236,7 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
 
         return {
             ...updatedBudget,
-            buckets: updatedBuckets,
+            buckets: groupBuckets(updatedBuckets),
             updated: true
         };
     });
