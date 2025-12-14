@@ -9,26 +9,24 @@ export class HelpCommand extends CommandHandler {
 
     async execute(ctx: BotContext): Promise<CommandExecutionResult> {
         await ctx.reply(
-            "🤖 *Kodetama Bot - Asisten Keuangan*\n\n" +
-            "*Cara Mencatat Transaksi:*\n" +
-            "Kirim pesan natural seperti:\n" +
-            "• `makan 20rb` → pengeluaran makanan\n" +
-            "• `gaji 8jt` → pemasukan gaji\n" +
-            "• `bensin 150rb` → pengeluaran transportasi\n" +
-            "• `transfer ke mama 500k` → transfer\n\n" +
-            "*Format Angka:*\n" +
-            "• `rb` atau `ribu` = ribuan (20rb = 20.000)\n" +
-            "• `jt` atau `juta` = jutaan (1,5jt = 1.500.000)\n" +
-            "• `k` = ribuan (500k = 500.000)\n\n" +
+            "🤖 *Kodetama Bot (BETA)*\n\n" +
+            "Asisten keuangan personal lo.\n\n" +
+            "*Cara Pakai:*\n" +
+            "Langsung chat aja pengeluaran lo:\n" +
+            "• `makan 20rb`\n" +
+            "• `gaji 10jt`\n" +
+            "• `bensin 50rb`\n" +
+            "• `transfer ke mama 500k`\n\n" +
+            "*Fitur Pro (Gratis selama Beta):*\n" +
+            "• Kirim foto struk/invoice\n" +
+            "• Kirim voice note\n\n" +
             "*Perintah:*\n" +
-            "/start - Mulai atau registrasi\n" +
-            "/help - Bantuan\n" +
-            "/budget - Lihat budget\n" +
+            "/start - Mulai/Reset\n" +
+            "/help - Bantuan ini\n" +
+            "/budget - Cek budget\n" +
             "/summary - Ringkasan bulan ini\n" +
-            "/undo - Batalkan transaksi terakhir\n" +
-            "/wallet - Lihat saldo\n" +
-            "/export - Export ke Google Sheets\n" +
-            "/cancel - Batalkan percakapan",
+            "/undo - Batalin transaksi terakhir\n" +
+            "/cancel - Batalin percakapan",
             { parse_mode: "Markdown" }
         );
 

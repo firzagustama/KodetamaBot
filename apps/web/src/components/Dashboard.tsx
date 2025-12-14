@@ -32,9 +32,12 @@ export default function Dashboard() {
         return <DashboardSkeleton />;
     }
 
-    const { byBucket, totalExpenses } = summary;
-    const remainingBudget = budget.estimatedIncome - totalExpenses;
-    const spendingPercentage = getPercent(totalExpenses, budget.estimatedIncome);
+    const { byBucket, totalExpenses, totalIncome } = summary;
+    const remainingBudget = (budget.estimatedIncome || totalIncome) - totalExpenses;
+    const spendingPercentage = getPercent(totalExpenses, budget.estimatedIncome || totalIncome);
+    const topThree = byBucket
+        .sort((a, b) => (b.spent / b.allocated) - (a.spent / a.allocated))
+        .slice(0, 3);
 
     return (
         <div className="space-y-6 pb-6 animate-fade-in">
@@ -59,7 +62,7 @@ export default function Dashboard() {
                             <span className="opacity-70 text-xs">Pemasukan</span>
                             <span className="font-semibold flex items-center gap-1">
                                 <ArrowUpRight size={14} className="text-primary-content/70" />
-                                {formatRupiah(budget.estimatedIncome)}
+                                {formatRupiah(budget.estimatedIncome || totalIncome)}
                             </span>
                         </div>
                         <div className="w-px h-8 bg-white/20"></div>
@@ -84,7 +87,7 @@ export default function Dashboard() {
 
             {/* 2. THE BIG THREE: Buckets */}
             <div className="grid grid-cols-3 gap-3">
-                {byBucket.map((bucket) => (
+                {topThree.map((bucket) => (
                     <BucketCard
                         key={bucket.id}
                         icon={<DynamicIcon name={bucket.icon} size={18} />}

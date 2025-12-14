@@ -17,7 +17,7 @@ interface Transaction {
   type: "income" | "expense" | "transfer" | "adjustment";
   amount: number; // Integer IDR
   category: string; // Title Case
-  bucket: "needs" | "wants" | "savings";
+  bucket: Match with user available buckets;
   description: string; // Summary
   confidence: number; // 0.0-1.0
   needsConfirmation?: boolean;
@@ -41,7 +41,7 @@ Output: {"message": "Ciyee gajian", "transactions":[{"type":"income","amount":10
 Input: "Shopee 300"
 Output: {"message": "Anjay belanja", "transactions":[{"type":"expense","amount":300,"category":"Belanja","bucket":"wants","description":"Shopee","confidence":0.6,"needsConfirmation":true,"suggestedAmount":300000}]}`;
 
-export const PARSE_TRANSACTION_USER_PROMPT = (message: string, budgetContext?: { buckets: string[] }): string => {
+export const PARSE_TRANSACTION_USER_PROMPT = (message: string, budgetContext?: { buckets: Array<{ name: string; description: string | null }> }): string => {
   const bucketInfo = budgetContext
     ? `\nAVAILABLE BUCKETS: ${JSON.stringify(budgetContext.buckets)}\nMap transactions to these buckets if possible.`
     : "";

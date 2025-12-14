@@ -199,12 +199,14 @@ export class AIOrchestrator {
     /**
      * Parse a casual Indonesian financial message into structured transaction data
      */
-    /**
-     * Parse a casual Indonesian financial message into structured transaction data
-     */
     async parseTransaction(
         message: string,
-        budgetContext?: { buckets: string[] }
+        budgetContext?: {
+            buckets: Array<{
+                name: string;
+                description: string | null;
+            }>
+        }
     ): Promise<{ result: ParsedTransaction; usage: UsageStats }> {
         if (this.isDevMode) {
             // Simulate processing delay

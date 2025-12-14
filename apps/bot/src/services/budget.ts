@@ -73,14 +73,10 @@ export async function getBudgetSummary(targetId: string, periodId: string, isGro
 export async function upsertBudget(data: {
     periodId: string;
     estimatedIncome: number;
-    needsPercent: number;
-    wantsPercent: number;
-    savingsPercent: number;
+    needsPercent?: number;
+    wantsPercent?: number;
+    savingsPercent?: number;
 }) {
-    const needsAmount = Math.round(data.estimatedIncome * (data.needsPercent / 100));
-    const wantsAmount = Math.round(data.estimatedIncome * (data.wantsPercent / 100));
-    const savingsAmount = Math.round(data.estimatedIncome * (data.savingsPercent / 100));
-
     const existing = await getBudget(data.periodId);
 
     if (existing) {
@@ -91,7 +87,14 @@ export async function upsertBudget(data: {
             })
             .where(eq(budgets.id, existing.id));
 
-        await createBucket(existing.id, needsAmount, wantsAmount, savingsAmount);
+        // If percentages are provided, we might want to re-allocate, but for now let's just keep existing buckets
+        // Or if it's a new "Unallocated" style, we might need to handle that.
+        // For this task, we assume we are creating new budgets with Unallocated.
+        // If updating, we might just leave buckets as is for now unless we want to support re-balancing.
+
+        // If it was previously unallocated and now we have percentages, we might want to switch?
+        // But the requirement is just to create "Unallocated" for new flows.
+
         return existing.id;
     }
 
@@ -100,11 +103,19 @@ export async function upsertBudget(data: {
         estimatedIncome: data.estimatedIncome.toString(),
     }).returning({ id: budgets.id });
 
-    await createBucket(newBudget.id, needsAmount, wantsAmount, savingsAmount);
+    if (data.needsPercent !== undefined && data.wantsPercent !== undefined && data.savingsPercent !== undefined) {
+        const needsAmount = Math.round(data.estimatedIncome * (data.needsPercent / 100));
+        const wantsAmount = Math.round(data.estimatedIncome * (data.wantsPercent / 100));
+        const savingsAmount = Math.round(data.estimatedIncome * (data.savingsPercent / 100));
+        await createSplitBuckets(newBudget.id, needsAmount, wantsAmount, savingsAmount);
+    } else {
+        await createUnallocatedBucket(newBudget.id, data.estimatedIncome);
+    }
+
     return newBudget.id;
 }
 
-async function createBucket(budgetId: string, needsAmount: number, wantsAmount: number, savingsAmount: number) {
+async function createSplitBuckets(budgetId: string, needsAmount: number, wantsAmount: number, savingsAmount: number) {
     await db.insert(buckets).values({
         budgetId: budgetId,
         name: "Needs",
@@ -127,5 +138,15 @@ async function createBucket(budgetId: string, needsAmount: number, wantsAmount: 
         description: "Money set aside for future expenses",
         icon: "PiggyBank",
         amount: savingsAmount.toString(),
+    });
+}
+
+async function createUnallocatedBucket(budgetId: string, amount: number) {
+    await db.insert(buckets).values({
+        budgetId: budgetId,
+        name: "Unallocated",
+        description: "Dana belum dialokasikan",
+        icon: "Wallet", // Using Wallet icon for unallocated
+        amount: amount.toString(),
     });
 }

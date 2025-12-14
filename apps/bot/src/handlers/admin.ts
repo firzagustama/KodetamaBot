@@ -3,6 +3,9 @@ import { logger } from "../utils/logger.js";
 import {
     approveRegistration,
     updateRegistrationStatus,
+    updateUserIncomeSettings,
+    ensurePeriodExists,
+    upsertBudget,
 } from "../services/index.js";
 
 /**
@@ -49,17 +52,49 @@ export async function handleAdminCallback(ctx: BotContext): Promise<void> {
                 { parse_mode: "Markdown" }
             );
 
-            // Notify the user
+            // Automate Budget Setup
             try {
+                const now = new Date();
+                const currentMonth = now.getMonth();
+                const currentYear = now.getFullYear();
+                const incomeDate = 1;
+                const isIncomeUncertain = true;
+
+                // 1. Update income settings
+                await updateUserIncomeSettings(newUserId, incomeDate, isIncomeUncertain);
+
+                // 2. Ensure period exists
+                const periodDate = new Date(currentYear, currentMonth, 1);
+                const periodId = await ensurePeriodExists(newUserId, periodDate, incomeDate);
+
+                // 3. Create Unallocated budget
+                await upsertBudget({
+                    periodId,
+                    estimatedIncome: 0,
+                    // No percentages -> Unallocated
+                });
+
+                logger.info(`Automatic budget setup completed for user ${userId}`);
+
+                // Notify the user
                 await ctx.api.sendMessage(
                     userId,
                     "🎉 *Selamat!*\n\n" +
                     "Registrasimu telah disetujui oleh admin.\n" +
-                    "Ketik /start untuk memulai setup budget kamu!",
+                    "Budget otomatis dibuat (Unallocated).\n\n" +
+                    "Langsung chat pengeluaranmu, untuk detailnya ketik /help",
                     { parse_mode: "Markdown" }
                 );
-            } catch (error) {
-                logger.error(`Failed to notify user ${userId}:`, error);
+            } catch (setupError) {
+                logger.error(`Failed to setup budget for user ${userId}:`, setupError);
+                // Fallback notification
+                await ctx.api.sendMessage(
+                    userId,
+                    "🎉 *Selamat!*\n\n" +
+                    "Registrasimu telah disetujui oleh admin.\n" +
+                    "Tapi ada error dikit pas setup budget. Ketik /start buat coba lagi.",
+                    { parse_mode: "Markdown" }
+                );
             }
 
             await ctx.answerCallbackQuery("User approved!");
@@ -83,7 +118,7 @@ export async function handleAdminCallback(ctx: BotContext): Promise<void> {
                 await ctx.api.sendMessage(
                     userId,
                     "😔 *Maaf*\n\n" +
-                    "Registrasimu tidak dapat disetujui saat ini.\n" +
+                    "Lo ngga dapet izin\n" +
                     "Silakan hubungi admin untuk informasi lebih lanjut.",
                     { parse_mode: "Markdown" }
                 );

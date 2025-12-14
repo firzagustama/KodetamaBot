@@ -43,46 +43,39 @@ export async function registrationConversation(
 
     // Welcome message
     await ctx.reply(
-        "*Ya udah, selamat datang.*\n\n" +
-        "Gue asisten keuangan biasa. Bantu atur duit kamu.\n\n" +
-        "Pilih tier yang cocok:",
+        "*Selamat datang di Kodetama Bot!* 🤖\n\n" +
+        "Gue bisa bantu lo:\n" +
+        "✅ Catat pengeluaran via chat (`makan 20rb`)\n" +
+        "✅ Kirim foto struk/invoice buat dicatat\n" +
+        "✅ Analisis keuangan simpel\n\n" +
+        "⚠️ *PENTING: Bot ini masih tahap BETA.*\n" +
+        "Mungkin ada bug atau fitur yang berubah.",
         { parse_mode: "Markdown" }
     );
 
-    // Tier selection keyboard
-    const tierKeyboard = new InlineKeyboard()
-        .text("Standard - Gratis", "tier_standard")
-        .row()
-        .text("Pro - Premium", "tier_pro")
-        .row()
-        .text("Family - Grup", "tier_family");
+    // Beta confirmation keyboard
+    const betaKeyboard = new InlineKeyboard()
+        .text("🚀 Gas", "beta_yes")
+        .text("❌ Gak", "beta_no");
 
     await ctx.reply(
-        "Tier apa?:\n\n" +
-        "*Standard* (Gratis)\n" +
-        "• Catat transaksi via chat\n" +
-        "• Export ke Google Sheets\n" +
-        "• Analitik dasar\n" +
-        "• Klasifikasi smart\n\n" +
-        "*Pro* (Premium)\n" +
-        "• Semua fitur Standard\n" +
-        "• Upload invoice → Google Drive\n" +
-        "• Voice note → transaksi\n" +
-        "• Auto-kategorisasi\n" +
-        "• Ringkasan bulanan smart\n\n" +
-        "*Family* (Grup)\n" +
-        "• Setara fitur Pro\n" +
-        "• Untuk grup Telegram\n" +
-        "• Anggota grup bisa catat pengeluaran\n" +
-        "• Wallet dan kategori bersama",
-        { parse_mode: "Markdown", reply_markup: tierKeyboard }
+        "Mau ikutan jadi Beta Tester?\n" +
+        "_Psst_ lo juga bisa pakai bot ini di grup bareng keluarga loh...",
+        { parse_mode: "Markdown", reply_markup: betaKeyboard }
     );
 
-    // Wait for tier selection
-    const tierResponse = await conversation.waitForCallbackQuery(/^tier_/);
-    const selectedTier = tierResponse.callbackQuery.data.replace("tier_", "") as Tier;
+    // Wait for beta selection
+    const betaResponse = await conversation.waitForCallbackQuery(/^beta_/);
+    const betaChoice = betaResponse.callbackQuery.data;
+    await betaResponse.answerCallbackQuery();
 
-    await tierResponse.answerCallbackQuery(`Tier ${selectedTier} dipilih.`);
+    if (betaChoice === "beta_no") {
+        await ctx.reply("Oke, siap. Kalau berubah pikiran, ketik /start lagi ya. 👋");
+        return;
+    }
+
+    // Default to Family tier for beta testers
+    const selectedTier: Tier = "family";
 
     // Store registration data in session
     conversation.session.registrationData = {
@@ -116,7 +109,7 @@ export async function registrationConversation(
     try {
         const adminMessage = await ctx.api.sendMessage(
             parseInt(ADMIN_TELEGRAM_ID),
-            `🆕 *Registrasi Baru*\n\n` +
+            `🆕 *Registrasi Baru (BETA)*\n\n` +
             `👤 *User:* ${user.first_name} ${user.last_name ?? ""}\n` +
             `📛 *Username:* @${user.username ?? "tidak ada"}\n` +
             `🆔 *ID:* \`${user.id}\`\n` +
@@ -154,10 +147,10 @@ export async function registrationConversation(
 
     // Notify user that request is pending
     await ctx.reply(
-        "✨ *Terima kasih!*\n\n" +
-        "Permintaan registrasimu sudah dikirim ke admin untuk di-review.\n" +
-        "Kamu akan mendapat notifikasi setelah disetujui.\n\n" +
-        "⏳ Mohon tunggu...",
+        "✨ *Sip, Request Terkirim!*\n\n" +
+        "Admin lagi review pendaftaran lo.\n" +
+        "Tunggu notifikasi selanjutnya ya.\n\n" +
+        "⏳ *Status: Pending Approval*",
         { parse_mode: "Markdown" }
     );
 }

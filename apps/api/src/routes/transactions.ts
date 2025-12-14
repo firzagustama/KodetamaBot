@@ -349,13 +349,12 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
             } else if (tx.type === "expense") {
                 totalExpenses += amount;
                 if (tx.bucket) {
-                    bucketSpending[tx.bucket] = (bucketSpending[tx.bucket] ?? 0) + amount;
+                    bucketSpending[tx.bucket.toLowerCase()] = (bucketSpending[tx.bucket.toLowerCase()] ?? 0) + amount;
                 }
                 const catName = tx.category?.name ?? "Lainnya";
                 categorySpending[catName] = (categorySpending[catName] ?? 0) + amount;
             }
         }
-        console.log(bucketSpending)
 
         // Build top categories
         const sortedCategories = Object.entries(categorySpending)

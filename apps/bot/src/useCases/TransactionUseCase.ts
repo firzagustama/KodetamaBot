@@ -264,7 +264,7 @@ export class TransactionUseCase {
      */
     async parseTransaction(message: string, periodId?: string) {
         try {
-            let budgetContext: { buckets: string[] } | undefined;
+            let budgetContext: { buckets: Array<{ name: string; description: string | null }> } | undefined;
 
             if (periodId) {
                 // Dynamic import to avoid circular dependency if any (though service import should be fine)
@@ -272,7 +272,10 @@ export class TransactionUseCase {
                 const budget = await getBudget(periodId);
                 if (budget && budget.buckets) {
                     budgetContext = {
-                        buckets: budget.buckets.map(b => b.name)
+                        buckets: budget.buckets.map(b => ({
+                            name: b.name!,
+                            description: b.description
+                        }))
                     };
                 }
             }
