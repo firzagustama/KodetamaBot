@@ -47,7 +47,7 @@ export class BotRunner {
             { command: "start", description: "Mulai atau registrasi" },
             { command: "help", description: "Bantuan penggunaan" },
             { command: "dashboard", description: "Dashboard" },
-            // { command: "budget", description: "Lihat budget bulan ini" },
+            { command: "budget", description: "Lihat budget bulan ini" },
             // { command: "summary", description: "Ringkasan transaksi" },
             { command: "undo", description: "Batalkan transaksi terakhir" },
             // { command: "wallet", description: "Lihat saldo wallet" },

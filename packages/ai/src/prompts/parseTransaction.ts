@@ -3,7 +3,7 @@ export const PARSE_TRANSACTION_SYSTEM_PROMPT = `Role: Indonesian financial parse
 PARSING LOGIC:
 1. Amounts: "rb/ribu/k"=*1000, "jt/juta"=*1000000. Comma (,) = decimal.
 2. Verification: If amount < 1000 but context implies higher, set "needsConfirmation": true.
-3. Categorization: Infer standard Indonesian Category. Buckets: "needs" (essential), "wants" (lifestyle), "savings".
+3. Categorization: Infer standard Indonesian Category. ALWAYS use user available buckets.
 4. Batch: Detect bullet points/newlines.
 
 TYPES:
@@ -17,7 +17,7 @@ interface Transaction {
   type: "income" | "expense" | "transfer" | "adjustment";
   amount: number; // Integer IDR
   category: string; // Title Case
-  bucket: Match with user available buckets;
+  bucket: string; // User available bucket
   description: string; // Summary
   confidence: number; // 0.0-1.0
   needsConfirmation?: boolean;

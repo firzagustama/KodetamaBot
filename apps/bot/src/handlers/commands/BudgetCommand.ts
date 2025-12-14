@@ -59,9 +59,10 @@ export class BudgetCommand extends CommandHandler {
                 `💰 *Budget ${period.name}*\n\n` +
                 `📊 *Estimasi Pendapatan:* ${formatRupiah(summary.budget.estimatedIncome)}\n\n`;
             for (const bucket of summary.budget.buckets) {
+                const percent = bucket.amount / summary.budget.estimatedIncome * 100;
                 response +=
-                    `*${bucket.bucket} (${bucket.amount}%)*\n` +
-                    `${progressBar(bucket.spent / bucket.amount)}\n` +
+                    `*${bucket.bucket} (${percent}%)*\n` +
+                    `${progressBar(percent)}\n` +
                     `${formatRupiah(bucket.spent)} / ${formatRupiah(bucket.amount)}\n` +
                     `Sisa: ${formatRupiah(bucket.remaining)}\n\n`;
             }
