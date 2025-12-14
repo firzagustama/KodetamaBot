@@ -1,25 +1,44 @@
 import { create } from "zustand";
 import { authFetch } from "../utils/apiClient";
 
+interface Bucket {
+    id: string;
+    budgetId: string;
+    name: string;
+    description: string | undefined;
+    icon: string;
+    amount: number;
+    category: string;
+    isSystem: boolean;
+}
+
 interface Budget {
     id: string;
     estimatedIncome: number;
-    buckets: Array<{
-        id: string;
-        icon: string;
-        name: string;
-        amount: number;
-        spent: number;
-        remaining: number;
-        category?: string;
-        isSystem?: boolean;
-    }>,
+    buckets: {
+        system: Bucket,
+        needs: Bucket[],
+        wants: Bucket[],
+        savings: Bucket[],
+    },
     period: {
         id: string;
         name: string;
         startDate: string;
         endDate: string;
     };
+}
+
+interface UpdateBudget {
+    estimatedIncome?: string;
+    buckets?: Array<{
+        id: string;
+        amount: number;
+        name?: string;
+        description?: string;
+        icon?: string;
+        category?: string;
+    }>;
 }
 
 interface Transaction {
@@ -84,7 +103,7 @@ interface State {
     fetchTransactions: () => Promise<void>;
     fetchSummary: () => Promise<void>;
     fetchGoogleData: () => Promise<void>;
-    updateBudget: (data: Partial<Budget>) => Promise<void>;
+    updateBudget: (data: Partial<UpdateBudget>) => Promise<void>;
     reset: () => void;
     generateBucketDescription: (category: string, context?: string) => Promise<string | null>;
 }
@@ -247,7 +266,7 @@ export const useStore = create<State>((set, get) => ({
     },
 
     updateBudget: async (data) => {
-        const { budget, token, on401Handler, on403Handler } = get();
+        const { budget, token, on401Handler, on403Handler, fetchBudget } = get();
         if (!budget) return;
 
         try {
@@ -260,7 +279,7 @@ export const useStore = create<State>((set, get) => ({
                 throw new Error("Failed to update budget");
             }
 
-            set({ budget: { ...budget, ...data } });
+            await fetchBudget();
         } catch (err) {
             set({ error: err instanceof Error ? err.message : "Failed to update budget" });
         }

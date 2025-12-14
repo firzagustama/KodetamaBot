@@ -321,7 +321,15 @@ export default function BudgetManager() {
     useEffect(() => {
         if (budget) {
             setIncome(budget.estimatedIncome || 0);
-            setBuckets(budget.buckets);
+
+            // Flat buckets
+            const bucket = budget.buckets;
+            const allBuckets = [
+                ...bucket.needs,
+                ...bucket.wants,
+                ...bucket.savings,
+            ]
+            setBuckets(allBuckets);
         }
     }, [budget]);
 
@@ -418,8 +426,8 @@ export default function BudgetManager() {
             }));
 
             await updateBudget({
-                estimatedIncome: income,
-                buckets: bucketsPayload as any,
+                estimatedIncome: income.toString(),
+                buckets: bucketsPayload,
             });
 
             setEditing(false);
