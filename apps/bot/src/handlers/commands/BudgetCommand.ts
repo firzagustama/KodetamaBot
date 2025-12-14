@@ -52,7 +52,7 @@ export class BudgetCommand extends CommandHandler {
                 const empty = 10 - filled;
                 const bar = "█".repeat(filled) + "░".repeat(empty);
                 const emoji = percent > 90 ? "🔴" : percent > 75 ? "🟡" : "🟢";
-                return `${emoji} ${bar} ${percent}%`;
+                return `${emoji} ${bar} ${percent.toFixed(2)}%`;
             };
 
             let response =
@@ -60,9 +60,11 @@ export class BudgetCommand extends CommandHandler {
                 `📊 *Estimasi Pendapatan:* ${formatRupiah(summary.budget.estimatedIncome)}\n\n`;
             for (const bucket of summary.budget.buckets) {
                 const percent = bucket.amount / summary.budget.estimatedIncome * 100;
+                const progress = bucket.spent / bucket.amount * 100;
+                const percentString = percent.toFixed(0);
                 response +=
-                    `*${bucket.bucket} (${percent}%)*\n` +
-                    `${progressBar(percent)}\n` +
+                    `*${bucket.bucket} (${percentString}%)*\n` +
+                    `${progressBar(progress)}\n` +
                     `${formatRupiah(bucket.spent)} / ${formatRupiah(bucket.amount)}\n` +
                     `Sisa: ${formatRupiah(bucket.remaining)}\n\n`;
             }
