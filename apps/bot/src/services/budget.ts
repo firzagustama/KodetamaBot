@@ -8,6 +8,9 @@ import { eq, and, sql } from "drizzle-orm";
 export async function getBudget(periodId: string) {
     return await db.query.budgets.findFirst({
         where: eq(budgets.periodId, periodId),
+        with: {
+            buckets: true,
+        },
     });
 }
 
@@ -43,35 +46,23 @@ export async function getBudgetSummary(targetId: string, periodId: string, isGro
         )
         .groupBy(transactions.bucket);
 
-    const needsSpent = spending.find(s => s.bucket === "needs")?.total ?? 0;
-    const wantsSpent = spending.find(s => s.bucket === "wants")?.total ?? 0;
-    const savingsSpent = spending.find(s => s.bucket === "savings")?.total ?? 0;
+    const spendingBuckets = <Record<string, number>>{}
+    for (const s of spending) {
+        spendingBuckets[s.bucket!] = s.total;
+    }
+    const bucketDetail = budget.buckets.map(b => {
+        return {
+            bucket: b.name,
+            amount: parseFloat(b.amount),
+            spent: spendingBuckets[b.name] ?? 0,
+            remaining: parseFloat(b.amount) - (spendingBuckets[b.name] ?? 0),
+        };
+    });
 
     return {
         budget: {
             estimatedIncome: parseFloat(budget.estimatedIncome),
-            // needs: needsBudget,
-            // wants: wantsBudget,
-            // savings: savingsBudget,
-            // needsPercent: budget.needsPercentage,
-            // wantsPercent: budget.wantsPercentage,
-            // savingsPercent: budget.savingsPercentage,
-        },
-        spent: {
-            needs: needsSpent,
-            wants: wantsSpent,
-            savings: savingsSpent,
-            total: needsSpent + wantsSpent + savingsSpent,
-        },
-        remaining: {
-            // needs: needsBudget - needsSpent,
-            // wants: wantsBudget - wantsSpent,
-            // savings: savingsBudget - savingsSpent,
-        },
-        percentage: {
-            // needs: needsBudget > 0 ? Math.round((needsSpent / needsBudget) * 100) : 0,
-            // wants: wantsBudget > 0 ? Math.round((wantsSpent / wantsBudget) * 100) : 0,
-            // savings: savingsBudget > 0 ? Math.round((savingsSpent / savingsBudget) * 100) : 0,
+            buckets: bucketDetail,
         },
     };
 }

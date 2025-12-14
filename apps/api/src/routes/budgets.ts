@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { db } from "@kodetama/db";
 import { buckets, budgets, datePeriods } from "@kodetama/db/schema";
 import { eq, and } from "drizzle-orm";
+import { AIOrchestrator } from "@kodetama/ai";
 
 import { authenticate } from "../middleware/auth.js";
 import { loggingMiddleware } from "../middleware/loggingMiddleware.js";
@@ -26,7 +27,6 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
                 eq(datePeriods.isCurrent, true)
             ),
         });
-        console.log(payload)
 
         if (!currentPeriod) {
             return reply.status(403).send({ error: "Current period not found" });
@@ -102,57 +102,117 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
     });
 
     /**
-     * PUT /budgets/:periodId
-     * Update budget allocation
-     */
+ * PUT /budgets/:periodId
+ * Update budget allocation with full CRUD for buckets
+ */
     fastify.put<{
         Params: { periodId: string };
         Body: {
             estimatedIncome?: string;
-            needsPercentage?: number;
-            wantsPercentage?: number;
-            savingsPercentage?: number;
+            buckets?: Array<{
+                id: string;
+                amount: number;
+                name?: string;
+                icon?: string;
+            }>;
         };
     }>("/:periodId", {
         preHandler: loggingMiddleware,
     }, async (request, reply) => {
         const { periodId } = request.params;
-        const { estimatedIncome, needsPercentage, wantsPercentage, savingsPercentage } = request.body;
+        const { estimatedIncome, buckets: bucketUpdates } = request.body;
 
-        // Calculate amounts if income and percentages provided
-        const income = estimatedIncome ? parseFloat(estimatedIncome) : undefined;
         const updateData: Record<string, unknown> = {
             updatedAt: new Date(),
         };
 
         if (estimatedIncome) updateData.estimatedIncome = estimatedIncome;
-        if (needsPercentage !== undefined) updateData.needsPercentage = needsPercentage.toString();
-        if (wantsPercentage !== undefined) updateData.wantsPercentage = wantsPercentage.toString();
-        if (savingsPercentage !== undefined) updateData.savingsPercentage = savingsPercentage.toString();
 
-        // Recalculate amounts if we have the data
-        if (income && needsPercentage !== undefined) {
-            updateData.needsAmount = (income * needsPercentage / 100).toFixed(2);
-        }
-        if (income && wantsPercentage !== undefined) {
-            updateData.wantsAmount = (income * wantsPercentage / 100).toFixed(2);
-        }
-        if (income && savingsPercentage !== undefined) {
-            updateData.savingsAmount = (income * savingsPercentage / 100).toFixed(2);
+        // Update budget details
+        if (Object.keys(updateData).length > 1) {
+            await db
+                .update(budgets)
+                .set(updateData)
+                .where(eq(budgets.periodId, periodId));
         }
 
-        console.log("[DATABASE] insert to db", updateData);
-        const updated = await db
-            .update(budgets)
-            .set(updateData)
-            .where(eq(budgets.periodId, periodId))
-            .returning();
+        // Get the budget to work with buckets
+        const budget = await db.query.budgets.findFirst({
+            where: eq(budgets.periodId, periodId),
+        });
 
-        if (updated.length === 0) {
+        if (!budget) {
             return reply.status(404).send({ error: "Budget not found" });
         }
 
-        return { ...updated[0], updated: true };
+        // Handle bucket CRUD operations
+        if (bucketUpdates && bucketUpdates.length > 0) {
+            // Get existing buckets
+            const existingBuckets = await db.query.buckets.findMany({
+                where: eq(buckets.budgetId, budget.id),
+            });
+
+            const existingBucketIds = new Set(existingBuckets.map(b => b.id));
+            const incomingBucketIds = new Set(
+                bucketUpdates
+                    .filter(b => !b.id.startsWith('temp'))
+                    .map(b => b.id)
+            );
+
+            // CREATE: Insert new buckets (id starts with 'temp')
+            const newBuckets = bucketUpdates.filter(b => b.id.startsWith('temp'));
+            for (const bucket of newBuckets) {
+                await db.insert(buckets).values({
+                    id: crypto.randomUUID(), // Generate real ID
+                    budgetId: budget.id,
+                    name: bucket.name || 'Unnamed Bucket',
+                    amount: bucket.amount.toString(),
+                    icon: bucket.icon || 'Wallet',
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                });
+            }
+
+            // UPDATE: Update existing buckets
+            const existingBucketUpdates = bucketUpdates.filter(b => !b.id.startsWith('temp'));
+            for (const bucket of existingBucketUpdates) {
+                await db
+                    .update(buckets)
+                    .set({
+                        amount: bucket.amount.toString(),
+                        ...(bucket.name ? { name: bucket.name } : {}),
+                        ...(bucket.icon ? { icon: bucket.icon } : {}),
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(buckets.id, bucket.id));
+            }
+
+            // DELETE: Remove buckets that exist in DB but not in request
+            const bucketsToDelete = existingBuckets.filter(
+                b => !incomingBucketIds.has(b.id)
+            );
+            for (const bucket of bucketsToDelete) {
+                await db.delete(buckets).where(eq(buckets.id, bucket.id));
+            }
+        } else {
+            // If no buckets provided, delete all existing buckets
+            await db.delete(buckets).where(eq(buckets.budgetId, budget.id));
+        }
+
+        // Fetch updated data to return
+        const updatedBudget = await db.query.budgets.findFirst({
+            where: eq(budgets.periodId, periodId),
+        });
+
+        const updatedBuckets = await db.query.buckets.findMany({
+            where: eq(buckets.budgetId, budget.id),
+        });
+
+        return {
+            ...updatedBudget,
+            buckets: updatedBuckets,
+            updated: true
+        };
     });
 
     /**
@@ -189,5 +249,26 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
             .returning();
 
         return newBudget[0];
+    });
+    /**
+     * POST /budgets/generate-description
+     * Generate a description for a budget bucket using AI
+     */
+    fastify.post<{
+        Body: {
+            category: string;
+            context?: string;
+        };
+    }>("/generate-description", {
+        preHandler: [authenticate, loggingMiddleware],
+    }, async (request) => {
+        const { category, context } = request.body;
+        const ai = new AIOrchestrator({
+            apiKey: process.env.OPENROUTER_API_KEY ?? "",
+            model: process.env.OPENROUTER_MODEL,
+        });
+
+        const { result } = await ai.generateBucketDescription(category, context);
+        return { description: result };
     });
 }

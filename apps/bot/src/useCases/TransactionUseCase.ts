@@ -262,11 +262,24 @@ export class TransactionUseCase {
     /**
      * Parse transaction using AI
      */
-    async parseTransaction(message: string) {
+    async parseTransaction(message: string, periodId?: string) {
         try {
-            const { result: parsed, usage } = await this.ai.parseTransaction(message);
+            let budgetContext: { buckets: string[] } | undefined;
 
-            logger.info("Transaction parsed", { raw: message, parsed, usage });
+            if (periodId) {
+                // Dynamic import to avoid circular dependency if any (though service import should be fine)
+                const { getBudget } = await import("../services/budget.js");
+                const budget = await getBudget(periodId);
+                if (budget && budget.buckets) {
+                    budgetContext = {
+                        buckets: budget.buckets.map(b => b.name)
+                    };
+                }
+            }
+
+            const { result: parsed, usage } = await this.ai.parseTransaction(message, budgetContext);
+
+            logger.info("Transaction parsed", { raw: message, parsed, usage, budgetContext });
 
             return { success: true, parsed, usage };
         } catch (error) {

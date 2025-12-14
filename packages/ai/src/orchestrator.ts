@@ -7,6 +7,8 @@ import {
     BUDGET_SPLIT_USER_PROMPT,
     MONTHLY_SUMMARY_SYSTEM_PROMPT,
     MONTHLY_SUMMARY_USER_PROMPT,
+    GENERATE_DESCRIPTION_SYSTEM_PROMPT,
+    GENERATE_DESCRIPTION_USER_PROMPT,
 } from "./prompts/index.js";
 
 // =============================================================================
@@ -197,8 +199,12 @@ export class AIOrchestrator {
     /**
      * Parse a casual Indonesian financial message into structured transaction data
      */
+    /**
+     * Parse a casual Indonesian financial message into structured transaction data
+     */
     async parseTransaction(
-        message: string
+        message: string,
+        budgetContext?: { buckets: string[] }
     ): Promise<{ result: ParsedTransaction; usage: UsageStats }> {
         if (this.isDevMode) {
             // Simulate processing delay
@@ -214,7 +220,7 @@ export class AIOrchestrator {
             model: this.model,
             messages: [
                 { role: "system", content: PARSE_TRANSACTION_SYSTEM_PROMPT },
-                { role: "user", content: PARSE_TRANSACTION_USER_PROMPT(message) },
+                { role: "user", content: PARSE_TRANSACTION_USER_PROMPT(message, budgetContext) },
             ],
             response_format: { type: "json_object" },
             temperature: 0.3, // Lower temperature for more consistent parsing
@@ -313,6 +319,44 @@ export class AIOrchestrator {
 
         return {
             result: parsed,
+            usage: {
+                inputTokens: response.usage?.prompt_tokens ?? 0,
+                outputTokens: response.usage?.completion_tokens ?? 0,
+                model: this.model,
+            },
+        };
+    }
+
+    /**
+     * Generate a short description for a budget bucket
+     */
+    async generateBucketDescription(
+        category: string,
+        context?: string
+    ): Promise<{ result: string; usage: UsageStats }> {
+        if (this.isDevMode) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            return {
+                result: `Budget untuk ${category}`,
+                usage: { inputTokens: 10, outputTokens: 5, model: "dev-mock" }
+            };
+        }
+
+        if (!this.client) {
+            throw new Error("OpenAI client not initialized");
+        }
+
+        const response = await this.client.chat.completions.create({
+            model: this.model,
+            messages: [
+                { role: "system", content: GENERATE_DESCRIPTION_SYSTEM_PROMPT },
+                { role: "user", content: GENERATE_DESCRIPTION_USER_PROMPT(category, context) },
+            ],
+            temperature: 0.7,
+        });
+
+        return {
+            result: response.choices[0]?.message?.content ?? "",
             usage: {
                 inputTokens: response.usage?.prompt_tokens ?? 0,
                 outputTokens: response.usage?.completion_tokens ?? 0,

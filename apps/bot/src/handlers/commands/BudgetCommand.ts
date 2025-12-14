@@ -48,23 +48,18 @@ export class BudgetCommand extends CommandHandler {
                 return `${emoji} ${bar} ${percent}%`;
             };
 
-            await ctx.reply(
+            let response =
                 `💰 *Budget ${period.name}*\n\n` +
-                `📊 *Estimasi Pendapatan:* ${formatRupiah(summary.budget.estimatedIncome)}\n\n` +
-                `*🏠 Needs (${summary.budget.needsPercent}%)*\n` +
-                `${progressBar(summary.percentage.needs)}\n` +
-                `${formatRupiah(summary.spent.needs)} / ${formatRupiah(summary.budget.needs)}\n` +
-                `Sisa: ${formatRupiah(summary.remaining.needs)}\n\n` +
-                `*🎮 Wants (${summary.budget.wantsPercent}%)*\n` +
-                `${progressBar(summary.percentage.wants)}\n` +
-                `${formatRupiah(summary.spent.wants)} / ${formatRupiah(summary.budget.wants)}\n` +
-                `Sisa: ${formatRupiah(summary.remaining.wants)}\n\n` +
-                `*💵 Savings (${summary.budget.savingsPercent}%)*\n` +
-                `${progressBar(summary.percentage.savings)}\n` +
-                `${formatRupiah(summary.spent.savings)} / ${formatRupiah(summary.budget.savings)}\n` +
-                `Sisa: ${formatRupiah(summary.remaining.savings)}`,
-                { parse_mode: "Markdown" }
-            );
+                `📊 *Estimasi Pendapatan:* ${formatRupiah(summary.budget.estimatedIncome)}\n\n`;
+            for (const bucket of summary.budget.buckets) {
+                response +=
+                    `*${bucket.bucket} (${bucket.amount}%)*\n` +
+                    `${progressBar(bucket.spent / bucket.amount)}\n` +
+                    `${formatRupiah(bucket.spent)} / ${formatRupiah(bucket.amount)}\n` +
+                    `Sisa: ${formatRupiah(bucket.remaining)}\n\n`;
+            }
+
+            await ctx.reply(response, { parse_mode: "Markdown" });
 
             return { success: true };
         } catch (error) {

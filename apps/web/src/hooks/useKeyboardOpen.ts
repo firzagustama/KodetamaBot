@@ -1,13 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { viewport, useSignal } from "@tma.js/sdk-react";
 
 export function useKeyboardOpen() {
     const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
-    // Track viewport height and stable height using signals
+    // Capture the initial stable height on mount
+    const initialStableHeight = useRef<number | null>(null);
+
+    // Track current viewport height
     const height = useSignal(viewport.height);
     const stableHeight = useSignal(viewport.stableHeight);
-    const isStable = useSignal(viewport.isStable);
 
     useEffect(() => {
         // Mount viewport if not already mounted
@@ -21,13 +23,19 @@ export function useKeyboardOpen() {
     }, []);
 
     useEffect(() => {
-        // If viewport height is significantly less than stable height, keyboard is likely open
-        // We use 0.75 as threshold (if height is less than 75% of stable height)
-        if (isStable && stableHeight && height) {
-            const isOpen = height < stableHeight * 0.75;
+        if (initialStableHeight.current == null || initialStableHeight.current < stableHeight) {
+            initialStableHeight.current = stableHeight;
+        }
+    }, [stableHeight]);
+
+    useEffect(() => {
+        // Compare current height against the INITIAL stable height
+        if (initialStableHeight.current && height) {
+            // If current height is significantly less than initial height, keyboard is open
+            const isOpen = height < initialStableHeight.current * 0.75;
             setIsKeyboardOpen(isOpen);
         }
-    }, [height, stableHeight, isStable]);
+    }, [height]);
 
     return isKeyboardOpen;
 }

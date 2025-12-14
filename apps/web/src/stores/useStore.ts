@@ -79,6 +79,7 @@ interface State {
     fetchGoogleData: () => Promise<void>;
     updateBudget: (data: Partial<Budget>) => Promise<void>;
     reset: () => void;
+    generateBucketDescription: (category: string, context?: string) => Promise<string | null>;
 }
 
 export const useStore = create<State>((set, get) => ({
@@ -270,5 +271,25 @@ export const useStore = create<State>((set, get) => ({
             loading: false,
             error: null,
         });
+    },
+
+    generateBucketDescription: async (category: string, context?: string) => {
+        const { token, on401Handler, on403Handler } = get();
+        try {
+            const res = await authFetch(`/budgets/generate-description`, token, {
+                method: "POST",
+                body: JSON.stringify({ category, context }),
+            }, on401Handler || undefined, on403Handler || undefined);
+
+            if (!res.ok) {
+                throw new Error("Failed to generate description");
+            }
+
+            const data = await res.json();
+            return data.description;
+        } catch (err) {
+            console.error(err);
+            return null;
+        }
     },
 }));

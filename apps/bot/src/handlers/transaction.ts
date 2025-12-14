@@ -69,7 +69,7 @@ export async function handleTransaction(ctx: BotContext): Promise<void> {
         const useCase = getTransactionUseCase();
 
         // Parse transaction using AI
-        const parseResult = await useCase.parseTransaction(message);
+        const parseResult = await useCase.parseTransaction(message, periodId);
         if (!parseResult.success || !parseResult.parsed) {
             throw new Error("Failed to parse transaction");
         }
