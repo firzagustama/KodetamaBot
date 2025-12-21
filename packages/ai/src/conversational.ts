@@ -1,11 +1,11 @@
 import OpenAI from "openai";
-import { AIConfig } from "./orchestrator";
+import { AIConfig } from "./orchestrator.js";
 import { getTargetContextKey, redisManager, TargetContext } from "@kodetama/shared";
 import { contextSummary, datePeriods, transactions, db } from "@kodetama/db";
 import { ChatCompletionMessage, ChatCompletionMessageParam } from "openai/resources.mjs";
-import { CONTEXT_SUMMARY_USER_PROMPT, CONVERSATION_SYSTEM_PROMPT } from "./prompts";
+import { CONTEXT_SUMMARY_USER_PROMPT, CONVERSATION_SYSTEM_PROMPT } from "./prompts/index.js";
 import { eq, or, and, desc } from "drizzle-orm";
-import { deleteTransactionTool, upsertTransactionTool } from "./tools";
+import { deleteTransactionTool, upsertTransactionTool } from "./tools/index.js";
 
 export class ConversationAI {
     private isDevMode: boolean;

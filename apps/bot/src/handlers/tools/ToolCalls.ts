@@ -1,5 +1,5 @@
-import { upsertTransaction, deleteTransaction } from "../../services";
-import { BotContext } from "../../types";
+import { upsertTransaction, deleteTransaction } from "../../services/index.js";
+import { BotContext } from "../../types.js";
 
 export async function toolCalls(
     toolCalls: any[],
