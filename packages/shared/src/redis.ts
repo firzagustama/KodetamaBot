@@ -88,6 +88,10 @@ export function getOnboardingStateKey(userId: number): string {
     return `onboarding:user:${userId}`;
 }
 
+export function getTargetContextKey(targetId: string): string {
+    return `target:context:${targetId}`;
+}
+
 export function getOnboardingTTL(): number {
     // 24 hours for incomplete onboarding
     return 24 * 60 * 60;

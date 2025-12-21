@@ -1,14 +1,11 @@
-import type { BotContext, TransactionData } from "../types.js";
+import type { BotContext } from "../types.js";
 import { GroupRepository } from "../infrastructure/repositories/index.js";
-import { getUserByTelegramId, resolveGroupPeriodId } from "../services/index.js";
+import { getUserByTelegramId } from "../services/index.js";
 import { logger } from "../utils/logger.js";
-import { TransactionUseCase } from "../useCases/TransactionUseCase.js";
-import { AIOrchestrator } from "@kodetama/ai";
+import { handleTransaction } from "./transaction.js";
 
 // Initialize shared instances
 let groupRepo: GroupRepository | null = null;
-let ai: AIOrchestrator | null = null;
-let transactionUseCase: TransactionUseCase | null = null;
 
 /**
  * Get or create group repository (singleton pattern)
@@ -18,30 +15,6 @@ function getGroupRepository(): GroupRepository {
         groupRepo = new GroupRepository();
     }
     return groupRepo;
-}
-
-/**
- * Get or create AI orchestrator (singleton pattern)
- */
-function getAiOrchestrator(): AIOrchestrator {
-    if (!ai) {
-        ai = new AIOrchestrator({
-            apiKey: process.env.OPENROUTER_API_KEY ?? "",
-            model: process.env.OPENROUTER_MODEL,
-        });
-    }
-    return ai;
-}
-
-/**
- * Get or create transaction use case (singleton pattern)
- */
-function getTransactionUseCase(): TransactionUseCase {
-    if (!transactionUseCase) {
-        const aiOrchestrator = getAiOrchestrator();
-        transactionUseCase = new TransactionUseCase(aiOrchestrator);
-    }
-    return transactionUseCase;
 }
 
 /**
@@ -105,7 +78,7 @@ export async function handleGroupMessage(ctx: BotContext): Promise<void> {
         const userAccount = await getUserByTelegramId(ctx.from.id);
         if (!userAccount) {
             await ctx.reply(
-                "Kamu belum terdaftar. Ketik /start untuk mendaftar terlebih dahulu.",
+                "Kamu belum terdaftar. Ketik /join_family untuk mendaftar terlebih dahulu.",
                 { reply_to_message_id: ctx.message?.message_id }
             );
             return;
@@ -121,66 +94,13 @@ export async function handleGroupMessage(ctx: BotContext): Promise<void> {
             );
             return;
         }
-
-        // Ensure period exists
-        const periodId = await resolveGroupPeriodId(group.id);
-        if (!periodId) {
-            // SAITAMA: Annoyed but helpful.
-            await ctx.reply("Duh, budget belum diatur. Ribet nih. Setup dulu gih biar bisa dicatet.");
-            await ctx.conversation.enter("onboardingConversation");
-            return;
-        }
-
-        // Skip commands - these are handled by CommandRegistry regardless of group context
-        if (cleanedMessage.startsWith("/")) return;
-
-        // Get use case instance
-        const useCase = getTransactionUseCase();
-
-        // Parse transaction using AI
-        const parseResult = await useCase.parseTransaction(message, periodId);
-        if (!parseResult.success || !parseResult.parsed) {
-            throw new Error("Failed to parse transaction");
-        }
-
-        const { parsed, usage } = parseResult;
-
-        // User just sent a message, not a transaction
-        if (parsed.transactions.length === 0) {
-            ctx.reply(parsed.message);
-            return;
-        }
-
-        const transactionData: TransactionData = {
-            account: {
-                userId: userAccount.userId,
-                groupId: group.id,
-                periodId: periodId
-            },
-            parsed,
-            usage,
-            rawMessage: message
-        }
-        await useCase.saveMultipleTransactionsWithConfirmation(
-            ctx,
-            transactionData
-        )
-        return;
     } catch (error) {
-        logger.error("Failed to parse group transaction:", error);
-
-        await ctx.reply(
-            "*Baca dong format nya.* 🤷‍♂️\n\n" +
-            "Coba kayak gini:\n" +
-            "• `makan 20rb`\n" +
-            "• `gaji 8jt`\n" +
-            "• `bensin 150rb`\n\n" +
-            "Atau batch:\n" +
-            "```\ncatat\n* gaji 8jt\n* kopi 20rb\n* makan 20rb```",
-            {
-                parse_mode: "Markdown",
-                reply_to_message_id: ctx.message?.message_id
-            }
-        );
+        logger.error("Failed to handle group message:", error);
+        await ctx.reply("Terjadi kesalahan. Coba lagi nanti.", {
+            reply_to_message_id: ctx.message?.message_id
+        });
     }
+
+    ctx.message!.text = cleanedMessage;
+    await handleTransaction(ctx);
 }

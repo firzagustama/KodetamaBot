@@ -40,6 +40,14 @@ export const TelegramAccountSchema = z.object({
 });
 export type TelegramAccount = z.infer<typeof TelegramAccountSchema>;
 
+export const TargetContextSchema = z.object({
+    isGroup: z.boolean(),
+    targetId: z.string(), // userId for private, groupId for group
+    userId: z.string().optional(), // always the individual user
+    groupId: z.string().optional(), // present only in group context
+});
+export type TargetContext = z.infer<typeof TargetContextSchema>;
+
 // =============================================================================
 // TRANSACTION SCHEMAS
 // =============================================================================

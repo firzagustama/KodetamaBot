@@ -1,7 +1,8 @@
 import { db } from "@kodetama/db";
 import { transactions, categories, aiUsage, budgets } from "@kodetama/db/schema";
 import { eq, and, desc, sql, ilike } from "drizzle-orm";
-import type { TxType } from "@kodetama/shared";
+import type { TargetContext, TxType } from "@kodetama/shared";
+import { UpsertTransactionParams } from "@kodetama/ai";
 
 interface Transaction {
     userId: string;
@@ -155,6 +156,22 @@ export async function getTransactionsSummary(userId: string, periodId: string) {
 }
 
 /**
+ * Get All Transaction in current period
+ */
+export async function getAllTransactions(target: TargetContext, periodId: string) {
+    const condition = target.groupId ?
+        eq(transactions.groupId, target.groupId) :
+        eq(transactions.userId, target.userId!);
+
+    return await db.query.transactions.findMany({
+        where: and(
+            condition,
+            eq(transactions.periodId, periodId)
+        ),
+    });
+}
+
+/**
  * Get total income and expenses for a period
  */
 export async function getPeriodTotals(userId: string, periodId: string) {
@@ -224,4 +241,44 @@ export async function recommendSetupBuckets(userId: string, periodId: string): P
         },
     });
     return (!budget || budget.buckets.length === 1) && txCount >= 5;
+}
+
+export async function upsertTransaction(target: TargetContext, periodId: string, data: UpsertTransactionParams): Promise<string> {
+    if (data.confidence < 0.8) {
+        throw new Error("AI not confident enough, reason: " + data.confirmationMessage);
+    }
+    if (data.amount <= 0) {
+        throw new Error("Amount must be greater than 0");
+    }
+
+    // Update transaction
+    if (data.transactionId) {
+        const categoryId = await findOrCreateCategory(target.targetId, periodId, data.category);
+        await db.update(transactions).set({
+            type: data.type,
+            amount: data.amount.toString(),
+            description: data.description,
+            categoryId: categoryId,
+            bucket: data.bucket,
+            aiConfidence: data.confidence.toString(),
+        }).where(eq(transactions.id, data.transactionId));
+        return data.transactionId;
+    }
+    // Insert transaction
+    return await saveTransaction({
+        userId: target.userId!,
+        groupId: target.groupId,
+        periodId: periodId,
+        transaction: {
+            userId: target.userId!,
+            periodId: periodId,
+            type: data.type,
+            amount: data.amount,
+            description: data.description,
+            category: data.category,
+            bucket: data.bucket,
+            aiConfidence: data.confidence,
+        },
+        rawMessage: undefined,
+    })
 }

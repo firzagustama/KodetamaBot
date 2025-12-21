@@ -69,6 +69,9 @@ importers:
 
   apps/bot:
     dependencies:
+      '@grammyjs/auto-chat-action':
+        specifier: ^0.1.1
+        version: 0.1.1(grammy@1.38.4)
       '@grammyjs/conversations':
         specifier: ^1.2.0
         version: 1.2.0(grammy@1.38.4)
@@ -164,9 +167,15 @@ importers:
 
   packages/ai:
     dependencies:
+      '@kodetama/db':
+        specifier: workspace:*
+        version: link:../db
       '@kodetama/shared':
         specifier: workspace:*
         version: link:../shared
+      drizzle-orm:
+        specifier: ^0.33.0
+        version: 0.33.0(postgres@3.4.7)
       openai:
         specifier: ^4.67.0
         version: 4.104.0
@@ -1565,6 +1574,14 @@ packages:
 
   /@floating-ui/utils@0.2.10:
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
+    dev: false
+
+  /@grammyjs/auto-chat-action@0.1.1(grammy@1.38.4):
+    resolution: {integrity: sha512-70Jdy+keIri4452tluaZpKtHag5gD8pNczoXqajsnsx7pJC5wg3DAQ5unpt0xJb8KsVBAGWuJb298SBl3TVecg==}
+    peerDependencies:
+      grammy: ^1.0.0
+    dependencies:
+      grammy: 1.38.4
     dev: false
 
   /@grammyjs/conversations@1.2.0(grammy@1.38.4):

@@ -253,6 +253,17 @@ export const googleDriveFolders = pgTable("google_drive_folders", {
 });
 
 // =============================================================================
+// AI CONTEXT HISTORY CONVERSATION
+// =============================================================================
+export const contextSummary = pgTable("context_summary", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    targetId: uuid("target_id").notNull(), // user_id or group_id, MVP mark group_id as one context
+    summary: varchar("summary", { length: 1024 }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// =============================================================================
 // RELATIONS
 // =============================================================================
 

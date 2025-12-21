@@ -11,7 +11,7 @@ import {
 } from "./core/index.js";
 
 // Command handlers
-import { StartCommand, HelpCommand, BudgetCommand, DashboardCommand, JoinFamilyCommand, LinkFamilyCommand, UndoCommand } from "./handlers/commands/index.js";
+import { StartCommand, HelpCommand, BudgetCommand, DashboardCommand, JoinFamilyCommand, LinkFamilyCommand, UndoCommand, SummaryCommand } from "./handlers/commands/index.js";
 
 // Event handlers
 import { handleAdminCallback } from "./handlers/admin.js";
@@ -51,6 +51,7 @@ async function createBotApplication() {
     commandRegistry.register(new JoinFamilyCommand());
     commandRegistry.register(new LinkFamilyCommand());
     commandRegistry.register(new UndoCommand());
+    commandRegistry.register(new SummaryCommand());
 
     // 4. Create message processor with command routing
     const messageProcessor = new MessageProcessor(commandRegistry);

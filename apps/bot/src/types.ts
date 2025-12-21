@@ -2,6 +2,7 @@ import type { Context, SessionFlavor } from "grammy";
 import type { ConversationFlavor } from "@grammyjs/conversations";
 import type { HydrateFlavor } from "@grammyjs/hydrate";
 import type { ParsedTransaction, Tier } from "@kodetama/shared";
+import { AutoChatActionFlavor } from "@grammyjs/auto-chat-action";
 
 // =============================================================================
 // SESSION DATA
@@ -62,7 +63,8 @@ export interface SessionData {
 export type BotContext = Context &
     SessionFlavor<SessionData> &
     ConversationFlavor &
-    HydrateFlavor<Context>;
+    HydrateFlavor<Context> &
+    AutoChatActionFlavor;
 
 // =============================================================================
 // CONVERSATION CONTEXT
