@@ -154,13 +154,12 @@ export class ConversationAI {
                 }
             }
         });
-        if (!period) {
+        if (!period?.budget?.buckets) {
             return "Unallocated";
         }
 
-        const buckets = period.budget.buckets;
-        return buckets.map((bucket) => {
-            return `${bucket.name} (${bucket.amount})`;
+        return period.budget.buckets.map((bucket) => {
+            return `${bucket.name} (${bucket.description})`;
         }).join(", ");
     }
 

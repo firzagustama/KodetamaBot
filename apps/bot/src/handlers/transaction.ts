@@ -80,7 +80,6 @@ export async function handleTransaction(ctx: BotContext): Promise<void> {
 
             // Final response - send to user
             if (response.content) {
-                console.log(messages);
                 await ctx.reply(response.content);
                 await ai.setTargetContext(messages);
             }

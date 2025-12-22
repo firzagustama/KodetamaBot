@@ -22,7 +22,8 @@ export async function getTargetContext(ctx: BotContext): Promise<TargetContext> 
 
     const account = await getUserByTelegramId(user.id);
     if (!account) {
-        throw new Error("Kamu belum terdaftar, ketik /start untuk memulai");
+        await ctx.reply("Kamu belum terdaftar, ketik /start untuk memulai");
+        throw new Error("User not found");
     }
 
     // Check if this is a group chat
@@ -42,12 +43,14 @@ export async function getTargetContext(ctx: BotContext): Promise<TargetContext> 
     let group = await groupRepo.findByTelegramId(ctx.chat!.id);
 
     if (!group) {
-        throw new Error("Grup ini belum terdaftar, ketika /link_family untuk mengaktifkan grup ini.");
+        await ctx.reply("Grup ini belum terdaftar, ketik /link_family untuk mengaktifkan grup ini.");
+        throw new Error("Group not found");
     }
 
     const isMember = await groupRepo.isUserMember(account.userId, group.id);
     if (!isMember) {
-        throw new Error("Kamu bukan anggota grup keluarga ini.");
+        await ctx.reply("Kamu bukan anggota grup keluarga ini, ketik /join_family untuk menjadi anggota grup");
+        throw new Error("User not member");
     }
 
     return {
