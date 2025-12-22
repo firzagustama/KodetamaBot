@@ -136,7 +136,7 @@ export class ConversationAI {
         const estimatedIncome = period.budget?.estimatedIncome ?? 0;
 
         let buckets = "Unallocated";
-        if (period.budget?.buckets) {
+        if (period.budget?.buckets && period.budget.buckets.length > 0) {
             buckets = period.budget.buckets.map((bucket) => `${bucket.name} (${bucket.description})`).join("\n");
         }
         return `Summary: ${summary}\n\nLast 5 transactions: ${lastNTransactions}\n\nEstimated income: ${estimatedIncome}\n\nBudget buckets: ${buckets}\n\n`;
