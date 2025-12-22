@@ -1,10 +1,11 @@
+import { Period } from "@kodetama/shared";
 import { upsertTransaction, deleteTransaction, upsertBucket, deleteBucket } from "../../services/index.js";
 import { BotContext } from "../../types.js";
 
 export async function toolCalls(
     toolCalls: any[],
     target: any,
-    periodId: string,
+    period: Period,
     ctx: BotContext
 ) {
     const toolResults: any[] = [];
@@ -12,13 +13,14 @@ export async function toolCalls(
     for (const toolCall of toolCalls) {
         const { id, function: func } = toolCall;
         const args = JSON.parse(func.arguments);
+        console.log(args)
 
         try {
             let result: any;
 
             switch (func.name) {
                 case "upsertTransaction":
-                    result = await upsertTransaction(target, periodId, args);
+                    result = await upsertTransaction(target, period.id, args.input);
                     ctx.session.lastTransactionIds.slice(-5).push(result);
                     toolResults.push({
                         role: "tool",
@@ -48,7 +50,7 @@ export async function toolCalls(
                     break;
 
                 case "upsertBucket":
-                    result = await upsertBucket(periodId, args);
+                    result = await upsertBucket(period.id, args);
                     toolResults.push({
                         role: "tool",
                         tool_call_id: id,
@@ -60,7 +62,7 @@ export async function toolCalls(
                     break;
 
                 case "deleteBucket":
-                    result = await deleteBucket(args.bucketId);
+                    result = await deleteBucket(period, args);
                     toolResults.push({
                         role: "tool",
                         tool_call_id: id,

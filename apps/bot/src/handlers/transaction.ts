@@ -1,6 +1,6 @@
 import type { BotContext } from "../types.js";
 import { ConversationAI } from "@kodetama/ai";
-import { resolveGroupPeriodId, resolvePeriodId } from "../services/period.js";
+import { getTargetCurrentPeriod } from "../services/period.js";
 import { getTargetContext } from "../core/targetContext.js";
 import { toolCalls } from "./tools/index.js";
 
@@ -31,18 +31,16 @@ export async function handleTransaction(ctx: BotContext): Promise<void> {
     if (!message || !user) return;
 
     const target = await getTargetContext(ctx);
-    const periodId = target.groupId ?
-        await resolveGroupPeriodId(target.groupId) :
-        await resolvePeriodId(target.userId);
+    const period = await getTargetCurrentPeriod(target);
 
-    if (!periodId) {
+    if (!period) {
         await ctx.reply("Duh, budget belum diatur. Ribet nih. Setup dulu gih biar bisa dicatet.");
         await ctx.conversation.enter("onboardingConversation");
         return;
     }
 
     const ai = getConversationAI();
-    let messages = await ai.buildPrompt(target);
+    let messages = await ai.buildPrompt(target, period);
     messages.push({ role: "user", content: message });
 
     const MAX_ITERATIONS = 5;
@@ -67,7 +65,7 @@ export async function handleTransaction(ctx: BotContext): Promise<void> {
                 const toolResults = await toolCalls(
                     response.tool_calls,
                     target,
-                    periodId,
+                    period,
                     ctx
                 );
 

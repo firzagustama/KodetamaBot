@@ -1,6 +1,7 @@
-import { UpsertBucketParams } from "@kodetama/ai";
+import { deleteBucketParams, UpsertBucketParams } from "@kodetama/ai";
 import { db } from "@kodetama/db";
 import { buckets, budgets, transactions } from "@kodetama/db/schema";
+import { Period } from "@kodetama/shared";
 import { eq, and, sql } from "drizzle-orm";
 
 /**
@@ -177,6 +178,10 @@ export async function upsertBucket(periodId: string, data: UpsertBucketParams) {
     }
 
     if (data.bucketId) {
+        await db.update(transactions).set({
+            bucket: data.name,
+        }).where(and(eq(transactions.bucket, data.name), eq(transactions.periodId, periodId)));
+
         await db.update(buckets).set({
             name: data.name,
             description: data.description,
@@ -209,6 +214,21 @@ export async function upsertBucket(periodId: string, data: UpsertBucketParams) {
     }
 }
 
-export async function deleteBucket(bucketId: string) {
-    await db.delete(buckets).where(eq(buckets.id, bucketId));
+export async function deleteBucket(period: Period, data: deleteBucketParams) {
+    if (data.confidence < 0.8) {
+        throw new Error("Confidence must be greater than or equal 0.8, confirmationMessage: " + data.confirmationMessage);
+    }
+    const bucket = await db.query.buckets.findMany({
+        where: and(eq(buckets.name, data.name), eq(buckets.budgetId, period.budget!.id)),
+    });
+    if (!bucket || bucket.length === 0) {
+        throw new Error("Bucket not found");
+    } else if (bucket.length > 1) {
+        throw new Error("Multiple buckets found: " + bucket.map(b => `${b.name} (${b.description})`).join("\n"));
+    }
+
+    await db.update(transactions).set({
+        bucket: data.moveBucket,
+    }).where(and(eq(transactions.bucket, bucket[0].name), eq(transactions.periodId, period.id)));
+    await db.delete(buckets).where(eq(buckets.id, bucket[0].id));
 }

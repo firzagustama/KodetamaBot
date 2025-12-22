@@ -1,7 +1,7 @@
 import { db } from "@kodetama/db";
 import { datePeriods } from "@kodetama/db/schema";
 import { eq, and } from "drizzle-orm";
-import { formatPeriodName, getMonthlyPeriodDates, getCustomPeriodDates } from "@kodetama/shared";
+import { formatPeriodName, getMonthlyPeriodDates, getCustomPeriodDates, TargetContext, Period } from "@kodetama/shared";
 
 /**
  * Get current periodId for user
@@ -88,6 +88,27 @@ export async function getUserPeriods(userId: string) {
 export async function resolveGroupPeriodId(groupId: string) {
     const currentPeriod = await getCurrentGroupPeriod(groupId);
     return currentPeriod?.id;
+}
+
+/**
+ * Get current period based on TargetContext
+ */
+export async function getTargetCurrentPeriod(target: TargetContext): Promise<Period | undefined> {
+    return await db.query.datePeriods.findFirst({
+        where: and(
+            eq(datePeriods.isCurrent, true),
+            target.groupId ?
+                eq(datePeriods.groupId, target.groupId) :
+                eq(datePeriods.userId, target.userId!)
+        ),
+        with: {
+            budget: {
+                with: {
+                    buckets: true
+                }
+            }
+        }
+    })
 }
 
 /**

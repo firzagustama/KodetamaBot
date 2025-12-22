@@ -243,42 +243,79 @@ export async function recommendSetupBuckets(userId: string, periodId: string): P
     return (!budget || budget.buckets.length === 1) && txCount >= 5;
 }
 
-export async function upsertTransaction(target: TargetContext, periodId: string, data: UpsertTransactionParams): Promise<string> {
-    if (data.confidence < 0.8) {
-        throw new Error("AI not confident enough, reason: " + data.confirmationMessage);
-    }
-    if (data.amount <= 0) {
-        throw new Error("Amount must be greater than 0");
+export async function upsertTransaction(
+    target: TargetContext,
+    periodId: string,
+    dataArray: UpsertTransactionParams[]
+): Promise<string[]> {
+
+    // 1. VALIDATE ALL FIRST (fail fast)
+    for (const data of dataArray) {
+        if (data.confidence < 0.8) {
+            throw new Error(`AI not confident for "${data.description}": ${data.confirmationMessage}`);
+        }
+        if (data.amount <= 0) {
+            throw new Error(`Invalid amount for "${data.description}"`);
+        }
     }
 
-    // Update transaction
-    if (data.transactionId) {
-        const categoryId = await findOrCreateCategory(target.targetId, periodId, data.category);
-        await db.update(transactions).set({
-            type: data.type,
-            amount: data.amount.toString(),
-            description: data.description,
-            categoryId: categoryId,
-            bucket: data.bucket,
-            aiConfidence: data.confidence.toString(),
-        }).where(eq(transactions.id, data.transactionId));
-        return data.transactionId;
+    // 2. PREPARE CATEGORIES (avoid duplicate queries)
+    const uniqueCategories = [...new Set(dataArray.map(d => d.category))];
+    const categoryMap = new Map<string, string>();
+
+    for (const category of uniqueCategories) {
+        const categoryId = await findOrCreateCategory(target.targetId, periodId, category);
+        categoryMap.set(category, categoryId);
     }
-    // Insert transaction
-    return await saveTransaction({
-        userId: target.userId!,
-        groupId: target.groupId,
-        periodId: periodId,
-        transaction: {
-            userId: target.userId!,
-            periodId: periodId,
-            type: data.type,
-            amount: data.amount,
-            description: data.description,
-            category: data.category,
-            bucket: data.bucket,
-            aiConfidence: data.confidence,
-        },
-        rawMessage: undefined,
-    })
+
+    // 3. SEPARATE UPDATES vs INSERTS
+    const updates = dataArray.filter(d => d.transactionId);
+    const inserts = dataArray.filter(d => !d.transactionId);
+
+    const resultIds: string[] = [];
+
+    // 4. USE DB TRANSACTION (all or nothing)
+    await db.transaction(async (tx) => {
+
+        // BULK UPDATE
+        if (updates.length > 0) {
+            for (const data of updates) {
+                await tx.update(transactions)
+                    .set({
+                        type: data.type,
+                        amount: data.amount.toString(),
+                        description: data.description,
+                        categoryId: categoryMap.get(data.category)!,
+                        bucket: data.bucket,
+                        aiConfidence: data.confidence.toString(),
+                    })
+                    .where(eq(transactions.id, data.transactionId!));
+
+                resultIds.push(data.transactionId!);
+            }
+        }
+
+        // BULK INSERT
+        if (inserts.length > 0) {
+            const insertData = inserts.map(data => ({
+                userId: target.userId!,
+                groupId: target.groupId,
+                periodId: periodId,
+                type: data.type,
+                amount: data.amount.toString(),
+                description: data.description,
+                categoryId: categoryMap.get(data.category)!,
+                bucket: data.bucket,
+                aiConfidence: data.confidence.toString(),
+            }));
+
+            const inserted = await tx.insert(transactions)
+                .values(insertData)
+                .returning({ id: transactions.id });
+
+            resultIds.push(...inserted.map(r => r.id));
+        }
+    });
+
+    return resultIds;
 }

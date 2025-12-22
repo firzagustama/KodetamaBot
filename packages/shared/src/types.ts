@@ -155,6 +155,43 @@ export const DatePeriodSchema = z.object({
 });
 export type DatePeriod = z.infer<typeof DatePeriodSchema>;
 
+export const BucketSchema = z.object({
+    id: z.string().uuid(),
+    name: z.string(),
+    createdAt: z.date(),
+    updatedAt: z.date(),
+    budgetId: z.string().uuid(),
+    description: z.string().nullable(),
+    amount: z.string(),
+    icon: z.string().nullable(),
+    category: z.string().nullable(),
+    isSystem: z.boolean(),
+});
+export type Bucket = z.infer<typeof BucketSchema>;
+
+export const PeriodBudgetSchema = z.object({
+    id: z.string().uuid(),
+    createdAt: z.date(),
+    updatedAt: z.date(),
+    periodId: z.string().uuid(),
+    estimatedIncome: z.string(),
+    buckets: z.array(BucketSchema),
+});
+export type PeriodBudget = z.infer<typeof PeriodBudgetSchema>;
+
+export const PeriodSchema = z.object({
+    id: z.string().uuid(),
+    name: z.string(),
+    createdAt: z.date(),
+    userId: z.string().nullable(),
+    groupId: z.string().nullable(),
+    startDate: z.date(),
+    endDate: z.date(),
+    isCurrent: z.boolean(),
+    budget: PeriodBudgetSchema.nullable(),
+});
+export type Period = z.infer<typeof PeriodSchema>;
+
 // =============================================================================
 // REGISTRATION SCHEMAS
 // =============================================================================

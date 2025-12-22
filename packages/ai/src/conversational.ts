@@ -1,10 +1,10 @@
 import OpenAI from "openai";
 import { AIConfig } from "./orchestrator.js";
-import { getTargetContextKey, redisManager, TargetContext } from "@kodetama/shared";
-import { contextSummary, datePeriods, transactions, db } from "@kodetama/db";
+import { getTargetContextKey, Period, redisManager, TargetContext } from "@kodetama/shared";
+import { contextSummary, transactions, db } from "@kodetama/db";
 import { ChatCompletionMessage, ChatCompletionMessageParam } from "openai/resources.mjs";
 import { CONTEXT_SUMMARY_USER_PROMPT, CONVERSATION_SYSTEM_PROMPT } from "./prompts/index.js";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { deleteBucketTool, deleteTransactionTool, upsertBucketTool, upsertTransactionTool } from "./tools/index.js";
 
 export class ConversationAI {
@@ -31,16 +31,12 @@ export class ConversationAI {
         this.clientModel = config.model ?? "gemini-2.5-flash";
     }
 
-    async buildPrompt(target: TargetContext): Promise<ChatCompletionMessageParam[]> {
+    async buildPrompt(target: TargetContext, period: Period): Promise<ChatCompletionMessageParam[]> {
         const messages = await this.getTargetContext(target);
-        const bucket = await this.getBuckets(target);
-        const lastTransactions = await this.getLastNTransaction(target, 5);
-        const summary = await this.getSummary(target);
+        const context = await this.getContext(target, period);
         return [
             { role: "system", content: CONVERSATION_SYSTEM_PROMPT },
-            { role: "system", content: `User budgets/buckets:\n${bucket}` },
-            { role: "system", content: `Last transactions:\n${lastTransactions}` },
-            { role: "system", content: `User context:\n${summary}` },
+            { role: "system", content: `User context:\n${context}` },
             ...messages
         ];
     }
@@ -134,39 +130,21 @@ export class ConversationAI {
         }).where(eq(contextSummary.targetId, target.targetId));
     }
 
-    private async getBuckets(target: TargetContext): Promise<string> {
-        const condition = target.groupId ? eq(datePeriods.groupId, target.groupId) : eq(datePeriods.userId, target.userId!);
-        const period = await db.query.datePeriods.findFirst({
-            where: and(
-                eq(datePeriods.isCurrent, true),
-                condition,
-            ),
-            with: {
-                budget: {
-                    with: {
-                        buckets: true
-                    }
-                }
-            }
-        });
-        if (!period?.budget?.buckets) {
-            return "Unallocated";
-        }
+    private async getContext(target: TargetContext, period: Period): Promise<string> {
+        const summary = await this.getSummary(target);
+        const lastNTransactions = await this.getLastNTransaction(period.id, 5);
+        const estimatedIncome = period.budget?.estimatedIncome ?? 0;
 
-        return JSON.stringify(period.budget.buckets.map((bucket) => {
-            return {
-                bucketId: bucket.id,
-                name: bucket.name,
-                description: bucket.description
-            }
-        }));
+        let buckets = "Unallocated";
+        if (period.budget?.buckets) {
+            buckets = period.budget.buckets.map((bucket) => `${bucket.name} (${bucket.description})`).join("\n");
+        }
+        return `Summary: ${summary}\n\nLast 5 transactions: ${lastNTransactions}\n\nEstimated income: ${estimatedIncome}\n\nBudget buckets: ${buckets}\n\n`;
     }
 
-    private async getLastNTransaction(target: TargetContext, n: number): Promise<string> {
+    private async getLastNTransaction(periodId: string, n: number): Promise<string> {
         const lastTransactions = await db.query.transactions.findMany({
-            where: target.groupId ?
-                eq(transactions.groupId, target.groupId) :
-                eq(transactions.userId, target.userId!),
+            where: eq(transactions.periodId, periodId),
             orderBy: [desc(transactions.createdAt)],
             limit: n
         });

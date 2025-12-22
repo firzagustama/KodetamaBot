@@ -1,5 +1,13 @@
 import { ChatCompletionTool } from "openai/resources.mjs";
 
+export interface deleteBucketParams {
+    name: string;
+    description: string;
+    moveBucket: string;
+    confidence: number;
+    confirmationMessage: string;
+}
+
 export const deleteBucketTool: ChatCompletionTool = {
     type: "function",
     function: {
@@ -8,12 +16,28 @@ export const deleteBucketTool: ChatCompletionTool = {
         parameters: {
             type: "object",
             properties: {
-                bucketId: {
+                name: {
                     type: "string",
-                    description: "Bucket ID to delete. Use the ID from context or previous messages.",
-                }
+                    description: "Name of bucket",
+                },
+                description: {
+                    type: "string",
+                    description: "Description of bucket",
+                },
+                moveBucket: {
+                    type: "string",
+                    description: "Move all transactions to this bucket",
+                },
+                confidence: {
+                    type: "number",
+                    description: "0.0 - 1.0",
+                },
+                confirmationMessage: {
+                    type: "string",
+                    description: "Confirmation message if confidence < 0.7 to send to user",
+                },
             },
-            required: ["bucketId"],
+            required: ["name", "description", "moveBucket", "confidence", "confirmationMessage"],
         },
     },
 }
