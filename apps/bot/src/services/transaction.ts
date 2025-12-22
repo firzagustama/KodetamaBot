@@ -56,7 +56,7 @@ async function findOrCreateCategory(
         userId,
         groupId,
         name: categoryName,
-        bucket: bucket || "needs", // default bucket
+        bucket: bucket,
         isDefault: false,
     }).returning({ id: categories.id });
 
@@ -264,7 +264,7 @@ export async function upsertTransaction(
     const categoryMap = new Map<string, string>();
 
     for (const category of uniqueCategories) {
-        const categoryId = await findOrCreateCategory(target.targetId, periodId, category);
+        const categoryId = await findOrCreateCategory(target.userId, target.groupId, category);
         categoryMap.set(category, categoryId);
     }
 
