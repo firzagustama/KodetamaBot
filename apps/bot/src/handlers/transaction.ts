@@ -1,7 +1,7 @@
 import type { BotContext } from "../types.js";
 import { ConversationAI } from "@kodetama/ai";
 import { resolveGroupPeriodId, resolvePeriodId } from "../services/period.js";
-import { getTargetContext, TargetContext } from "../core/targetContext.js";
+import { getTargetContext } from "../core/targetContext.js";
 import { toolCalls } from "./tools/index.js";
 
 // Initialize shared instances
@@ -10,9 +10,9 @@ let conversationAI: ConversationAI | null = null;
 /**
  * Get or create conversation AI (singleton pattern)
  */
-function getConversationAI(target: TargetContext): ConversationAI {
+function getConversationAI(): ConversationAI {
     if (!conversationAI) {
-        conversationAI = new ConversationAI(target, {
+        conversationAI = new ConversationAI({
             apiKey: process.env.OPENROUTER_API_KEY ?? "",
             model: process.env.OPENROUTER_MODEL,
         });
@@ -41,8 +41,8 @@ export async function handleTransaction(ctx: BotContext): Promise<void> {
         return;
     }
 
-    const ai = getConversationAI(target);
-    let messages = await ai.buildPrompt();
+    const ai = getConversationAI();
+    let messages = await ai.buildPrompt(target);
     messages.push({ role: "user", content: message });
 
     const MAX_ITERATIONS = 5;
@@ -81,7 +81,7 @@ export async function handleTransaction(ctx: BotContext): Promise<void> {
             // Final response - send to user
             if (response.content) {
                 await ctx.reply(response.content);
-                await ai.setTargetContext(messages);
+                await ai.setTargetContext(target, messages);
             }
 
             break; // Exit loop after sending response
