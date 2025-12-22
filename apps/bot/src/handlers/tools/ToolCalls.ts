@@ -1,4 +1,4 @@
-import { upsertTransaction, deleteTransaction } from "../../services/index.js";
+import { upsertTransaction, deleteTransaction, upsertBucket, deleteBucket } from "../../services/index.js";
 import { BotContext } from "../../types.js";
 
 export async function toolCalls(
@@ -47,8 +47,28 @@ export async function toolCalls(
                     });
                     break;
 
-                case "getBudgetSummary":
-                    // TODO: Implement getBudgetSummary
+                case "upsertBucket":
+                    result = await upsertBucket(periodId, args);
+                    toolResults.push({
+                        role: "tool",
+                        tool_call_id: id,
+                        content: JSON.stringify({
+                            success: true,
+                            message: "Bucket upserted successfully",
+                        })
+                    })
+                    break;
+
+                case "deleteBucket":
+                    result = await deleteBucket(args.bucketId);
+                    toolResults.push({
+                        role: "tool",
+                        tool_call_id: id,
+                        content: JSON.stringify({
+                            success: true,
+                            message: "Bucket deleted successfully",
+                        })
+                    })
                     break;
 
                 case "getTransactionHistory":

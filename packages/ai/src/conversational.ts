@@ -5,7 +5,7 @@ import { contextSummary, datePeriods, transactions, db } from "@kodetama/db";
 import { ChatCompletionMessage, ChatCompletionMessageParam } from "openai/resources.mjs";
 import { CONTEXT_SUMMARY_USER_PROMPT, CONVERSATION_SYSTEM_PROMPT } from "./prompts/index.js";
 import { eq, or, and, desc } from "drizzle-orm";
-import { deleteTransactionTool, upsertTransactionTool } from "./tools/index.js";
+import { deleteBucketTool, deleteTransactionTool, upsertBucketTool, upsertTransactionTool } from "./tools/index.js";
 
 export class ConversationAI {
     private isDevMode: boolean;
@@ -44,7 +44,7 @@ export class ConversationAI {
         const summary = await this.getSummary();
         return [
             { role: "system", content: CONVERSATION_SYSTEM_PROMPT },
-            { role: "system", content: `User buckets:\n${bucket}` },
+            { role: "system", content: `User budgets/buckets:\n${bucket}` },
             { role: "system", content: `Last transactions:\n${lastTransactions}` },
             { role: "system", content: `User context:\n${summary}` },
             ...messages
@@ -62,7 +62,7 @@ export class ConversationAI {
         const response = await this.client?.chat.completions.create({
             model: this.clientModel,
             messages: messages,
-            tools: [upsertTransactionTool, deleteTransactionTool]
+            tools: [upsertTransactionTool, upsertBucketTool, deleteTransactionTool, deleteBucketTool]
         });
         return response?.choices[0].message;
     }
@@ -76,6 +76,7 @@ export class ConversationAI {
     }
 
     async setTargetContext(messages: ChatCompletionMessageParam[]): Promise<void> {
+        console.log(messages);
         const filtered = messages.filter((message) => message.role !== "system");
         await redisManager.set(this.CONTEXT_KEY, JSON.stringify(filtered));
 
@@ -158,9 +159,13 @@ export class ConversationAI {
             return "Unallocated";
         }
 
-        return period.budget.buckets.map((bucket) => {
-            return `${bucket.name} (${bucket.description})`;
-        }).join(", ");
+        return JSON.stringify(period.budget.buckets.map((bucket) => {
+            return {
+                bucketId: bucket.id,
+                name: bucket.name,
+                description: bucket.description
+            }
+        }));
     }
 
     private async getLastNTransaction(n: number): Promise<string> {
@@ -171,14 +176,14 @@ export class ConversationAI {
             orderBy: [desc(transactions.createdAt)],
             limit: n
         });
-        return lastTransactions.map((transaction) => {
-            return JSON.stringify({
+        return JSON.stringify(lastTransactions.map((transaction) => {
+            return {
                 id: transaction.id,
                 type: transaction.type,
                 amount: transaction.amount,
                 description: transaction.description,
                 bucket: transaction.bucket,
-            })
-        }).join("\n");
+            }
+        }));
     }
 }

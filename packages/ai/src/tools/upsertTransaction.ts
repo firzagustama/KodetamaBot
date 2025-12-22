@@ -16,7 +16,7 @@ export const upsertTransactionTool: ChatCompletionTool = {
     type: "function",
     function: {
         name: "upsertTransaction",
-        description: "Upsert Transaction Log",
+        description: "Update or Insert Transaction Log",
         parameters: {
             type: "object",
             properties: {

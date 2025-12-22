@@ -54,7 +54,7 @@ export class BotRunner {
             // { command: "export", description: "Export ke Google Sheets" },
             { command: "join_family", description: "Join family" },
             { command: "link_family", description: "Hubungkan grup telegram" },
-            // { command: "cancel", description: "Batalkan percakapan" },
+            { command: "cancel", description: "Batalkan percakapan" },
         ]);
 
         logger.info("Bot commands menu set");

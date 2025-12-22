@@ -15,7 +15,7 @@ export class HelpCommand extends CommandHandler {
             "Langsung chat aja pengeluaran lo:\n" +
             "• `makan 20rb`\n" +
             "• `gaji 10jt`\n" +
-            "• `bensin 50rb`\n" +
+            "• `buat budget belanja 500rb`\n" +
             "• `transfer ke mama 500k`\n\n" +
             "*Fitur Pro (Gratis selama Beta):*\n" +
             "• Kirim foto struk/invoice\n" +
@@ -25,7 +25,7 @@ export class HelpCommand extends CommandHandler {
             "/help - Bantuan ini\n" +
             "/budget - Cek budget\n" +
             "/summary - Ringkasan bulan ini\n" +
-            "/undo - Batalin transaksi terakhir\n" +
+            // "/undo - Batalin transaksi terakhir\n" +
             "/cancel - Batalin percakapan",
             { parse_mode: "Markdown" }
         );

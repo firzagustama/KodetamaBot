@@ -1,3 +1,4 @@
+import { UpsertBucketParams } from "@kodetama/ai";
 import { db } from "@kodetama/db";
 import { buckets, budgets, transactions } from "@kodetama/db/schema";
 import { eq, and, sql } from "drizzle-orm";
@@ -167,4 +168,47 @@ async function createUnallocatedBucket(budgetId: string, amount: number) {
         category: null,
         isSystem: true,
     });
+}
+
+export async function upsertBucket(periodId: string, data: UpsertBucketParams) {
+    const icon = data.category === "needs" ? "Home" : data.category === "wants" ? "ShoppingBag" : "PiggyBank";
+    if (data.amount <= 0) {
+        throw new Error("Amount must be greater than 0");
+    }
+
+    if (data.bucketId) {
+        await db.update(buckets).set({
+            name: data.name,
+            description: data.description,
+            amount: data.amount.toString(),
+            category: data.category,
+            icon: icon,
+            isSystem: false,
+        }).where(eq(buckets.id, data.bucketId));
+    } else {
+        const budget = await getBudget(periodId);
+        let budgetId: string;
+        if (!budget) {
+            budgetId = await upsertBudget({
+                periodId: periodId,
+                estimatedIncome: 0,
+            });
+        } else {
+            budgetId = budget.id;
+        }
+
+        await db.insert(buckets).values({
+            budgetId: budgetId,
+            name: data.name,
+            description: data.description,
+            amount: data.amount.toString(),
+            category: data.category,
+            icon: icon,
+            isSystem: false,
+        });
+    }
+}
+
+export async function deleteBucket(bucketId: string) {
+    await db.delete(buckets).where(eq(buckets.id, bucketId));
 }

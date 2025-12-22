@@ -44,6 +44,7 @@ export async function onboardingConversation(
             "• `makan nasi goreng 20rb`\n" +
             "• `gaji bulan ini 10jt`\n" +
             "• `beli bensin 50rb`\n" +
+            "• `buat budget belanja 500rb`\n" +
             "• `bayar listrik 500k`\n\n" +
             "📸 *Fitur Pro:*\n" +
             "• Kirim foto struk/invoice\n" +
@@ -139,7 +140,6 @@ export async function onboardingConversation(
         await ctx.reply(
             "✅ *Siap Digunakan!*\n\n" +
             `📅 *Periode Aktif:* ${periodName}\n` +
-            `💰 *Budget:* Unallocated (Otomatis)\n\n` +
             "Langsung aja chat pengeluaran pertama lo sekarang! 👇",
             { parse_mode: "Markdown", reply_markup: finalKeyboard }
         );

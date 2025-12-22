@@ -8,7 +8,10 @@ export const deleteTransactionTool: ChatCompletionTool = {
         parameters: {
             type: "object",
             properties: {
-                transactionId: { type: "string" }
+                transactionId: {
+                    type: "string",
+                    description: "Transaction ID to delete. Use the ID from context or previous messages.",
+                }
             },
             required: ["transactionId"],
         },
