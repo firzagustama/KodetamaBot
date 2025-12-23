@@ -4,14 +4,11 @@ export const deleteTransactionTool: ChatCompletionTool = {
     type: "function",
     function: {
         name: "deleteTransaction",
-        description: "Delete Transaction Log",
+        description: "Delete transaction by ID from context",
         parameters: {
             type: "object",
             properties: {
-                transactionId: {
-                    type: "string",
-                    description: "Transaction ID to delete. Use the ID from context or previous messages.",
-                }
+                transactionId: { type: "string" }
             },
             required: ["transactionId"],
         },

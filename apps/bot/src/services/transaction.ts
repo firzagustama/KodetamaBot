@@ -3,6 +3,7 @@ import { transactions, categories, aiUsage, budgets } from "@kodetama/db/schema"
 import { eq, and, desc, sql, ilike } from "drizzle-orm";
 import type { TargetContext, TxType } from "@kodetama/shared";
 import { UpsertTransactionParams } from "@kodetama/ai";
+import { getBudgetSummary } from "./budget.js";
 
 interface Transaction {
     userId: string;
@@ -247,7 +248,15 @@ export async function upsertTransaction(
     target: TargetContext,
     periodId: string,
     dataArray: UpsertTransactionParams[]
-): Promise<string[]> {
+): Promise<{
+    ids: string[];
+    remainingBucket: {
+        bucket: string;
+        amount: number;
+        spent: number;
+        remaining: number;
+    }[]
+}> {
 
     // 1. VALIDATE ALL FIRST (fail fast)
     for (const data of dataArray) {
@@ -275,6 +284,7 @@ export async function upsertTransaction(
     const resultIds: string[] = [];
 
     // 4. USE DB TRANSACTION (all or nothing)
+    let buckets: string[] = [];
     await db.transaction(async (tx) => {
 
         // BULK UPDATE
@@ -291,6 +301,7 @@ export async function upsertTransaction(
                     })
                     .where(eq(transactions.id, data.transactionId!));
 
+                buckets.push(data.bucket);
                 resultIds.push(data.transactionId!);
             }
         }
@@ -314,8 +325,105 @@ export async function upsertTransaction(
                 .returning({ id: transactions.id });
 
             resultIds.push(...inserted.map(r => r.id));
+            buckets.push(...insertData.map(d => d.bucket));
         }
     });
 
-    return resultIds;
+    const remainingBudget = await getBudgetSummary(target.targetId, periodId, !!target.groupId);
+    let remainingBucket = remainingBudget?.budget.buckets ?? [];
+    if (remainingBucket.length > 0) {
+        const lowerCaseBuckets = buckets.map(b => b.toLowerCase());
+        remainingBucket = remainingBucket.filter(b => lowerCaseBuckets.includes(b.bucket.toLowerCase()));
+    }
+
+    return { ids: resultIds, remainingBucket };
+}
+
+// =============================================================================
+// AI READ TOOL SERVICES
+// =============================================================================
+
+export interface TransactionHistoryOptions {
+    limit?: number;
+    bucket?: string;
+    type?: string;
+    daysBack?: number;
+}
+
+/**
+ * Get transaction history for AI tool
+ */
+export async function getTransactionHistory(
+    target: TargetContext,
+    periodId: string,
+    options: TransactionHistoryOptions = {}
+) {
+    const limit = options.limit ?? 5;
+    const daysBack = options.daysBack ?? 7;
+    const sinceDate = new Date();
+    sinceDate.setDate(sinceDate.getDate() - daysBack);
+
+    const condition = target.groupId
+        ? eq(transactions.groupId, target.groupId)
+        : eq(transactions.userId, target.userId!);
+
+    const whereConditions = [
+        eq(transactions.periodId, periodId),
+        condition,
+    ];
+
+    if (options.bucket) {
+        whereConditions.push(eq(transactions.bucket, options.bucket));
+    }
+    if (options.type) {
+        whereConditions.push(eq(transactions.type, options.type as any));
+    }
+
+    const results = await db.query.transactions.findMany({
+        where: and(...whereConditions),
+        orderBy: [desc(transactions.createdAt)],
+        limit: limit,
+    });
+
+    return results.map(tx => ({
+        id: tx.id,
+        type: tx.type,
+        amount: tx.amount,
+        description: tx.description,
+        bucket: tx.bucket,
+        createdAt: tx.createdAt,
+    }));
+}
+
+/**
+ * Search transactions by keyword for AI tool
+ */
+export async function searchTransactionsByKeyword(
+    target: TargetContext,
+    periodId: string,
+    query: string,
+    limit: number = 10
+) {
+    const condition = target.groupId
+        ? eq(transactions.groupId, target.groupId)
+        : eq(transactions.userId, target.userId!);
+
+    const results = await db.query.transactions.findMany({
+        where: and(
+            eq(transactions.periodId, periodId),
+            condition,
+            ilike(transactions.description, `%${query}%`),
+        ),
+        orderBy: [desc(transactions.createdAt)],
+        limit: limit,
+    });
+
+    return results.map(tx => ({
+        id: tx.id,
+        type: tx.type,
+        amount: tx.amount,
+        description: tx.description,
+        bucket: tx.bucket,
+        createdAt: tx.createdAt,
+    }));
 }

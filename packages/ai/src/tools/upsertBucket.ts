@@ -12,31 +12,15 @@ export const upsertBucketTool: ChatCompletionTool = {
     type: "function",
     function: {
         name: "upsertBucket",
-        description: "Update or Insert Budget or Bucket",
+        description: "Create/update budget bucket",
         parameters: {
             type: "object",
             properties: {
-                bucketId: {
-                    type: "string",
-                    description: "Bucket ID, NEVER ask ID to user",
-                },
-                name: {
-                    type: "string",
-                    description: "Bucket name",
-                },
-                description: {
-                    type: "string",
-                    description: "Bucket description",
-                },
-                amount: {
-                    type: "number",
-                    description: "Bucket amount",
-                },
-                category: {
-                    type: "string",
-                    enum: ["needs", "wants", "savings"],
-                    description: "Bucket category, set needs for essential expenses, wants for non-essential expenses, savings for savings",
-                }
+                bucketId: { type: "string" },
+                name: { type: "string" },
+                description: { type: "string" },
+                amount: { type: "number", description: "IDR" },
+                category: { type: "string", enum: ["needs", "wants", "savings"] }
             },
             required: ["name", "description", "amount", "category"],
         },

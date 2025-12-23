@@ -1,108 +1,176 @@
-import { Period } from "@kodetama/shared";
-import { upsertTransaction, deleteTransaction, upsertBucket, deleteBucket } from "../../services/index.js";
+import { Period, TargetContext } from "@kodetama/shared";
+import {
+    upsertTransaction,
+    deleteTransaction,
+    getPeriodTotals,
+    getTransactionHistory,
+    searchTransactionsByKeyword,
+} from "../../services/transaction.js";
+import {
+    upsertBucket,
+    deleteBucket,
+    getBudgetSummary,
+} from "../../services/budget.js";
+import { upsertPeriodWithBudget } from "../../services/period.js";
 import { BotContext } from "../../types.js";
 
+// Compact JSON helper - removes null/undefined and shortens keys
+const compact = (obj: Record<string, any>): string => {
+    const cleaned = Object.fromEntries(
+        Object.entries(obj).filter(([_, v]) => v != null && v !== '')
+    );
+    return JSON.stringify(cleaned);
+};
+
+/**
+ * Execute tool calls from AI and return results (token-optimized)
+ */
 export async function toolCalls(
-    toolCalls: any[],
-    target: any,
+    toolCallsList: any[],
+    target: TargetContext,
     period: Period,
     ctx: BotContext
 ) {
-    const toolResults: any[] = [];
+    const results: any[] = [];
 
-    for (const toolCall of toolCalls) {
+    for (const toolCall of toolCallsList) {
         const { id, function: func } = toolCall;
         const args = JSON.parse(func.arguments);
-        console.log(args)
 
         try {
-            let result: any;
+            let r: any;
 
             switch (func.name) {
+                // WRITE TOOLS
                 case "upsertTransaction":
-                    result = await upsertTransaction(target, period.id, args.input);
-                    ctx.session.lastTransactionIds.slice(-5).push(result);
-                    toolResults.push({
+                    r = await upsertTransaction(target, period.id, args.input);
+                    ctx.session.lastTransactionIds = [...ctx.session.lastTransactionIds.slice(-4), ...r.ids];
+                    results.push({
                         role: "tool",
                         tool_call_id: id,
-                        content: JSON.stringify({
-                            success: true,
-                            message: "Transaction upserted successfully",
-                            data: {
-                                transactionId: result
-                            },
-                            // Proactive hint for AI
-                            suggest: "Ask if user wants to undo or add more transactions"
-                        })
+                        content: compact({ ok: true, ids: r.ids, remainingBucket: r.remainingBucket })
                     });
                     break;
 
                 case "deleteTransaction":
-                    result = await deleteTransaction(args.transactionId);
-                    toolResults.push({
+                    r = await deleteTransaction(args.transactionId);
+                    results.push({
                         role: "tool",
                         tool_call_id: id,
-                        content: JSON.stringify({
-                            success: true,
-                            message: "Transaction deleted successfully",
-                        })
+                        content: compact({ ok: r })
                     });
                     break;
 
                 case "upsertBucket":
-                    result = await upsertBucket(period, args);
-                    toolResults.push({
+                    await upsertBucket(period, args);
+                    results.push({
                         role: "tool",
                         tool_call_id: id,
-                        content: JSON.stringify({
-                            success: true,
-                            message: "Bucket upserted successfully",
-                        })
-                    })
+                        content: compact({ ok: true, name: args.name })
+                    });
                     break;
 
                 case "deleteBucket":
-                    result = await deleteBucket(period, args);
-                    toolResults.push({
+                    await deleteBucket(period, args);
+                    results.push({
                         role: "tool",
                         tool_call_id: id,
-                        content: JSON.stringify({
-                            success: true,
-                            message: "Bucket deleted successfully",
-                        })
-                    })
+                        content: compact({ ok: true })
+                    });
                     break;
 
+                case "upsertPeriod":
+                    r = await upsertPeriodWithBudget(target, {
+                        name: args.name,
+                        incomeDate: args.incomeDate,
+                        copyFromPrevious: args.copyFromPrevious,
+                    });
+                    results.push({
+                        role: "tool",
+                        tool_call_id: id,
+                        content: compact({ ok: true, pid: r.periodId, copied: r.budgetCopied })
+                    });
+                    break;
+
+                // READ TOOLS
                 case "getTransactionHistory":
-                    // TODO: Implement getTransactionHistory
+                    r = await getTransactionHistory(target, period.id, {
+                        limit: args.limit,
+                        bucket: args.bucket,
+                        type: args.type,
+                        daysBack: args.daysBack,
+                    });
+                    // Compact: "id:type:amt:desc" per line
+                    const txList = r.map((t: any) =>
+                        `${t.id}:${t.type}:${t.amount}:${t.description?.slice(0, 15) ?? ''}`
+                    ).join("|");
+                    results.push({
+                        role: "tool",
+                        tool_call_id: id,
+                        content: compact({ n: r.length, tx: txList })
+                    });
                     break;
 
-                case "checkBudgetStatus":
-                    // TODO: Implement checkBudgetStatus
+                case "getBudgetStatus":
+                    const bs = await getBudgetSummary(target.targetId, period.id, !!target.groupId);
+                    let buckets = bs?.budget.buckets ?? [];
+                    if (args.bucketName) {
+                        buckets = buckets.filter((b: any) =>
+                            b.bucket.toLowerCase() === args.bucketName.toLowerCase()
+                        );
+                    }
+                    // Compact: "name:alloc:spent:left"
+                    const bktList = buckets.map((b: any) =>
+                        `${b.bucket}:${b.amount}:${b.spent}:${b.remaining}`
+                    ).join("|");
+                    results.push({
+                        role: "tool",
+                        tool_call_id: id,
+                        content: compact({ inc: bs?.budget.estimatedIncome, bkt: bktList })
+                    });
+                    break;
+
+                case "searchTransactions":
+                    r = await searchTransactionsByKeyword(target, period.id, args.query, args.limit ?? 10);
+                    const searchList = r.map((t: any) =>
+                        `${t.id}:${t.amount}:${t.description?.slice(0, 15) ?? ''}`
+                    ).join("|");
+                    results.push({
+                        role: "tool",
+                        tool_call_id: id,
+                        content: compact({ q: args.query, n: r.length, tx: searchList })
+                    });
+                    break;
+
+                case "getFinancialSummary":
+                    const totals = await getPeriodTotals(target.userId!, period.id);
+                    results.push({
+                        role: "tool",
+                        tool_call_id: id,
+                        content: compact({
+                            in: totals.income,
+                            out: totals.expense,
+                            bal: totals.balance
+                        })
+                    });
                     break;
 
                 default:
-                    toolResults.push({
+                    results.push({
                         role: "tool",
                         tool_call_id: id,
-                        content: JSON.stringify({
-                            success: false,
-                            error: `Unknown tool: ${func.name}`
-                        })
+                        content: compact({ err: `Unknown: ${func.name}` })
                     });
             }
 
         } catch (error: any) {
-            toolResults.push({
+            results.push({
                 role: "tool",
                 tool_call_id: id,
-                content: JSON.stringify({
-                    needsConfirmation: true,
-                    error: error.message || "Tool execution failed"
-                })
+                content: compact({ err: error.message?.slice(0, 50) || "Failed" })
             });
         }
     }
 
-    return toolResults;
+    return results;
 }

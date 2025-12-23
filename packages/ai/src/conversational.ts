@@ -5,7 +5,19 @@ import { contextSummary, transactions, db } from "@kodetama/db";
 import { ChatCompletionMessage, ChatCompletionMessageParam } from "openai/resources.mjs";
 import { CONTEXT_SUMMARY_USER_PROMPT, CONVERSATION_SYSTEM_PROMPT } from "./prompts/index.js";
 import { eq, desc } from "drizzle-orm";
-import { deleteBucketTool, deleteTransactionTool, upsertBucketTool, upsertTransactionTool } from "./tools/index.js";
+import {
+    // Write tools
+    upsertTransactionTool,
+    deleteTransactionTool,
+    upsertBucketTool,
+    deleteBucketTool,
+    upsertPeriodTool,
+    // Read tools
+    getTransactionHistoryTool,
+    getBudgetStatusTool,
+    searchTransactionsTool,
+    getFinancialSummaryTool,
+} from "./tools/index.js";
 
 export class ConversationAI {
     private isDevMode: boolean;
@@ -13,9 +25,29 @@ export class ConversationAI {
     private clientModel!: string;
 
     // Context Limit
-    private CONTEXT_LIMIT = 20; // 10 messages include assistant and user
+    private CONTEXT_LIMIT = 20;
     private CONTEXT_LAST_N = 5;
     private CONTEXT_TTL = 60 * 60; // 1 hour
+
+    // Retry configuration
+    private readonly MAX_RETRIES = 3;
+    private readonly RETRY_DELAYS = [1000, 2000, 4000]; // exponential backoff
+    private readonly TIMEOUT_MS = 30000;
+
+    // All available tools
+    private readonly tools = [
+        // Write tools
+        upsertTransactionTool,
+        deleteTransactionTool,
+        upsertBucketTool,
+        deleteBucketTool,
+        upsertPeriodTool,
+        // Read tools
+        getTransactionHistoryTool,
+        getBudgetStatusTool,
+        searchTransactionsTool,
+        getFinancialSummaryTool,
+    ];
 
     constructor(config: AIConfig) {
         this.isDevMode = !config.apiKey;
@@ -49,12 +81,49 @@ export class ConversationAI {
                 refusal: ""
             }
         }
-        const response = await this.client?.chat.completions.create({
-            model: this.clientModel,
-            messages: messages,
-            tools: [upsertTransactionTool, upsertBucketTool, deleteTransactionTool, deleteBucketTool]
+        return this.withRetry(async () => {
+            const response = await this.client?.chat.completions.create({
+                model: this.clientModel,
+                messages: messages,
+                tools: this.tools,
+            });
+            return response?.choices[0].message;
         });
-        return response?.choices[0].message;
+    }
+
+    /**
+     * Execute a function with retry logic and exponential backoff
+     */
+    private async withRetry<T>(fn: () => Promise<T>): Promise<T> {
+        let lastError: Error | undefined;
+
+        for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
+            try {
+                // Create a timeout promise
+                const timeoutPromise = new Promise<never>((_, reject) => {
+                    setTimeout(() => reject(new Error('Request timeout')), this.TIMEOUT_MS);
+                });
+
+                // Race between the function and timeout
+                return await Promise.race([fn(), timeoutPromise]);
+            } catch (error) {
+                lastError = error as Error;
+                console.error(`AI request failed (attempt ${attempt + 1}/${this.MAX_RETRIES + 1}):`, error);
+
+                // Don't retry on final attempt
+                if (attempt < this.MAX_RETRIES) {
+                    const delay = this.RETRY_DELAYS[attempt] ?? 4000;
+                    console.log(`Retrying in ${delay}ms...`);
+                    await this.sleep(delay);
+                }
+            }
+        }
+
+        throw lastError ?? new Error('AI request failed after retries');
+    }
+
+    private sleep(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     private async getTargetContext(target: TargetContext): Promise<ChatCompletionMessageParam[]> {
@@ -131,31 +200,30 @@ export class ConversationAI {
     }
 
     private async getContext(target: TargetContext, period: Period): Promise<string> {
+        const periodCtx = `${period.id}: ${period.name} (Ends in ${period.endDate})`
         const summary = await this.getSummary(target);
-        const lastNTransactions = await this.getLastNTransaction(period.id, 5);
-        const estimatedIncome = period.budget?.estimatedIncome ?? 0;
+        const recentTx = await this.getLastNTransaction(period.id, 5);
+        const income = period.budget?.estimatedIncome ?? 0;
 
+        // Compact bucket format: "id:Name(description)"
         let buckets = "Unallocated";
         if (period.budget?.buckets && period.budget.buckets.length > 0) {
-            buckets = period.budget.buckets.map((bucket) => `${bucket.id}: ${bucket.name} (${bucket.description})`).join("\n");
+            buckets = period.budget.buckets
+                .map(b => `${b.id}:${b.name}(${b.description})`)
+                .join("\n");
         }
-        return `Summary: ${summary}\n\nLast 5 transactions: ${lastNTransactions}\n\nEstimated income: ${estimatedIncome}\n\nBudget buckets: ${buckets}\n\n`;
+        return `Period\n${periodCtx}\n\nSummary: ${summary}\n\nLast Transactions: ${recentTx}\n\nIncome: ${income}\n\nBuckets: ${buckets}`;
     }
 
     private async getLastNTransaction(periodId: string, n: number): Promise<string> {
-        const lastTransactions = await db.query.transactions.findMany({
+        const txs = await db.query.transactions.findMany({
             where: eq(transactions.periodId, periodId),
             orderBy: [desc(transactions.createdAt)],
             limit: n
         });
-        return JSON.stringify(lastTransactions.map((transaction) => {
-            return {
-                id: transaction.id,
-                type: transaction.type,
-                amount: transaction.amount,
-                description: transaction.description,
-                bucket: transaction.bucket,
-            }
-        }));
+        // Compact format: "id:type:amount:desc:bucket"
+        return txs.map(t =>
+            `${t.id}:${t.type}:${t.amount}:${t.description?.slice(0, 20) ?? ''}:${t.bucket ?? ''}`
+        ).join("\n");
     }
 }

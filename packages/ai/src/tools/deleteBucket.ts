@@ -12,32 +12,16 @@ export const deleteBucketTool: ChatCompletionTool = {
     type: "function",
     function: {
         name: "deleteBucket",
-        description: "Delete Budget or Bucket",
+        description: "Delete bucket, move transactions to another",
         parameters: {
             type: "object",
             properties: {
-                name: {
-                    type: "string",
-                    description: "Name of bucket",
-                },
-                description: {
-                    type: "string",
-                    description: "Description of bucket",
-                },
-                moveBucket: {
-                    type: "string",
-                    description: "Move all transactions to this bucket",
-                },
-                confidence: {
-                    type: "number",
-                    description: "0.0 - 1.0",
-                },
-                confirmationMessage: {
-                    type: "string",
-                    description: "Confirmation message if confidence < 0.7 to send to user",
-                },
+                name: { type: "string" },
+                moveBucket: { type: "string", description: "Target bucket for transactions" },
+                confidence: { type: "number", description: ">0.8 to execute" },
+                confirmationMessage: { type: "string" },
             },
-            required: ["name", "description", "moveBucket", "confidence", "confirmationMessage"],
+            required: ["name", "moveBucket", "confidence", "confirmationMessage"],
         },
     },
 }

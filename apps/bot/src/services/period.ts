@@ -1,6 +1,6 @@
 import { db } from "@kodetama/db";
-import { datePeriods } from "@kodetama/db/schema";
-import { eq, and } from "drizzle-orm";
+import { datePeriods, budgets, buckets } from "@kodetama/db/schema";
+import { eq, and, desc } from "drizzle-orm";
 import { formatPeriodName, getMonthlyPeriodDates, getCustomPeriodDates, TargetContext, Period } from "@kodetama/shared";
 
 /**
@@ -170,4 +170,90 @@ export async function ensureGroupPeriodExists(
     }).returning({ id: datePeriods.id });
 
     return newPeriod.id;
+}
+
+// =============================================================================
+// AI TOOL: UPSERT PERIOD WITH BUDGET COPY
+// =============================================================================
+
+export interface UpsertPeriodOptions {
+    name?: string;
+    incomeDate?: number;
+    makeCurrent?: boolean;
+    copyFromPrevious?: boolean;
+}
+
+/**
+ * Create or update a period for AI tool, optionally copying budget from previous period
+ */
+export async function upsertPeriodWithBudget(
+    target: TargetContext,
+    options: UpsertPeriodOptions = {}
+): Promise<{ periodId: string; budgetCopied: boolean }> {
+    const date = options.name ? new Date(options.name) : new Date();
+    const incomeDate = options.incomeDate ?? 1;
+    const copyFromPrevious = options.copyFromPrevious ?? true;
+
+    // Create the period
+    let periodId: string;
+    if (target.groupId) {
+        periodId = await ensureGroupPeriodExists(target.groupId, date, incomeDate);
+    } else {
+        periodId = await ensurePeriodExists(target.userId!, date, incomeDate);
+    }
+
+    // Check if budget already exists for this period
+    const existingBudget = await db.query.budgets.findFirst({
+        where: eq(budgets.periodId, periodId),
+    });
+
+    if (existingBudget) {
+        return { periodId, budgetCopied: false };
+    }
+
+    // If copyFromPrevious, find the previous period's budget
+    if (copyFromPrevious) {
+        const previousPeriod = await db.query.datePeriods.findFirst({
+            where: and(
+                target.groupId
+                    ? eq(datePeriods.groupId, target.groupId)
+                    : eq(datePeriods.userId, target.userId!),
+            ),
+            orderBy: [desc(datePeriods.createdAt)],
+            with: {
+                budget: {
+                    with: {
+                        buckets: true,
+                    },
+                },
+            },
+        });
+
+        if (previousPeriod?.budget) {
+            // Create new budget with same estimated income
+            const [newBudget] = await db.insert(budgets).values({
+                periodId: periodId,
+                estimatedIncome: previousPeriod.budget.estimatedIncome,
+            }).returning({ id: budgets.id });
+
+            // Copy all buckets
+            if (previousPeriod.budget.buckets.length > 0) {
+                await db.insert(buckets).values(
+                    previousPeriod.budget.buckets.map(bucket => ({
+                        budgetId: newBudget.id,
+                        name: bucket.name,
+                        description: bucket.description,
+                        icon: bucket.icon,
+                        amount: bucket.amount,
+                        category: bucket.category,
+                        isSystem: bucket.isSystem,
+                    }))
+                );
+            }
+
+            return { periodId, budgetCopied: true };
+        }
+    }
+
+    return { periodId, budgetCopied: false };
 }
