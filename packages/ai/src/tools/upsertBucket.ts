@@ -2,7 +2,6 @@ import { ChatCompletionTool } from "openai/resources.mjs";
 
 export interface UpsertBucketParams {
     bucketId?: string;
-    budgetId: string;
     name: string;
     description: string;
     amount: number;
@@ -19,11 +18,7 @@ export const upsertBucketTool: ChatCompletionTool = {
             properties: {
                 bucketId: {
                     type: "string",
-                    description: "Bucket ID",
-                },
-                budgetId: {
-                    type: "string",
-                    description: "Budget ID",
+                    description: "Bucket ID, NEVER ask ID to user",
                 },
                 name: {
                     type: "string",
@@ -43,7 +38,7 @@ export const upsertBucketTool: ChatCompletionTool = {
                     description: "Bucket category, set needs for essential expenses, wants for non-essential expenses, savings for savings",
                 }
             },
-            required: ["budgetId", "name", "description", "amount", "category"],
+            required: ["name", "description", "amount", "category"],
         },
     },
 }

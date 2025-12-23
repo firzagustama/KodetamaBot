@@ -171,7 +171,7 @@ async function createUnallocatedBucket(budgetId: string, amount: number) {
     });
 }
 
-export async function upsertBucket(periodId: string, data: UpsertBucketParams) {
+export async function upsertBucket(period: Period, data: UpsertBucketParams) {
     const icon = data.category === "needs" ? "Home" : data.category === "wants" ? "ShoppingBag" : "PiggyBank";
     if (data.amount <= 0) {
         throw new Error("Amount must be greater than 0");
@@ -180,7 +180,7 @@ export async function upsertBucket(periodId: string, data: UpsertBucketParams) {
     if (data.bucketId) {
         await db.update(transactions).set({
             bucket: data.name,
-        }).where(and(eq(transactions.bucket, data.name), eq(transactions.periodId, periodId)));
+        }).where(and(eq(transactions.bucket, data.name), eq(transactions.periodId, period.id)));
 
         await db.update(buckets).set({
             name: data.name,
@@ -191,16 +191,10 @@ export async function upsertBucket(periodId: string, data: UpsertBucketParams) {
             isSystem: false,
         }).where(eq(buckets.id, data.bucketId));
     } else {
-        const budget = await getBudget(periodId);
-        let budgetId: string;
-        if (!budget) {
-            budgetId = await upsertBudget({
-                periodId: periodId,
-                estimatedIncome: 0,
-            });
-        } else {
-            budgetId = budget.id;
-        }
+        const budgetId = period.budget?.id ?? await upsertBudget({
+            periodId: period.id,
+            estimatedIncome: 0,
+        });
 
         await db.insert(buckets).values({
             budgetId: budgetId,

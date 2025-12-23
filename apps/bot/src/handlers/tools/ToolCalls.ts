@@ -50,7 +50,7 @@ export async function toolCalls(
                     break;
 
                 case "upsertBucket":
-                    result = await upsertBucket(period.id, args);
+                    result = await upsertBucket(period, args);
                     toolResults.push({
                         role: "tool",
                         tool_call_id: id,
