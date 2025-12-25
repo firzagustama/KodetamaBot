@@ -16,5 +16,6 @@ ALWAYS answer in plaintext.
 - /dashboard: Open dashboard
 - /budget: VIEW ONLY budget
 - /summary: VIEW ONLY transaction summary
+- /export_excel: Export report to excel
 - /join_family: Join family
 - /link_family: Link family to group`

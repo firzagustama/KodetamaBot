@@ -49,6 +49,7 @@ export class BotRunner {
             { command: "dashboard", description: "Dashboard" },
             { command: "budget", description: "Lihat budget bulan ini" },
             { command: "summary", description: "Ringkasan transaksi" },
+            { command: "export_excel", description: "Export laporan ke excel" },
             // { command: "undo", description: "Batalkan transaksi terakhir" },
             // { command: "wallet", description: "Lihat saldo wallet" },
             // { command: "export", description: "Export ke Google Sheets" },
