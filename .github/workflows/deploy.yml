@@ -35,7 +35,7 @@ jobs:
               - 'packages/**'
               - 'docker/Dockerfile.bot'
 
-  deploy-api:
+  build-api:
     needs: changes
     if: needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
@@ -62,18 +62,7 @@ jobs:
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
-      - name: Deploy API
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            cd ~/bot/kodetama
-            docker compose pull api
-            docker compose up -d api
-
-  deploy-bot:
+  build-bot:
     needs: changes
     if: needs.changes.outputs.bot == 'true'
     runs-on: ubuntu-latest
@@ -100,7 +89,16 @@ jobs:
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
-      - name: Deploy Bot
+  deploy:
+    needs: [changes, build-api, build-bot]
+    if: |
+      always() &&
+      (needs.changes.outputs.api == 'true' || needs.changes.outputs.bot == 'true') &&
+      (needs.build-api.result == 'success' || needs.build-api.result == 'skipped') &&
+      (needs.build-bot.result == 'success' || needs.build-bot.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -108,5 +106,5 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd ~/bot/kodetama
-            docker compose pull bot
-            docker compose up -d bot
+            docker compose pull
+            docker compose up -d
