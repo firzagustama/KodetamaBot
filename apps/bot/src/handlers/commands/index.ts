@@ -7,3 +7,4 @@ export { JoinFamilyCommand } from "./JoinFamilyCommand.js";
 export { LinkFamilyCommand } from "./LinkFamilyCommand.js";
 export { UndoCommand } from "./UndoCommand.js";
 export { SummaryCommand } from "./SummaryCommand.js";
+export { ExportExcelCommand } from "./ExportExcelCommand.js";

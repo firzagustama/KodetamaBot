@@ -169,6 +169,12 @@ export async function getAllTransactions(target: TargetContext, periodId: string
             condition,
             eq(transactions.periodId, periodId)
         ),
+        with: {
+            category: true,
+        },
+        orderBy: (transactions, { desc }) => [
+            desc(transactions.transactionDate),
+        ],
     });
 }
 
