@@ -8,8 +8,8 @@ export class ExcelService {
      */
     async generateFinancialReport(period: Period, transactions: TransactionWithCategory[]): Promise<Buffer> {
         const workbook = new ExcelJS.Workbook();
-        workbook.creator = "Kodetama Bot";
-        workbook.lastModifiedBy = "Kodetama Bot";
+        workbook.creator = "KodetamaBot";
+        workbook.lastModifiedBy = "KodetamaBot";
         workbook.created = new Date();
         workbook.modified = new Date();
 
