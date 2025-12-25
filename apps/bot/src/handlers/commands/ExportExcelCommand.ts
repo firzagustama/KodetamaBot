@@ -26,7 +26,7 @@ export class ExportExcelCommand extends CommandHandler {
             const excelService = new ExcelService();
             const buffer = await excelService.generateFinancialReportv2(period as any, transactions as any);
 
-            const fileName = `Kodetama_Report_${period.name.replace(/\s+/g, "_")}.xlsx`;
+            const fileName = `Report_${period.name.replace(/\s+/g, "_")}.xlsx`;
 
             await ctx.replyWithDocument(new InputFile(buffer, fileName), {
                 caption: `Berikut adalah laporan keuangan untuk periode *${period.name}*.`,
