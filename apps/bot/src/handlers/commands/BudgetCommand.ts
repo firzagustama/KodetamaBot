@@ -5,7 +5,6 @@ import {
     getCurrentPeriod,
     getCurrentGroupPeriod,
     getBudgetSummary,
-    getBuckets,
 } from "../../services/index.js";
 import { logger } from "../../utils/logger.js";
 
@@ -24,28 +23,27 @@ export class BudgetCommand extends CommandHandler {
                 ? await getCurrentGroupPeriod(target.targetId)
                 : await getCurrentPeriod(target.targetId);
 
-            if (!period) {
-                await ctx.reply(
-                    "Belum ada budget yang diatur.\n" +
-                    "Buka Dashboard untuk mengatur budget bulan ini."
-                );
-                return { success: true };
-            }
+            // if (!period) {
+            //     await ctx.reply(
+            //         "Belum ada budget yang diatur.\n" +
+            //         "Buka Dashboard untuk mengatur budget bulan ini."
+            //     );
+            //     return { success: true };
+            // }
 
-            const buckets = await getBuckets(period.id);
-            if (!buckets || buckets.length === 1) {
-                await ctx.conversation.enter("setupbudget");
-                return { success: true };
-            }
+            // if (!buckets || buckets.length === 1) {
+            //     await ctx.conversation.enter("setupbudget");
+            //     return { success: true };
+            // }
 
-            const summary = await getBudgetSummary(target.targetId, period.id, target.isGroup);
-            if (!summary) {
-                await ctx.reply(
-                    "Belum ada budget yang diatur untuk bulan ini.\n" +
-                    "Buka Dashboard untuk mengatur budget."
-                );
-                return { success: true };
-            }
+            const summary = await getBudgetSummary(target.targetId, period!.id, target.isGroup);
+            // if (!summary) {
+            //     await ctx.reply(
+            //         "Belum ada budget yang diatur untuk bulan ini.\n" +
+            //         "Buka Dashboard untuk mengatur budget."
+            //     );
+            //     return { success: true };
+            // }
 
             const progressBar = (percent: number) => {
                 const filled = Math.min(Math.floor(percent / 10), 10);
@@ -56,10 +54,10 @@ export class BudgetCommand extends CommandHandler {
             };
 
             let response =
-                `💰 *Budget ${period.name}*\n\n` +
-                `📊 *Estimasi Pendapatan:* ${formatRupiah(summary.budget.estimatedIncome)}\n\n`;
-            for (const bucket of summary.budget.buckets) {
-                const percent = bucket.amount / summary.budget.estimatedIncome * 100;
+                `💰 *Budget ${period!.name}*\n\n` +
+                `📊 *Estimasi Pendapatan:* ${formatRupiah(summary!.budget.estimatedIncome)}\n\n`;
+            for (const bucket of summary!.budget.buckets) {
+                const percent = bucket.amount / summary!.budget.estimatedIncome * 100;
                 const progress = bucket.spent / bucket.amount * 100;
                 const percentString = percent.toFixed(0);
                 response +=

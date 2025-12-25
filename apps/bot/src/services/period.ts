@@ -1,6 +1,6 @@
 import { db } from "@kodetama/db";
 import { datePeriods, budgets, buckets } from "@kodetama/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { formatPeriodName, getMonthlyPeriodDates, getCustomPeriodDates, TargetContext, Period } from "@kodetama/shared";
 
 /**
@@ -177,10 +177,9 @@ export async function ensureGroupPeriodExists(
 // =============================================================================
 
 export interface UpsertPeriodOptions {
-    name?: string;
-    incomeDate?: number;
+    name: string;
     makeCurrent?: boolean;
-    copyFromPrevious?: boolean;
+    copyFromPrevious: boolean;
 }
 
 /**
@@ -188,11 +187,11 @@ export interface UpsertPeriodOptions {
  */
 export async function upsertPeriodWithBudget(
     target: TargetContext,
-    options: UpsertPeriodOptions = {}
+    options: UpsertPeriodOptions
 ): Promise<{ periodId: string; budgetCopied: boolean }> {
     const date = options.name ? new Date(options.name) : new Date();
-    const incomeDate = options.incomeDate ?? 1;
-    const copyFromPrevious = options.copyFromPrevious ?? true;
+    const incomeDate = Math.max(date.getDate(), 28);
+    const copyFromPrevious = options.copyFromPrevious;
 
     // Create the period
     let periodId: string;
@@ -218,8 +217,9 @@ export async function upsertPeriodWithBudget(
                 target.groupId
                     ? eq(datePeriods.groupId, target.groupId)
                     : eq(datePeriods.userId, target.userId!),
+                eq(datePeriods.isCurrent, false)
             ),
-            orderBy: [desc(datePeriods.createdAt)],
+            orderBy: (datePeriods, { desc }) => [desc(datePeriods.createdAt)],
             with: {
                 budget: {
                     with: {
@@ -229,6 +229,7 @@ export async function upsertPeriodWithBudget(
             },
         });
 
+        console.log(previousPeriod)
         if (previousPeriod?.budget) {
             // Create new budget with same estimated income
             const [newBudget] = await db.insert(budgets).values({
@@ -254,6 +255,22 @@ export async function upsertPeriodWithBudget(
             return { periodId, budgetCopied: true };
         }
     }
+
+    // Create budget and unallocated bucket
+    const [newBudget] = await db.insert(budgets).values({
+        periodId: periodId,
+        estimatedIncome: "0",
+    }).returning({ id: budgets.id });
+
+    await db.insert(buckets).values({
+        budgetId: newBudget.id,
+        name: "Unallocated",
+        description: "Unallocated",
+        icon: "",
+        amount: "0",
+        category: "",
+        isSystem: true,
+    });
 
     return { periodId, budgetCopied: false };
 }

@@ -80,9 +80,9 @@ export async function toolCalls(
                     break;
 
                 case "upsertPeriod":
+                    console.log(args);
                     r = await upsertPeriodWithBudget(target, {
                         name: args.name,
-                        incomeDate: args.incomeDate,
                         copyFromPrevious: args.copyFromPrevious,
                     });
                     results.push({

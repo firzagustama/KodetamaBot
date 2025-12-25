@@ -11,6 +11,7 @@ export class CancelCommand extends CommandHandler {
     async execute(ctx: BotContext): Promise<{ success: boolean; message?: string; error?: Error }> {
         try {
             // Exit any active conversation
+            console.log("Canceling conversation...");
             await ctx.conversation.exit();
 
             // Clear relevant session data if needed

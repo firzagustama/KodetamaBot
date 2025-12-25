@@ -68,6 +68,7 @@ export class ConversationAI {
         const context = await this.getContext(target, period);
         return [
             { role: "system", content: CONVERSATION_SYSTEM_PROMPT },
+            { role: "system", content: `Current date: ${new Date().toLocaleDateString()}` },
             { role: "system", content: `User context:\n${context}` },
             ...messages
         ];
@@ -135,7 +136,6 @@ export class ConversationAI {
     }
 
     async setTargetContext(target: TargetContext, messages: ChatCompletionMessageParam[]): Promise<void> {
-        console.log(messages);
         const contextKey = getTargetContextKey(target.targetId);
         const filtered = messages.filter((message) => message.role !== "system");
         await redisManager.set(contextKey, JSON.stringify(filtered));
