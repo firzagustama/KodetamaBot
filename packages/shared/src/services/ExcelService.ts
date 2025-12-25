@@ -6,7 +6,7 @@ export class ExcelService {
     /**
      * Generate a financial report Excel workbook
      */
-    async generateFinancialReport(period: Period, transactions: TransactionWithCategory[]): Promise<Buffer> {
+    async generateFinancialReportv2(period: Period, transactions: TransactionWithCategory[]): Promise<Buffer> {
         const workbook = new ExcelJS.Workbook();
         workbook.creator = "KodetamaBot";
         workbook.lastModifiedBy = "KodetamaBot";
