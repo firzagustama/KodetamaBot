@@ -93,7 +93,7 @@ export class ExcelService {
                     budgeted,
                     spent,
                     remaining,
-                    percentUsed
+                    (percentUsed * 100).toFixed(0)
                 ]);
 
                 // Style data row
