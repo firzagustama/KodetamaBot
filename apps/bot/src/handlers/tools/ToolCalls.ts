@@ -13,6 +13,7 @@ import {
 } from "../../services/budget.js";
 import { upsertPeriodWithBudget } from "../../services/period.js";
 import { BotContext } from "../../types.js";
+import { InlineKeyboard } from "grammy";
 
 // Compact JSON helper - removes null/undefined and shortens keys
 const compact = (obj: Record<string, any>): string => {
@@ -41,6 +42,20 @@ export async function toolCalls(
             let r: any;
 
             switch (func.name) {
+                // CONFIRM TOOLS
+                case "confirmTelegram":
+                    let keyboard: InlineKeyboard | undefined = undefined;
+                    for (const button of args.buttons) {
+                        if (!keyboard) keyboard = new InlineKeyboard();
+                        keyboard.text(button.text, `ai_${button.callback_data}`)
+                    }
+                    await ctx.reply(args.confirmationMessage, { reply_markup: keyboard })
+                    results.push({
+                        role: "tool",
+                        tool_call_id: id,
+                        content: compact({ ok: true })
+                    })
+                    break;
                 // WRITE TOOLS
                 case "upsertTransaction":
                     r = await upsertTransaction(target, period.id, args.input);

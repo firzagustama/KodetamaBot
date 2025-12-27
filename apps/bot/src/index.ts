@@ -15,9 +15,8 @@ import { StartCommand, HelpCommand, BudgetCommand, DashboardCommand, JoinFamilyC
 
 // Event handlers
 import { handleAdminCallback } from "./handlers/admin.js";
-
-// Callback handlers
 import { TransactionCallbackHandler } from "./handlers/callbacks/index.js";
+import { handleTransaction } from "./handlers/transaction.js";
 
 
 
@@ -127,6 +126,11 @@ function setupEventHandlers(
         if (data === "dismiss_education") {
             await ctx.answerCallbackQuery("Oke, nanti aja.");
             await ctx.deleteMessage();
+            return;
+        }
+
+        if (data.startsWith("ai_")) {
+            await handleTransaction(ctx);
             return;
         }
 

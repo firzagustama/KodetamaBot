@@ -24,8 +24,10 @@ function getConversationAI(): ConversationAI {
  * Handle transaction messages in private chat
  */
 export async function handleTransaction(ctx: BotContext): Promise<void> {
+    const isCallback = ctx.callbackQuery !== undefined;
+
     await ctx.replyWithChatAction("typing");
-    const message = ctx.message?.text;
+    const message = isCallback ? ctx.callbackQuery!.data!.split("_")[1] : ctx.message?.text;
     const user = ctx.from;
 
     if (!message || !user) return;
@@ -72,6 +74,11 @@ export async function handleTransaction(ctx: BotContext): Promise<void> {
                 // Add tool results to messages
                 messages.push(...toolResults);
 
+                if (response.tool_calls[0].function.name === "confirmTelegram") {
+                    await ai.setTargetContext(target, messages);
+                    break;
+                }
+
                 // Continue loop to get AI response after tool execution
                 continue;
             }
@@ -79,6 +86,9 @@ export async function handleTransaction(ctx: BotContext): Promise<void> {
             // Final response - send to user
             if (response.content) {
                 await ctx.reply(response.content);
+                if (isCallback) {
+                    await ctx.answerCallbackQuery();
+                }
                 await ai.setTargetContext(target, messages);
             }
 

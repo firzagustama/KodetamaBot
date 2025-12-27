@@ -17,6 +17,7 @@ import {
     getBudgetStatusTool,
     searchTransactionsTool,
     getFinancialSummaryTool,
+    confirmTelegramTool,
 } from "./tools/index.js";
 
 export class ConversationAI {
@@ -25,8 +26,8 @@ export class ConversationAI {
     private clientModel!: string;
 
     // Context Limit
-    private CONTEXT_LIMIT = 20;
-    private CONTEXT_LAST_N = 5;
+    private CONTEXT_LIMIT = 40;
+    private CONTEXT_LAST_N = 15;
     private CONTEXT_TTL = 60 * 60; // 1 hour
 
     // Retry configuration
@@ -36,6 +37,8 @@ export class ConversationAI {
 
     // All available tools
     private readonly tools = [
+        // Confirm tools
+        confirmTelegramTool,
         // Write tools
         upsertTransactionTool,
         deleteTransactionTool,
@@ -136,6 +139,7 @@ export class ConversationAI {
     }
 
     async setTargetContext(target: TargetContext, messages: ChatCompletionMessageParam[]): Promise<void> {
+        console.log(messages);
         const contextKey = getTargetContextKey(target.targetId);
         const filtered = messages.filter((message) => message.role !== "system");
         await redisManager.set(contextKey, JSON.stringify(filtered));
@@ -159,7 +163,16 @@ export class ConversationAI {
             return;
         }
         const messages = JSON.parse(raw) as ChatCompletionMessageParam[];
-        const lastN = messages.slice(-n);
+
+        // Slice last N
+        let lastN = messages.slice(-n);
+
+        // Ensure we don't start with a 'tool' message (orphan)
+        // A 'tool' message MUST follow an 'assistant' message with 'tool_calls'
+        while (lastN.length > 0 && lastN[0].role === "tool") {
+            lastN.shift();
+        }
+
         await redisManager.set(getTargetContextKey(target.targetId), JSON.stringify(lastN), this.CONTEXT_TTL);
     }
 

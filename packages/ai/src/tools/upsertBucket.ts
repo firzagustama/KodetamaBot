@@ -16,7 +16,7 @@ export const upsertBucketTool: ChatCompletionTool = {
         parameters: {
             type: "object",
             properties: {
-                bucketId: { type: "string" },
+                bucketId: { type: "string", description: "MANDATORY if updating existing bucket" },
                 name: { type: "string" },
                 description: { type: "string" },
                 amount: { type: "number", description: "IDR" },
