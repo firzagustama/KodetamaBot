@@ -6,6 +6,7 @@ import { AIOrchestrator } from "@kodetama/ai";
 
 import { authenticate } from "../middleware/auth.js";
 import { loggingMiddleware } from "../middleware/loggingMiddleware.js";
+import { logger } from "../utils/logger.js";
 
 const groupBuckets = (buckets: any[]) => {
     const system = buckets.filter(b => b.isSystem);
@@ -20,6 +21,18 @@ const groupBuckets = (buckets: any[]) => {
         savings: buckets.filter(b => !b.isSystem && b.category === 'savings'),
     };
 };
+
+let aiOrchestrator: AIOrchestrator | null = null;
+
+function getAI(): AIOrchestrator {
+    if (!aiOrchestrator) {
+        aiOrchestrator = new AIOrchestrator({
+            apiKey: process.env.OPENROUTER_API_KEY ?? "",
+            model: process.env.OPENROUTER_MODEL,
+        });
+    }
+    return aiOrchestrator;
+}
 
 export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
 
@@ -178,6 +191,15 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
             // CREATE: Insert new buckets (id starts with 'temp')
             const newBuckets = bucketUpdates.filter(b => b.id.startsWith('temp'));
             for (const bucket of newBuckets) {
+                let embedding: number[] | null = null;
+                try {
+                    const ai = getAI();
+                    const { result } = await ai.generateEmbedding(`${bucket.name}: ${bucket.description}`);
+                    embedding = result;
+                } catch (e) {
+                    logger.error("Failed to generate embedding for new bucket", { error: e });
+                }
+
                 await db.insert(buckets).values({
                     id: crypto.randomUUID(), // Generate real ID
                     budgetId: budget.id,
@@ -187,6 +209,7 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
                     icon: bucket.icon || 'Wallet',
                     category: bucket.category || 'needs',
                     isSystem: false,
+                    embedding: embedding,
                     createdAt: new Date(),
                     updatedAt: new Date(),
                 });
@@ -198,6 +221,19 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
                 const existingBucket = existingBuckets.find(b => b.id === bucket.id);
                 if (existingBucket?.isSystem) continue;
 
+                let embedding: number[] | undefined = undefined;
+                if (bucket.name || bucket.description) {
+                    try {
+                        const ai = getAI();
+                        const name = bucket.name ?? existingBucket?.name;
+                        const description = bucket.description ?? existingBucket?.description;
+                        const { result } = await ai.generateEmbedding(`${name}: ${description}`);
+                        embedding = result;
+                    } catch (e) {
+                        logger.error("Failed to generate embedding for updated bucket", { error: e });
+                    }
+                }
+
                 await db
                     .update(buckets)
                     .set({
@@ -206,6 +242,7 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
                         ...(bucket.description ? { description: bucket.description } : {}),
                         ...(bucket.icon ? { icon: bucket.icon } : {}),
                         ...(bucket.category ? { category: bucket.category } : {}),
+                        ...(embedding ? { embedding: embedding } : {}),
                         updatedAt: new Date(),
                     })
                     .where(eq(buckets.id, bucket.id));

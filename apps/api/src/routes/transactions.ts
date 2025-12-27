@@ -6,6 +6,7 @@ import { eq, desc, sql, and, inArray } from "drizzle-orm";
 import { authenticate } from "../middleware/auth.js";
 import { logger } from "../utils/logger.js";
 import { loggingMiddleware } from "../middleware/loggingMiddleware.js";
+import { AIOrchestrator } from "@kodetama/ai";
 
 // Indonesian date formatting helper
 function formatIndonesianDate(date: Date): string {
@@ -19,6 +20,18 @@ function formatIndonesianDate(date: Date): string {
 // Helper to get date-only string (YYYY-MM-DD)
 function getDateKey(date: Date): string {
     return date.toISOString().split('T')[0];
+}
+
+let aiOrchestrator: AIOrchestrator | null = null;
+
+function getAI(): AIOrchestrator {
+    if (!aiOrchestrator) {
+        aiOrchestrator = new AIOrchestrator({
+            apiKey: process.env.OPENROUTER_API_KEY ?? "",
+            model: process.env.OPENROUTER_MODEL,
+        });
+    }
+    return aiOrchestrator;
 }
 
 export async function transactionRoutes(fastify: FastifyInstance): Promise<void> {
@@ -209,6 +222,17 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
         });
 
         try {
+            let embedding: number[] | null = null;
+            if (description) {
+                try {
+                    const ai = getAI();
+                    const { result } = await ai.generateEmbedding(description);
+                    embedding = result;
+                } catch (e) {
+                    logger.error("Failed to generate embedding", { error: e });
+                }
+            }
+
             const newTx = await db
                 .insert(transactions)
                 .values({
@@ -221,6 +245,7 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
                     description: description ?? null,
                     rawMessage: rawMessage ?? null,
                     transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
+                    embedding: embedding,
                 })
                 .returning();
 

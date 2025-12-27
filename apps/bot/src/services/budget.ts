@@ -1,8 +1,20 @@
-import { deleteBucketParams, UpsertBucketParams } from "@kodetama/ai";
+import { deleteBucketParams, UpsertBucketParams, AIOrchestrator } from "@kodetama/ai";
 import { db } from "@kodetama/db";
 import { buckets, budgets, transactions } from "@kodetama/db/schema";
 import { Period } from "@kodetama/shared";
 import { eq, and, sql } from "drizzle-orm";
+
+let aiOrchestrator: AIOrchestrator | null = null;
+
+function getAI(): AIOrchestrator {
+    if (!aiOrchestrator) {
+        aiOrchestrator = new AIOrchestrator({
+            apiKey: process.env.OPENROUTER_API_KEY ?? "",
+            model: process.env.OPENROUTER_MODEL,
+        });
+    }
+    return aiOrchestrator;
+}
 
 /**
  * Get budget for a period
@@ -128,46 +140,74 @@ export async function getBuckets(periodId: string) {
 }
 
 async function createSplitBuckets(budgetId: string, needsAmount: number, wantsAmount: number, savingsAmount: number) {
-    await db.insert(buckets).values({
-        budgetId: budgetId,
-        name: "Needs",
-        description: "Essentials like rent, food, and utilities",
-        icon: "Home",
-        amount: needsAmount.toString(),
-        category: "needs",
-        isSystem: false,
-    });
+    const ai = getAI();
+    const bucketsData = [
+        {
+            name: "Needs",
+            description: "Essentials like rent, food, and utilities",
+            icon: "Home",
+            amount: needsAmount,
+            category: "needs",
+        },
+        {
+            name: "Wants",
+            description: "Non-essential expenses like entertainment and shopping",
+            icon: "ShoppingBag",
+            amount: wantsAmount,
+            category: "wants",
+        },
+        {
+            name: "Savings",
+            description: "Money set aside for future expenses",
+            icon: "PiggyBank",
+            amount: savingsAmount,
+            category: "savings",
+        },
+    ];
 
-    await db.insert(buckets).values({
-        budgetId: budgetId,
-        name: "Wants",
-        description: "Non-essential expenses like entertainment and shopping",
-        icon: "ShoppingBag",
-        amount: wantsAmount.toString(),
-        category: "wants",
-        isSystem: false,
-    });
+    for (const b of bucketsData) {
+        let embedding: number[] | null = null;
+        try {
+            const { result } = await ai.generateEmbedding(`${b.name}: ${b.description}`);
+            embedding = result;
+        } catch (e) {
+            console.error(`Failed to generate embedding for bucket ${b.name}`, e);
+        }
 
-    await db.insert(buckets).values({
-        budgetId: budgetId,
-        name: "Savings",
-        description: "Money set aside for future expenses",
-        icon: "PiggyBank",
-        amount: savingsAmount.toString(),
-        category: "savings",
-        isSystem: false,
-    });
+        await db.insert(buckets).values({
+            budgetId: budgetId,
+            name: b.name,
+            description: b.description,
+            icon: b.icon,
+            amount: b.amount.toString(),
+            category: b.category,
+            isSystem: false,
+            embedding: embedding,
+        });
+    }
 }
 
 async function createUnallocatedBucket(budgetId: string, amount: number) {
+    const name = "Unallocated";
+    const description = "Dana belum dialokasikan";
+    let embedding: number[] | null = null;
+    try {
+        const ai = getAI();
+        const { result } = await ai.generateEmbedding(`${name}: ${description}`);
+        embedding = result;
+    } catch (e) {
+        console.error("Failed to generate embedding for Unallocated bucket", e);
+    }
+
     await db.insert(buckets).values({
         budgetId: budgetId,
-        name: "Unallocated",
-        description: "Dana belum dialokasikan",
+        name: name,
+        description: description,
         icon: "Wallet", // Using Wallet icon for unallocated
         amount: amount.toString(),
         category: null,
         isSystem: true,
+        embedding: embedding,
     });
 }
 
@@ -175,6 +215,15 @@ export async function upsertBucket(period: Period, data: UpsertBucketParams) {
     const icon = data.category === "needs" ? "Home" : data.category === "wants" ? "ShoppingBag" : "PiggyBank";
     if (data.amount <= 0) {
         throw new Error("Amount must be greater than 0");
+    }
+
+    const ai = getAI();
+    let embedding: number[] | null = null;
+    try {
+        const { result } = await ai.generateEmbedding(`${data.name}: ${data.description}`);
+        embedding = result;
+    } catch (e) {
+        console.error(`Failed to generate embedding for bucket ${data.name}`, e);
     }
 
     if (data.bucketId) {
@@ -189,6 +238,7 @@ export async function upsertBucket(period: Period, data: UpsertBucketParams) {
             category: data.category,
             icon: icon,
             isSystem: false,
+            embedding: embedding,
         }).where(eq(buckets.id, data.bucketId));
     } else {
         const budgetId = period.budget?.id ?? await upsertBudget({
@@ -204,6 +254,7 @@ export async function upsertBucket(period: Period, data: UpsertBucketParams) {
             category: data.category,
             icon: icon,
             isSystem: false,
+            embedding: embedding,
         });
     }
 }

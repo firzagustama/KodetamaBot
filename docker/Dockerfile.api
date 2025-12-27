@@ -8,6 +8,7 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY packages/db/package.json ./packages/db/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/ai/package.json ./packages/ai/
+COPY packages/scripts/package.json ./packages/scripts/
 COPY apps/api/package.json ./apps/api/
 RUN pnpm install --frozen-lockfile
 
@@ -17,6 +18,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/packages/db/node_modules ./packages/db/node_modules
 COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY --from=deps /app/packages/ai/node_modules ./packages/ai/node_modules
+COPY --from=deps /app/packages/scripts/node_modules ./packages/scripts/node_modules
 COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY . .
 # Build packages in order
@@ -24,6 +26,7 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @kodetama/shared build && \
     pnpm --filter @kodetama/db build && \
     pnpm --filter @kodetama/ai build && \
+    pnpm --filter @kodetama/scripts build && \
     pnpm --filter @kodetama/api build
 
 # Production
@@ -40,11 +43,14 @@ COPY --from=builder /app/packages/ai/package.json ./packages/ai/
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/apps/api/package.json ./apps/api/
 COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=builder /app/packages/scripts/dist ./packages/scripts/dist
+COPY --from=builder /app/packages/scripts/package.json ./packages/scripts/
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/db/node_modules ./packages/db/node_modules
 COPY --from=builder /app/packages/db/drizzle ./packages/db/drizzle
 COPY --from=builder /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY --from=builder /app/packages/ai/node_modules ./packages/ai/node_modules
+COPY --from=builder /app/packages/scripts/node_modules ./packages/scripts/node_modules
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/pnpm-workspace.yaml ./
 

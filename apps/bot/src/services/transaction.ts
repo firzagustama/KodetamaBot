@@ -2,7 +2,7 @@ import { db } from "@kodetama/db";
 import { transactions, categories, aiUsage, budgets } from "@kodetama/db/schema";
 import { eq, and, desc, sql, ilike } from "drizzle-orm";
 import type { TargetContext, TxType } from "@kodetama/shared";
-import { UpsertTransactionParams } from "@kodetama/ai";
+import { UpsertTransactionParams, AIOrchestrator } from "@kodetama/ai";
 import { getBudgetSummary } from "./budget.js";
 
 interface Transaction {
@@ -22,6 +22,18 @@ export interface SaveTransactionData {
     transaction: Transaction;
     rawMessage?: string;
     groupId?: string;
+}
+
+let aiOrchestrator: AIOrchestrator | null = null;
+
+function getAI(): AIOrchestrator {
+    if (!aiOrchestrator) {
+        aiOrchestrator = new AIOrchestrator({
+            apiKey: process.env.OPENROUTER_API_KEY ?? "",
+            model: process.env.OPENROUTER_MODEL,
+        });
+    }
+    return aiOrchestrator;
 }
 
 /**
@@ -89,6 +101,17 @@ export async function saveTransaction(data: SaveTransactionData): Promise<string
         }
     }
 
+    let embedding: number[] | null = null;
+    try {
+        if (data.transaction.description) {
+            const ai = getAI();
+            const { result } = await ai.generateEmbedding(data.transaction.description);
+            embedding = result;
+        }
+    } catch (error) {
+        console.error("Failed to generate embedding:", error);
+    }
+
     const [tx] = await db.insert(transactions).values({
         userId: data.userId,
         periodId: data.periodId,
@@ -100,6 +123,7 @@ export async function saveTransaction(data: SaveTransactionData): Promise<string
         bucket: data.transaction.bucket,
         rawMessage: data.rawMessage,
         aiConfidence: data.transaction.aiConfidence?.toString(),
+        embedding: embedding,
     }).returning({ id: transactions.id });
 
     return tx.id;
@@ -287,6 +311,20 @@ export async function upsertTransaction(
     const updates = dataArray.filter(d => d.transactionId);
     const inserts = dataArray.filter(d => !d.transactionId);
 
+    // Generate embeddings for all items (parallel)
+    const ai = getAI();
+    const embeddingMap = new Map<string, number[]>(); // description -> embedding
+
+    const allDescriptions = [...new Set(dataArray.map(d => d.description).filter(Boolean))];
+    await Promise.all(allDescriptions.map(async (desc) => {
+        try {
+            const { result } = await ai.generateEmbedding(desc);
+            embeddingMap.set(desc, result);
+        } catch (e) {
+            console.error(`Failed to generate embedding for "${desc}":`, e);
+        }
+    }));
+
     const resultIds: string[] = [];
 
     // 4. USE DB TRANSACTION (all or nothing)
@@ -304,6 +342,7 @@ export async function upsertTransaction(
                         categoryId: categoryMap.get(data.category)!,
                         bucket: data.bucket,
                         aiConfidence: data.confidence.toString(),
+                        embedding: embeddingMap.get(data.description) ?? null,
                     })
                     .where(eq(transactions.id, data.transactionId!));
 
@@ -324,6 +363,7 @@ export async function upsertTransaction(
                 categoryId: categoryMap.get(data.category)!,
                 bucket: data.bucket,
                 aiConfidence: data.confidence.toString(),
+                embedding: embeddingMap.get(data.description) ?? null,
             }));
 
             const inserted = await tx.insert(transactions)

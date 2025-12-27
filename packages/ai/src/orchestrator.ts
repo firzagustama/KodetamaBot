@@ -18,6 +18,7 @@ import {
 export interface AIConfig {
     apiKey: string;
     model?: string;
+    embeddingModel?: string;
     baseURL?: string;
 }
 
@@ -178,6 +179,7 @@ async function* getMockStreamResponse(userMessage: string): AsyncGenerator<strin
 export class AIOrchestrator {
     private client: OpenAI | undefined;
     private model: string;
+    private embeddingModel: string;
     private isDevMode: boolean;
 
     constructor(config: AIConfig) {
@@ -194,6 +196,7 @@ export class AIOrchestrator {
             });
         }
         this.model = config.model ?? "openai/gpt-4-turbo";
+        this.embeddingModel = config.embeddingModel ?? "text-embedding-3-small";
     }
 
     /**
@@ -363,6 +366,39 @@ export class AIOrchestrator {
                 inputTokens: response.usage?.prompt_tokens ?? 0,
                 outputTokens: response.usage?.completion_tokens ?? 0,
                 model: this.model,
+            },
+        };
+    }
+
+    /**
+     * Generate an embedding for a given text
+     */
+    async generateEmbedding(
+        text: string
+    ): Promise<{ result: number[]; usage: UsageStats }> {
+        if (this.isDevMode) {
+            // Return a random vector of size 1536
+            return {
+                result: Array.from({ length: 1536 }, () => Math.random()),
+                usage: { inputTokens: 10, outputTokens: 0, model: "dev-mock" }
+            };
+        }
+
+        if (!this.client) {
+            throw new Error("OpenAI client not initialized");
+        }
+
+        const response = await this.client.embeddings.create({
+            model: this.embeddingModel,
+            input: text,
+        });
+
+        return {
+            result: response.data[0].embedding,
+            usage: {
+                inputTokens: response.usage.prompt_tokens,
+                outputTokens: 0,
+                model: this.embeddingModel,
             },
         };
     }

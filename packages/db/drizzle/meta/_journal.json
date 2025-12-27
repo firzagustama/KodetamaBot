@@ -57,6 +57,13 @@
       "when": 1766203650526,
       "tag": "0007_amazing_proteus",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1766826510829,
+      "tag": "0008_black_the_phantom",
+      "breakpoints": true
     }
   ]
 }

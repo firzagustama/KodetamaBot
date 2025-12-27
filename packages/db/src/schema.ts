@@ -11,8 +11,25 @@ import {
     jsonb,
     bigint,
     index,
+    customType,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+
+const vector = customType<{ data: number[] }>({
+    dataType() {
+        return "vector(1536)";
+    },
+    toDriver(value: number[]) {
+        return JSON.stringify(value);
+    },
+    fromDriver(value: unknown) {
+        if (typeof value !== "string") return [];
+        return value
+            .slice(1, -1)
+            .split(",")
+            .map((v) => parseFloat(v));
+    },
+});
 
 // =============================================================================
 // ENUMS
@@ -109,9 +126,12 @@ export const buckets = pgTable("buckets", {
     icon: varchar("icon", { length: 50 }).default("Wallet"),
     category: varchar("category", { length: 50 }), // needs, wants, savings
     isSystem: boolean("is_system").notNull().default(false),
+    embedding: vector("embedding"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-})
+}, (table) => ({
+    embeddingIdx: index("buckets_embedding_idx").using("hnsw", table.embedding.op("vector_cosine_ops")),
+}))
 
 // =============================================================================
 // CATEGORIES
@@ -147,10 +167,12 @@ export const transactions = pgTable("transactions", {
     fileId: uuid("file_id").references(() => files.id),
     voiceTranscriptId: uuid("voice_transcript_id").references(() => voiceTranscripts.id),
     transactionDate: timestamp("transaction_date", { withTimezone: true }).notNull().defaultNow(),
+    embedding: vector("embedding"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
     userPeriodIdx: index("transactions_user_period_idx").on(table.userId, table.periodId),
     groupPeriodIdx: index("transactions_group_period_idx").on(table.groupId, table.periodId),
+    embeddingIdx: index("transactions_embedding_idx").using("hnsw", table.embedding.op("vector_cosine_ops")),
 }));
 
 // =============================================================================
