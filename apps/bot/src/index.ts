@@ -17,6 +17,7 @@ import { StartCommand, HelpCommand, BudgetCommand, DashboardCommand, JoinFamilyC
 import { handleAdminCallback } from "./handlers/admin.js";
 import { TransactionCallbackHandler } from "./handlers/callbacks/index.js";
 import { handleTransaction } from "./handlers/transaction.js";
+import { Scheduler } from "./utils/Scheduler.js";
 
 
 
@@ -174,6 +175,10 @@ async function main() {
         });
 
         await runner.run();
+
+        // Init scheduler
+        const scheduler = new Scheduler();
+        scheduler.init();
     } catch (error) {
         console.error("Failed to start bot:", error);
         process.exit(1);

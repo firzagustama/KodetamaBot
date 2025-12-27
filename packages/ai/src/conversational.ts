@@ -142,7 +142,7 @@ export class ConversationAI {
         console.log(messages);
         const contextKey = getTargetContextKey(target.targetId);
         const filtered = messages.filter((message) => message.role !== "system");
-        await redisManager.set(contextKey, JSON.stringify(filtered));
+        await redisManager.set(contextKey, JSON.stringify(filtered), this.CONTEXT_TTL);
 
         if (filtered.length > this.CONTEXT_LIMIT) {
             this.createSummary(target, JSON.stringify(filtered));
@@ -210,6 +210,19 @@ export class ConversationAI {
         await db.update(contextSummary).set({
             summary: newSummary,
         }).where(eq(contextSummary.targetId, target.targetId));
+    }
+
+    async createSummaryFromCache(targetId: string) {
+        const messages = await redisManager.get(getTargetContextKey(targetId));
+        if (!messages) {
+            return;
+        }
+        await this.createSummary({
+            isGroup: false,
+            targetId: targetId,
+            userId: ""
+        }, messages);
+        await redisManager.del(getTargetContextKey(targetId));
     }
 
     private async getContext(target: TargetContext, period: Period): Promise<string> {

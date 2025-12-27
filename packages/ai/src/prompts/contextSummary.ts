@@ -3,7 +3,7 @@ export const CONTEXT_SUMMARY_USER_PROMPT = (oldSummary: string, recentConversati
 Rules:
 - Max 5 sentences
 - No numbers or totals
-- Describe user intent and habits
+- Describe user intent, habits, and preferences
 - Use tentative language
 - Do not include raw transactions
 
