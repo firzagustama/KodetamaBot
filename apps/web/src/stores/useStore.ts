@@ -71,15 +71,6 @@ interface Summary {
     };
 }
 
-interface GoogleSheet {
-    spreadsheetUrl: string;
-    lastSyncAt?: string;
-}
-
-interface GoogleFolder {
-    folderUrl: string;
-}
-
 interface State {
     // Auth
     token: string | null;
@@ -93,8 +84,6 @@ interface State {
     currentPage: number;
     totalTransactions: number;
     summary: Summary | null;
-    googleSheet: GoogleSheet | null;
-    googleFolder: GoogleFolder | null;
     loading: boolean;
     fetchingMore: boolean;
     error: string | null;
@@ -107,7 +96,6 @@ interface State {
     fetchTransactions: () => Promise<void>;
     fetchMoreTransactions: () => Promise<void>;
     fetchSummary: () => Promise<void>;
-    fetchGoogleData: () => Promise<void>;
     updateBudget: (data: Partial<UpdateBudget>) => Promise<void>;
     reset: () => void;
     generateBucketDescription: (category: string, context?: string) => Promise<string | null>;
@@ -123,8 +111,6 @@ export const useStore = create<State>((set, get) => ({
     currentPage: 1,
     totalTransactions: 0,
     summary: null,
-    googleSheet: null,
-    googleFolder: null,
     loading: false,
     fetchingMore: false,
     error: null,
@@ -278,29 +264,6 @@ export const useStore = create<State>((set, get) => ({
         }
     },
 
-    fetchGoogleData: async () => {
-        const { token, on401Handler, on403Handler } = get();
-
-        try {
-            const [sheetRes, folderRes] = await Promise.all([
-                authFetch(`/google/sheets/current`, token, {}, on401Handler || undefined, on403Handler || undefined),
-                authFetch(`/google/drive/folder`, token, {}, on401Handler || undefined, on403Handler || undefined),
-            ]);
-
-            if (sheetRes.ok) {
-                const sheetData = await sheetRes.json();
-                set({ googleSheet: sheetData });
-            }
-
-            if (folderRes.ok) {
-                const folderData = await folderRes.json();
-                set({ googleFolder: folderData });
-            }
-        } catch {
-            // Google not connected yet, ignore
-        }
-    },
-
     updateBudget: async (data) => {
         const { budget, token, on401Handler, on403Handler, fetchBudget } = get();
         if (!budget) return;
@@ -331,8 +294,6 @@ export const useStore = create<State>((set, get) => ({
             currentPage: 1,
             totalTransactions: 0,
             summary: null,
-            googleSheet: null,
-            googleFolder: null,
             loading: false,
             fetchingMore: false,
             error: null,

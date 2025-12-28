@@ -4,7 +4,6 @@ import { useKeyboardOpen } from "./hooks/useKeyboardOpen";
 import Dashboard from "./components/Dashboard";
 import BudgetManager from "./components/BudgetManager";
 import TransactionList from "./components/TransactionList";
-import GoogleIntegration from "./components/GoogleIntegration";
 import { useEffect, useState, useRef } from "react";
 import { StartBotInfo } from "./components/StartBotInfo";
 import { NavButton } from "./components/NavButton";
@@ -17,7 +16,7 @@ import {
     useSignal,
 } from "@tma.js/sdk-react";
 
-type Tab = "dashboard" | "budget" | "transactions" | "google";
+type Tab = "dashboard" | "budget" | "transactions";
 
 const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME;
 
@@ -175,7 +174,6 @@ function App() {
                 {activeTab === "dashboard" && <Dashboard />}
                 {activeTab === "budget" && <BudgetManager />}
                 {activeTab === "transactions" && <TransactionList />}
-                {activeTab === "google" && <GoogleIntegration />}
             </main>
 
             {/* Bottom Navigation - Fixed at bottom */}
@@ -198,12 +196,6 @@ function App() {
                         label="Transaksi"
                         active={activeTab === "transactions"}
                         onClick={() => setActiveTab("transactions")}
-                    />
-                    <NavButton
-                        icon="Google"
-                        label="Google"
-                        active={activeTab === "google"}
-                        onClick={() => setActiveTab("google")}
                     />
                 </div>
             )}

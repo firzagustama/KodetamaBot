@@ -187,8 +187,6 @@ export const files = pgTable("files", {
     fileType: varchar("file_type", { length: 50 }).notNull(),
     fileSize: integer("file_size").notNull(),
     telegramFileId: varchar("telegram_file_id", { length: 255 }),
-    googleDriveId: varchar("google_drive_id", { length: 255 }),
-    googleDriveUrl: text("google_drive_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -239,42 +237,6 @@ export const pendingRegistrations = pgTable("pending_registrations", {
 });
 
 // =============================================================================
-// GOOGLE INTEGRATION
-// =============================================================================
-
-export const googleTokens = pgTable("google_tokens", {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
-    accessToken: text("access_token").notNull(),
-    refreshToken: text("refresh_token"),
-    expiresAt: timestamp("expires_at", { withTimezone: true }),
-    scope: text("scope"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-export const googleSheets = pgTable("google_sheets", {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
-    groupId: uuid("group_id").references(() => groups.id, { onDelete: "cascade" }),
-    periodId: uuid("period_id").notNull().references(() => datePeriods.id),
-    spreadsheetId: varchar("spreadsheet_id", { length: 255 }).notNull(),
-    spreadsheetUrl: text("spreadsheet_url").notNull(),
-    lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-export const googleDriveFolders = pgTable("google_drive_folders", {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
-    groupId: uuid("group_id").references(() => groups.id, { onDelete: "cascade" }),
-    periodId: uuid("period_id").notNull().references(() => datePeriods.id),
-    folderId: varchar("folder_id", { length: 255 }).notNull(),
-    folderUrl: text("folder_url").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-// =============================================================================
 // AI CONTEXT HISTORY CONVERSATION
 // =============================================================================
 export const contextSummary = pgTable("context_summary", {
@@ -299,10 +261,6 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     files: many(files),
     voiceTranscripts: many(voiceTranscripts),
     aiUsage: many(aiUsage),
-    googleToken: one(googleTokens, {
-        fields: [users.id],
-        references: [googleTokens.userId],
-    }),
 }));
 
 export const telegramAccountsRelations = relations(telegramAccounts, ({ one }) => ({
