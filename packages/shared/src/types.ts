@@ -73,6 +73,7 @@ export const TransactionSchema = z.object({
     bucket: z.string().nullable(),
     rawMessage: z.string().nullable(),
     aiConfidence: z.string().nullable(), // decimal string from DB
+    fileId: z.string().uuid().nullable().optional(),
     transactionDate: z.date(),
     createdAt: z.date(),
 });

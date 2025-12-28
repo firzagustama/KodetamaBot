@@ -6,7 +6,7 @@ export class ExcelService {
     /**
      * Generate a financial report Excel workbook
      */
-    async generateFinancialReportv2(period: Period, transactions: TransactionWithCategory[]): Promise<Buffer> {
+    async generateFinancialReportv2(period: Period, transactions: TransactionWithCategory[], apiBaseUrl?: string): Promise<Buffer> {
         const workbook = new ExcelJS.Workbook();
         workbook.creator = "KodetamaBot";
         workbook.lastModifiedBy = "KodetamaBot";
@@ -132,7 +132,7 @@ export class ExcelService {
         const txSheet = workbook.addWorksheet("Transactions");
 
         // Header
-        txSheet.addRow(["Date", "Type", "Amount", "Category", "Bucket", "Description"]);
+        txSheet.addRow(["Date", "Type", "Amount", "Category", "Bucket", "Description", "Invoice"]);
         const txHeaderRow = txSheet.getRow(1);
         txHeaderRow.font = headerFont;
         txHeaderRow.eachCell((cell) => {
@@ -151,14 +151,27 @@ export class ExcelService {
         });
 
         for (const tx of transactions) {
-            const row = txSheet.addRow([
+            const rowData = [
                 tx.transactionDate,
                 tx.type,
                 parseFloat(tx.amount),
                 tx.category?.name || "N/A",
                 tx.bucket || "N/A",
                 tx.description || ""
-            ]);
+            ];
+
+            const row = txSheet.addRow(rowData);
+
+            // Add Invoice Link if fileId and apiBaseUrl are present
+            if (tx.fileId && apiBaseUrl) {
+                const link = `${apiBaseUrl}/files/${tx.fileId}`;
+                row.getCell(7).value = {
+                    text: "View Invoice",
+                    hyperlink: link,
+                    tooltip: "Click to view invoice"
+                };
+                row.getCell(7).font = { color: { argb: "FF0000FF" }, underline: true };
+            }
 
             // Alternating row colors
             if (row.number % 2 === 0) {
@@ -186,6 +199,7 @@ export class ExcelService {
             column.width = 20;
             if (i === 0) column.width = 15;
             if (i === 5) column.width = 40;
+            if (i === 6) column.width = 15;
         });
 
         // Generate Buffer

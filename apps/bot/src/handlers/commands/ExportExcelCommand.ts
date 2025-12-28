@@ -24,7 +24,8 @@ export class ExportExcelCommand extends CommandHandler {
             const transactions = await getAllTransactions(target, period.id);
 
             const excelService = new ExcelService();
-            const buffer = await excelService.generateFinancialReportv2(period as any, transactions as any);
+            const apiBaseUrl = process.env.VITE_API_URL || process.env.WEB_APP_URL + "/api";
+            const buffer = await excelService.generateFinancialReportv2(period as any, transactions as any, apiBaseUrl);
 
             const timestamp = new Date().toISOString().split('T')[0].replace(/-/g, '');
             const fileName = `Finance_Report_${period.name.replace(/\s+/g, "_")}_${timestamp}.xlsx`;

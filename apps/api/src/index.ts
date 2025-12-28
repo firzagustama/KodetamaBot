@@ -9,6 +9,7 @@ import { authRoutes } from "./routes/auth.js";
 import { userRoutes } from "./routes/users.js";
 import { budgetRoutes } from "./routes/budgets.js";
 import { transactionRoutes } from "./routes/transactions.js";
+import { filesRoutes } from "./routes/files.js";
 import { loggingMiddleware } from "./middleware/loggingMiddleware.js";
 
 // =============================================================================
@@ -59,6 +60,8 @@ await fastify.register(authRoutes, { prefix: "/api/auth" });
 await fastify.register(userRoutes, { prefix: "/api/users" });
 await fastify.register(budgetRoutes, { prefix: "/api/budgets" });
 await fastify.register(transactionRoutes, { prefix: "/api/transactions" });
+await fastify.register(filesRoutes, { prefix: "/api/files" });
+
 // Health check
 fastify.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
