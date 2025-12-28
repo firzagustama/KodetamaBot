@@ -6,8 +6,10 @@ import {
     Settings,
     Receipt,
     Calendar,
-    Tag
+    Tag,
+    Loader2
 } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 // --- Helpers ---
 function formatRupiah(amount: number): string {
@@ -41,15 +43,43 @@ function formatDate(dateStr: string): string {
 }
 
 function getDateKey(dateStr: string): string {
-    return new Date(dateStr).toISOString().split('T')[0];
+    const date = new Date(dateStr);
+    // Use local date components to create a YYYY-MM-DD key in local time
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 // --- Component ---
 export default function TransactionList() {
-    const { transactions } = useStore();
+    const { transactions, hasMore, fetchMoreTransactions, fetchingMore, totalTransactions } = useStore();
+    const observerTarget = useRef<HTMLDivElement>(null);
+
+    // Infinite Scroll Observer
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && hasMore && !fetchingMore) {
+                    fetchMoreTransactions();
+                }
+            },
+            { threshold: 1.0 }
+        );
+
+        if (observerTarget.current) {
+            observer.observe(observerTarget.current);
+        }
+
+        return () => {
+            if (observerTarget.current) {
+                observer.unobserve(observerTarget.current);
+            }
+        };
+    }, [hasMore, fetchingMore, fetchMoreTransactions]);
 
     // 1. Empty State
-    if (transactions.length === 0) {
+    if (transactions.length === 0 && !fetchingMore) {
         return (
             <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-4 animate-fade-in">
                 <div className="w-20 h-20 bg-base-200 rounded-full flex items-center justify-center">
@@ -85,7 +115,7 @@ export default function TransactionList() {
                 <div>
                     <h2 className="text-lg font-bold">Riwayat Transaksi</h2>
                     <p className="text-xs text-base-content/60">
-                        Total {transactions.length} aktivitas tercatat
+                        Total {totalTransactions} aktivitas tercatat
                     </p>
                 </div>
             </div>
@@ -94,8 +124,6 @@ export default function TransactionList() {
             <div className="space-y-5">
                 {sortedDates.map((dateKey) => {
                     const dayTransactions = transactionsByDate[dateKey];
-                    // Sort within day: newest first (assuming ID correlates with time or you have a timestamp)
-                    // dayTransactions.sort((a, b) => b.id - a.id); 
 
                     const totalDayAmount = dayTransactions.reduce((sum, tx) =>
                         sum + (tx.type === "income" ? tx.amount : -tx.amount), 0
@@ -112,8 +140,8 @@ export default function TransactionList() {
                                     </h3>
                                 </div>
                                 <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${totalDayAmount >= 0
-                                        ? "bg-success/10 text-success"
-                                        : "bg-base-200 text-base-content/60"
+                                    ? "bg-success/10 text-success"
+                                    : "bg-base-200 text-base-content/60"
                                     }`}>
                                     {totalDayAmount >= 0 ? "+" : ""}
                                     {formatRupiah(Math.abs(totalDayAmount))}
@@ -129,6 +157,21 @@ export default function TransactionList() {
                         </div>
                     );
                 })}
+            </div>
+
+            {/* Loading / Observer Target */}
+            <div ref={observerTarget} className="flex justify-center py-4">
+                {fetchingMore && (
+                    <div className="flex items-center gap-2 text-sm text-base-content/50">
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Memuat lebih banyak...</span>
+                    </div>
+                )}
+                {!hasMore && transactions.length > 0 && (
+                    <p className="text-xs text-base-content/30 italic">
+                        Semua transaksi telah dimuat
+                    </p>
+                )}
             </div>
         </div>
     );

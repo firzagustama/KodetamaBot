@@ -179,6 +179,7 @@ export async function toolCalls(
             }
 
         } catch (error: any) {
+            console.log(error.stack);
             results.push({
                 role: "tool",
                 tool_call_id: id,

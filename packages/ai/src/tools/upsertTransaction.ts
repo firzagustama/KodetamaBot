@@ -3,6 +3,7 @@ import { ChatCompletionTool } from "openai/resources.mjs";
 
 export interface UpsertTransactionParams {
     transactionId?: string;
+    fileId?: string;
     type: "income" | "expense" | "transfer" | "adjustment";
     amount: number;
     category: string;
@@ -25,7 +26,8 @@ export const upsertTransactionTool: ChatCompletionTool = {
                     items: {
                         type: "object",
                         properties: {
-                            transactionId: { type: "string", description: "MANDATORY if updating existing transaction" },
+                            transactionId: { type: "string", description: "MANDATORY if updating existing transaction (optional)" },
+                            fileId: { type: "string", description: "File ID associated with the transaction (optional)" },
                             type: { type: "string", enum: TX_TYPES },
                             amount: { type: "number", description: "IDR" },
                             category: { type: "string", description: "Indonesian category such as Makanan, Transportasi, Belanja, Kesehatan, etc" },

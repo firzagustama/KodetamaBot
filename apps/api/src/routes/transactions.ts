@@ -57,7 +57,7 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
 
     /**
      * GET /transactions
-     * List transactions for current period, grouped by day
+     * List transactions for current period
      */
     fastify.get<{
         Querystring: {
@@ -85,22 +85,7 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
         }
 
         try {
-            // Get period information first
-            const period = await db.query.datePeriods.findFirst({
-                where: eq(datePeriods.id, periodId),
-            });
-
-            if (!period) {
-                return {
-                    days: [],
-                    total: 0,
-                    page: pageNum,
-                    pageSize: pageSizeNum,
-                    hasMore: false,
-                };
-            }
-
-            // Get all transactions for the period to group by day
+            // Get all transactions for the period
             const allTransactions = await db.query.transactions.findMany({
                 where: eq(transactions.periodId, periodId),
                 orderBy: [desc(transactions.transactionDate)],
@@ -109,67 +94,19 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
                 },
             });
 
-            // Group transactions by date
-            const transactionsByDate: Record<string, any[]> = {};
-            for (const tx of allTransactions) {
-                const dateStr = getDateKey(tx.transactionDate);
-                if (!transactionsByDate[dateStr]) {
-                    transactionsByDate[dateStr] = [];
-                }
-                transactionsByDate[dateStr].push({
-                    id: tx.id,
-                    type: tx.type,
-                    amount: tx.amount,
-                    category: tx.category?.name ?? "Uncategorized",
-                    bucket: tx.bucket,
-                    description: tx.description,
-                    transactionDate: tx.transactionDate.toISOString(),
-                });
-            }
-
-            // Generate all dates in the period range (for empty days)
-            const startDate = new Date(period.startDate);
-            const endDate = new Date(period.endDate);
-            const allDatesInPeriod: string[] = [];
-            const currentDay = new Date(startDate);
-
-            while (currentDay <= endDate) {
-                allDatesInPeriod.push(getDateKey(currentDay));
-                currentDay.setDate(currentDay.getDate() + 1);
-            }
-
-            // Create paginated list of transactions (flatten for pagination)
-            const allTxs = allTransactions.slice(offset, offset + pageSizeNum);
-
-            // Group the transactions by day (only include days that have transactions in this page)
-            const daysMap: Record<string, any[]> = {};
-            for (const tx of allTxs) {
-                const dateStr = getDateKey(tx.transactionDate);
-                if (!daysMap[dateStr]) {
-                    daysMap[dateStr] = [];
-                }
-                daysMap[dateStr].push({
-                    id: tx.id,
-                    type: tx.type,
-                    amount: tx.amount,
-                    category: tx.category?.name ?? "Uncategorized",
-                    bucket: tx.bucket,
-                    description: tx.description,
-                    transactionDate: tx.transactionDate.toISOString(),
-                });
-            }
-
-            // Create final days array (only days that appear in this page)
-            const days = Object.entries(daysMap)
-                .sort(([a], [b]) => b.localeCompare(a)) // Sort by date desc
-                .map(([dateStr, dayTransactions]) => ({
-                    date: dateStr,
-                    formattedDate: formatIndonesianDate(new Date(dateStr)),
-                    transactions: dayTransactions,
-                }));
+            // Map and paginate transactions
+            const transactionsData = allTransactions.slice(offset, offset + pageSizeNum).map(tx => ({
+                id: tx.id,
+                type: tx.type,
+                amount: tx.amount,
+                category: tx.category?.name ?? "Uncategorized",
+                bucket: tx.bucket,
+                description: tx.description,
+                transactionDate: tx.transactionDate.toISOString(),
+            }));
 
             return {
-                days,
+                transactions: transactionsData,
                 total: allTransactions.length,
                 page: pageNum,
                 pageSize: pageSizeNum,
@@ -183,7 +120,7 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
                 error: err instanceof Error ? err.message : 'Unknown database error'
             });
             return {
-                days: [],
+                transactions: [],
                 total: 0,
                 page: pageNum,
                 pageSize: pageSizeNum,
@@ -371,6 +308,9 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
             const amount = parseFloat(tx.amount);
             if (tx.type === "income") {
                 totalIncome += amount;
+                if (tx.bucket) {
+                    bucketSpending[tx.bucket.toLowerCase()] = (bucketSpending[tx.bucket.toLowerCase()] ?? 0) - amount;
+                }
             } else if (tx.type === "expense") {
                 totalExpenses += amount;
                 if (tx.bucket) {

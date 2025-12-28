@@ -53,7 +53,8 @@ export interface SessionData {
     registrationData: RegistrationData | null;
     onboardingData: OnboardingData | null;
     lastTransactionIds: string[];
-    pendingTransactions: TransactionData | null
+    pendingTransactions: TransactionData | null;
+    pendingFileId?: string;
 }
 
 // =============================================================================

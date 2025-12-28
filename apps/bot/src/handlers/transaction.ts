@@ -3,6 +3,9 @@ import { ConversationAI } from "@kodetama/ai";
 import { getTargetCurrentPeriod } from "../services/period.js";
 import { getTargetContext } from "../core/targetContext.js";
 import { toolCalls } from "./tools/index.js";
+import { InlineKeyboard } from "grammy";
+import { saveFileMetadata } from "../services/file.js";
+import { getUserByTelegramId } from "../services/user.js";
 
 // Initialize shared instances
 let conversationAI: ConversationAI | null = null;
@@ -25,12 +28,29 @@ function getConversationAI(): ConversationAI {
  */
 export async function handleTransaction(ctx: BotContext): Promise<void> {
     const isCallback = ctx.callbackQuery !== undefined;
+    const callbackData = ctx.callbackQuery?.data;
+
+    // Handle group confirmation callbacks
+    if (isCallback && callbackData?.startsWith("log_invoice_")) {
+        const action = callbackData.split("_")[2];
+        if (action === "no") {
+            await ctx.answerCallbackQuery("Oke, dibatalkan.");
+            await ctx.editMessageText("Invoice tidak dicatat.");
+            return;
+        }
+        // If "yes", we continue with processing the image
+        if (!ctx.session.pendingFileId) {
+            await ctx.answerCallbackQuery("Waduh, filenya udah ilang. Coba upload lagi ya.");
+            return;
+        }
+        await ctx.answerCallbackQuery("Siapp, diproses ya...");
+        await ctx.editMessageText("Memproses invoice...");
+    }
 
     await ctx.replyWithChatAction("typing");
-    const message = isCallback ? ctx.callbackQuery!.data!.split("_")[1] : ctx.message?.text;
-    const user = ctx.from;
 
-    if (!message || !user) return;
+    const user = ctx.from;
+    if (!user) return;
 
     const target = await getTargetContext(ctx);
     const period = await getTargetCurrentPeriod(target);
@@ -41,9 +61,89 @@ export async function handleTransaction(ctx: BotContext): Promise<void> {
         return;
     }
 
+    // Check tier for image processing
+    const account = await getUserByTelegramId(user.id);
+    const tier = account?.user?.tier || "standard";
+
+    const isPhoto = ctx.message?.photo !== undefined;
+    const isDocument = ctx.message?.document !== undefined;
+
+    if ((isPhoto || isDocument) && tier === "standard") {
+        await ctx.reply("Fitur upload invoice cuma buat tier Pro atau Family nih. Upgrade dulu gih! 🚀");
+        return;
+    }
+
+    // Group confirmation flow
+    if ((isPhoto || isDocument) && target.isGroup && !isCallback) {
+        const fileId = ctx.message?.photo ? ctx.message.photo[ctx.message.photo.length - 1].file_id : ctx.message?.document?.file_id;
+        if (fileId) {
+            ctx.session.pendingFileId = fileId;
+            const keyboard = new InlineKeyboard()
+                .text("Ya, Catat", "log_invoice_yes")
+                .text("Gak usah", "log_invoice_no");
+            await ctx.reply("Wih ada invoice. Mau dicatat sekalian?", { reply_markup: keyboard });
+            return;
+        }
+    }
+
+    // Get message content or image
+    let message = isCallback ? ctx.callbackQuery!.data!.split("_")[1] : ctx.message?.text;
+    let imageBase64: string | undefined;
+    let fileId: string | undefined;
+
+    if (isPhoto || isDocument || (isCallback && callbackData === "log_invoice_yes")) {
+        const telegramFileId = ctx.session.pendingFileId || (ctx.message?.photo ? ctx.message?.photo[ctx.message?.photo.length - 1].file_id : ctx.message?.document?.file_id);
+        if (telegramFileId) {
+            try {
+                const file = await ctx.api.getFile(telegramFileId);
+                const url = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
+
+                // Download and convert to base64
+                const response = await fetch(url);
+                const buffer = await response.arrayBuffer();
+                imageBase64 = Buffer.from(buffer).toString("base64");
+
+                // Save metadata
+                fileId = await saveFileMetadata({
+                    userId: target.userId,
+                    periodId: period.id,
+                    fileName: ctx.message?.document?.file_name || `photo_${Date.now()}.jpg`,
+                    fileType: ctx.message?.document?.mime_type || "image/jpeg",
+                    fileSize: file.file_size || 0,
+                    telegramFileId: telegramFileId,
+                });
+
+                ctx.session.pendingFileId = undefined; // Clear after use
+                message = "Tolong catat transaksi dari invoice ini.";
+            } catch (error) {
+                console.error("Error processing file:", error);
+                await ctx.reply("Waduh, gagal proses filenya. Coba lagi deh.");
+                return;
+            }
+        }
+    }
+
+    if (!message && !imageBase64) return;
+
     const ai = getConversationAI();
     let messages = await ai.buildPrompt(target, period);
-    messages.push({ role: "user", content: message });
+
+    if (imageBase64) {
+        messages.push({
+            role: "user",
+            content: [
+                { type: "text", text: message || "Catat transaksi ini" },
+                {
+                    type: "image_url",
+                    image_url: {
+                        url: `data:image/jpeg;base64,${imageBase64}`,
+                    },
+                },
+            ],
+        } as any);
+    } else {
+        messages.push({ role: "user", content: message! });
+    }
 
     const MAX_ITERATIONS = 5;
     let iteration = 0;
@@ -64,6 +164,19 @@ export async function handleTransaction(ctx: BotContext): Promise<void> {
 
             // Handle tool calls
             if (response.tool_calls && response.tool_calls.length > 0) {
+                // Inject fileId into upsertTransaction arguments if available
+                if (fileId) {
+                    for (const toolCall of response.tool_calls) {
+                        if (toolCall.function.name === "upsertTransaction") {
+                            const args = JSON.parse(toolCall.function.arguments);
+                            if (args.input && Array.isArray(args.input)) {
+                                args.input = args.input.map((item: any) => ({ ...item, fileId }));
+                                toolCall.function.arguments = JSON.stringify(args);
+                            }
+                        }
+                    }
+                }
+
                 const toolResults = await toolCalls(
                     response.tool_calls,
                     target,

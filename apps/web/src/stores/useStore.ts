@@ -89,10 +89,14 @@ interface State {
     // Data
     budget: Budget | null;
     transactions: Transaction[];
+    hasMore: boolean;
+    currentPage: number;
+    totalTransactions: number;
     summary: Summary | null;
     googleSheet: GoogleSheet | null;
     googleFolder: GoogleFolder | null;
     loading: boolean;
+    fetchingMore: boolean;
     error: string | null;
 
     // Actions
@@ -101,6 +105,7 @@ interface State {
     setOn403Handler: (handler: () => Promise<void>) => void;
     fetchBudget: () => Promise<void>;
     fetchTransactions: () => Promise<void>;
+    fetchMoreTransactions: () => Promise<void>;
     fetchSummary: () => Promise<void>;
     fetchGoogleData: () => Promise<void>;
     updateBudget: (data: Partial<UpdateBudget>) => Promise<void>;
@@ -114,10 +119,14 @@ export const useStore = create<State>((set, get) => ({
     on403Handler: null,
     budget: null,
     transactions: [],
+    hasMore: false,
+    currentPage: 1,
+    totalTransactions: 0,
     summary: null,
     googleSheet: null,
     googleFolder: null,
     loading: false,
+    fetchingMore: false,
     error: null,
 
     setToken: (token) => set({ token }),
@@ -167,14 +176,13 @@ export const useStore = create<State>((set, get) => ({
 
     fetchTransactions: async () => {
         const { token, budget, on401Handler, on403Handler } = get();
-        set({ loading: true, error: null });
+        set({ loading: true, error: null, currentPage: 1 });
 
         try {
-            // Need periodId from budget to fetch transactions
             const periodId = budget?.period?.id;
             const url = periodId
-                ? `/transactions?periodId=${periodId}`
-                : `/transactions`;
+                ? `/transactions?periodId=${periodId}&page=1&pageSize=20`
+                : `/transactions?page=1&pageSize=20`;
 
             const res = await authFetch(url, token, {}, on401Handler || undefined, on403Handler || undefined);
 
@@ -187,35 +195,63 @@ export const useStore = create<State>((set, get) => ({
 
             const data = await res.json();
 
-            // New format: flatten transactions from days
-            const allTransactions: Transaction[] = [];
-            if (data.days) {
-                for (const day of data.days) {
-                    for (const tx of day.transactions) {
-                        allTransactions.push({
-                            ...tx,
-                            amount: parseFloat(tx.amount),
-                        });
-                    }
-                }
-            }
-
-            // Backward compatibility: also check for old items format
-            if (data.items) {
-                allTransactions.push(...data.items.map((t: Record<string, unknown>) => ({
-                    ...t,
-                    amount: parseFloat(t.amount as string),
-                })));
-            }
+            // The API now returns { transactions, total, page, pageSize, hasMore }
+            const mappedTransactions: Transaction[] = (data.transactions || []).map((tx: any) => ({
+                ...tx,
+                amount: parseFloat(tx.amount),
+            }));
 
             set({
-                transactions: allTransactions,
+                transactions: mappedTransactions,
+                totalTransactions: data.total || 0,
+                hasMore: data.hasMore || false,
+                currentPage: 1,
                 loading: false,
             });
         } catch (err) {
             set({
                 error: err instanceof Error ? err.message : "Failed to fetch transactions",
                 loading: false,
+            });
+        }
+    },
+
+    fetchMoreTransactions: async () => {
+        const { token, budget, on401Handler, on403Handler, currentPage, hasMore, transactions, fetchingMore } = get();
+        if (!hasMore || fetchingMore) return;
+
+        set({ fetchingMore: true });
+
+        try {
+            const nextPage = currentPage + 1;
+            const periodId = budget?.period?.id;
+            const url = periodId
+                ? `/transactions?periodId=${periodId}&page=${nextPage}&pageSize=20`
+                : `/transactions?page=${nextPage}&pageSize=20`;
+
+            const res = await authFetch(url, token, {}, on401Handler || undefined, on403Handler || undefined);
+
+            if (!res.ok) {
+                throw new Error("Failed to fetch more transactions");
+            }
+
+            const data = await res.json();
+
+            const newTransactions: Transaction[] = (data.transactions || []).map((tx: any) => ({
+                ...tx,
+                amount: parseFloat(tx.amount),
+            }));
+
+            set({
+                transactions: [...transactions, ...newTransactions],
+                currentPage: nextPage,
+                hasMore: data.hasMore || false,
+                fetchingMore: false,
+            });
+        } catch (err) {
+            set({
+                error: err instanceof Error ? err.message : "Failed to fetch more transactions",
+                fetchingMore: false,
             });
         }
     },
@@ -291,10 +327,14 @@ export const useStore = create<State>((set, get) => ({
             on401Handler: null,
             budget: null,
             transactions: [],
+            hasMore: false,
+            currentPage: 1,
+            totalTransactions: 0,
             summary: null,
             googleSheet: null,
             googleFolder: null,
             loading: false,
+            fetchingMore: false,
             error: null,
         });
     },

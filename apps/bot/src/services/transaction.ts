@@ -287,7 +287,7 @@ export async function upsertTransaction(
         remaining: number;
     }[]
 }> {
-
+    console.log(dataArray);
     // 1. VALIDATE ALL FIRST (fail fast)
     for (const data of dataArray) {
         if (data.confidence < 0.8) {
@@ -341,6 +341,7 @@ export async function upsertTransaction(
                         description: data.description,
                         categoryId: categoryMap.get(data.category)!,
                         bucket: data.bucket,
+                        fileId: data.fileId,
                         aiConfidence: data.confidence.toString(),
                         embedding: embeddingMap.get(data.description) ?? null,
                     })
@@ -362,6 +363,7 @@ export async function upsertTransaction(
                 description: data.description,
                 categoryId: categoryMap.get(data.category)!,
                 bucket: data.bucket,
+                fileId: data.fileId,
                 aiConfidence: data.confidence.toString(),
                 embedding: embeddingMap.get(data.description) ?? null,
             }));

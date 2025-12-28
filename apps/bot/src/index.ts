@@ -130,7 +130,7 @@ function setupEventHandlers(
             return;
         }
 
-        if (data.startsWith("ai_")) {
+        if (data.startsWith("ai_") || data.startsWith("log_invoice_")) {
             await handleTransaction(ctx);
             return;
         }
@@ -148,10 +148,7 @@ function setupEventHandlers(
 
     // Document/photo handler (invoice upload, Pro tier)
     bot.on(["message:document", "message:photo"], async (ctx) => {
-        await ctx.reply(
-            "Fitur upload invoice untuk tier Pro akan segera hadir! 📄\n" +
-            "Untuk saat ini, silakan ketik transaksi secara manual."
-        );
+        await handleTransaction(ctx);
     });
 }
 
