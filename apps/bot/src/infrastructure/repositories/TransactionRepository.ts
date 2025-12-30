@@ -45,10 +45,10 @@ export class TransactionRepository implements ITransactionRepository {
         }));
     }
 
-    async findByUserAndPeriod(userId: string, periodId: string): Promise<TransactionWithCategory[]> {
+    async findByTargetAndPeriod(targetId: string, periodId: string): Promise<TransactionWithCategory[]> {
         const results = await db.query.transactions.findMany({
             where: and(
-                eq(transactions.userId, userId),
+                eq(transactions.targetId, targetId),
                 eq(transactions.periodId, periodId)
             ),
             with: {
@@ -68,6 +68,7 @@ export class TransactionRepository implements ITransactionRepository {
 
         const [result] = await db.insert(transactions).values({
             ...transaction,
+            targetId: transaction.targetId,
             type: dbType,
         }).returning({ id: transactions.id });
 
@@ -82,7 +83,7 @@ export class TransactionRepository implements ITransactionRepository {
         return result.length > 0;
     }
 
-    async getPeriodTotals(userId: string, periodId: string): Promise<PeriodTotals> {
+    async getPeriodTotals(targetId: string, periodId: string): Promise<PeriodTotals> {
         const results = await db
             .select({
                 type: transactions.type,
@@ -91,7 +92,7 @@ export class TransactionRepository implements ITransactionRepository {
             .from(transactions)
             .where(
                 and(
-                    eq(transactions.userId, userId),
+                    eq(transactions.targetId, targetId),
                     eq(transactions.periodId, periodId)
                 )
             )
@@ -111,7 +112,7 @@ export class TransactionRepository implements ITransactionRepository {
         return totals;
     }
 
-    async getTransactionsSummary(userId: string, periodId: string): Promise<Array<{
+    async getTransactionsSummary(targetId: string, periodId: string): Promise<Array<{
         bucket: string | null;
         type: string;
         total: number;
@@ -127,7 +128,7 @@ export class TransactionRepository implements ITransactionRepository {
             .from(transactions)
             .where(
                 and(
-                    eq(transactions.userId, userId),
+                    eq(transactions.targetId, targetId),
                     eq(transactions.periodId, periodId)
                 )
             )

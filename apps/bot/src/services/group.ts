@@ -21,6 +21,21 @@ export class GroupService implements IGroupService {
     ) { }
 
     /**
+     * Find group by Telegram ID
+     */
+    async findGroupByTelegramId(telegramGroupId: number): Promise<Group | null> {
+        return await this.groupRepository.findByTelegramId(telegramGroupId);
+    }
+
+    /**
+     * Check if group exists
+     */
+    async groupExists(telegramGroupId: number): Promise<boolean> {
+        const group = await this.groupRepository.findByTelegramId(telegramGroupId);
+        return group !== null;
+    }
+
+    /**
      * Create a new group
      */
     async createGroup(ownerData: {

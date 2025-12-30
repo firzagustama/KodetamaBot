@@ -15,6 +15,10 @@ export interface TargetContext {
  * and the appropriate targetId for operations
  */
 export async function getTargetContext(ctx: BotContext): Promise<TargetContext> {
+    if (ctx.targetContext) {
+        return ctx.targetContext;
+    }
+
     const user = ctx.from;
     if (!user) {
         throw new Error("No user information");

@@ -1,7 +1,7 @@
 import type { BotContext } from "../../types.js";
 import { CommandHandler, CommandExecutionResult } from "../../core/index.js";
 import { InlineKeyboard } from "grammy";
-import { findGroupByTelegramId, groupExists } from "../../services/group.js";
+import { IGroupService } from "@kodetama/shared";
 
 /**
  * Handles /join_family command - shows dashboard overview with progress bars
@@ -9,6 +9,10 @@ import { findGroupByTelegramId, groupExists } from "../../services/group.js";
  */
 export class JoinFamilyCommand extends CommandHandler {
     protected readonly commandName = "join_family";
+
+    constructor(private groupService: IGroupService) {
+        super();
+    }
 
     async execute(ctx: BotContext): Promise<CommandExecutionResult> {
         const chat = ctx.chat;
@@ -18,12 +22,12 @@ export class JoinFamilyCommand extends CommandHandler {
         }
 
         const { id: groupId } = chat;
-        if (!await groupExists(groupId)) {
+        if (!await this.groupService.groupExists(groupId)) {
             await ctx.reply("Grup belum terdaftar, minta owner daftarin dulu ya");
             return { success: true };
         }
 
-        const group = await findGroupByTelegramId(groupId);
+        const group = await this.groupService.findGroupByTelegramId(groupId);
 
         const joinKeyboard = new InlineKeyboard().url("Join Family", `https://t.me/${ctx.me?.username}?start=join_${group?.id}`);
         await ctx.reply("Klik dibawah buat mulai mencatat keuangan kamu di grup ini!", { reply_markup: joinKeyboard });

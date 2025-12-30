@@ -93,16 +93,14 @@ export const familyMembers = pgTable("family_members", {
 
 export const datePeriods = pgTable("date_periods", {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
-    groupId: uuid("group_id").references(() => groups.id, { onDelete: "cascade" }),
+    targetId: uuid("target_id").notNull(), // user_id or group_id
     name: varchar("name", { length: 100 }).notNull(), // e.g., "Januari 2025"
     startDate: timestamp("start_date", { withTimezone: true }).notNull(),
     endDate: timestamp("end_date", { withTimezone: true }).notNull(),
     isCurrent: boolean("is_current").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
-    userPeriodIdx: index("date_periods_user_id_idx").on(table.userId),
-    groupPeriodIdx: index("date_periods_group_id_idx").on(table.groupId),
+    targetPeriodIdx: index("date_periods_target_id_idx").on(table.targetId),
 }));
 
 // =============================================================================
@@ -139,8 +137,7 @@ export const buckets = pgTable("buckets", {
 
 export const categories = pgTable("categories", {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
-    groupId: uuid("group_id").references(() => groups.id, { onDelete: "cascade" }),
+    targetId: uuid("target_id").notNull(), // user_id or group_id
     name: varchar("name", { length: 100 }).notNull(),
     icon: varchar("icon", { length: 50 }),
     bucket: varchar("bucket", { length: 50 }), // free text: needs, wants, savings, or custom
@@ -154,10 +151,10 @@ export const categories = pgTable("categories", {
 
 export const transactions = pgTable("transactions", {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }), // Author
+    targetId: uuid("target_id").notNull(), // Context (user_id or group_id)
     periodId: uuid("period_id").notNull().references(() => datePeriods.id),
     categoryId: uuid("category_id").references(() => categories.id),
-    groupId: uuid("group_id").references(() => groups.id),
     type: txTypeEnum("type").notNull(),
     amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
     description: text("description"),
@@ -170,8 +167,7 @@ export const transactions = pgTable("transactions", {
     embedding: vector("embedding"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
-    userPeriodIdx: index("transactions_user_period_idx").on(table.userId, table.periodId),
-    groupPeriodIdx: index("transactions_group_period_idx").on(table.groupId, table.periodId),
+    targetPeriodIdx: index("transactions_target_period_idx").on(table.targetId, table.periodId),
     embeddingIdx: index("transactions_embedding_idx").using("hnsw", table.embedding.op("vector_cosine_ops")),
 }));
 
@@ -281,14 +277,6 @@ export const groupsRelations = relations(groups, ({ one, many }) => ({
 }));
 
 export const datePeriodsRelations = relations(datePeriods, ({ one, many }) => ({
-    user: one(users, {
-        fields: [datePeriods.userId],
-        references: [users.id],
-    }),
-    group: one(groups, {
-        fields: [datePeriods.groupId],
-        references: [groups.id],
-    }),
     budget: one(budgets, {
         fields: [datePeriods.id],
         references: [budgets.periodId],

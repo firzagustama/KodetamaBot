@@ -1,8 +1,7 @@
 import { InputFile } from "grammy";
 import type { BotContext } from "../../types.js";
 import { CommandHandler, CommandExecutionResult, getTargetContext } from "../../core/index.js";
-import { ExcelService } from "@kodetama/shared";
-import { getTargetCurrentPeriod, getAllTransactions } from "../../services/index.js";
+import { ExcelService, ITransactionService, IPeriodService } from "@kodetama/shared";
 import { logger } from "../../utils/logger.js";
 
 /**
@@ -11,17 +10,25 @@ import { logger } from "../../utils/logger.js";
 export class ExportExcelCommand extends CommandHandler {
     protected readonly commandName = "export_excel";
 
+    constructor(
+        private transactionService: ITransactionService,
+        private periodService: IPeriodService
+    ) {
+        super();
+    }
+
     async execute(ctx: BotContext): Promise<CommandExecutionResult> {
         try {
-            const target = await getTargetContext(ctx);
-            const period = await getTargetCurrentPeriod(target);
+            const target = ctx.targetContext || await getTargetContext(ctx);
+            const targetId = target.groupId || target.userId!;
+            const period = ctx.periodContext || await this.periodService.getCurrentPeriod(targetId);
 
             if (!period) {
                 await ctx.reply("Belum ada periode aktif. Silakan atur budget terlebih dahulu.");
                 return { success: true };
             }
 
-            const transactions = await getAllTransactions(target, period.id);
+            const transactions = await this.transactionService.getAllTransactions(targetId, period.id);
 
             const excelService = new ExcelService();
             const apiBaseUrl = process.env.VITE_API_URL || process.env.WEB_APP_URL + "/api";

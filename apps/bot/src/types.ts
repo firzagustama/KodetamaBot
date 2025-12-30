@@ -65,7 +65,11 @@ export type BotContext = Context &
     SessionFlavor<SessionData> &
     ConversationFlavor &
     HydrateFlavor<Context> &
-    AutoChatActionFlavor;
+    AutoChatActionFlavor & {
+        userContext?: any; // Using any for now to avoid circular deps, will refine
+        targetContext?: any;
+        periodContext?: any;
+    };
 
 // =============================================================================
 // CONVERSATION CONTEXT

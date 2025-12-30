@@ -1,7 +1,5 @@
 import type { BotContext } from "../types.js";
 import { CommandRegistry } from "./CommandRegistry.js";
-import { handleTransaction } from "../handlers/transaction.js";
-import { handleGroupMessage } from "../handlers/group.js";
 
 /**
  * Processes incoming messages and routes them appropriately
@@ -9,9 +7,17 @@ import { handleGroupMessage } from "../handlers/group.js";
  */
 export class MessageProcessor {
     private readonly commandRegistry: CommandRegistry;
+    private readonly groupMessageHandler: (ctx: BotContext) => Promise<void>;
+    private readonly transactionHandler: (ctx: BotContext) => Promise<void>;
 
-    constructor(commandRegistry: CommandRegistry) {
+    constructor(
+        commandRegistry: CommandRegistry,
+        groupMessageHandler: (ctx: BotContext) => Promise<void>,
+        transactionHandler: (ctx: BotContext) => Promise<void>
+    ) {
         this.commandRegistry = commandRegistry;
+        this.groupMessageHandler = groupMessageHandler;
+        this.transactionHandler = transactionHandler;
     }
 
     /**
@@ -30,10 +36,10 @@ export class MessageProcessor {
         // Route based on context
         if (ctx.chat?.type === "group" || ctx.chat?.type === "supergroup") {
             // Group message handler
-            await handleGroupMessage(ctx);
+            await this.groupMessageHandler(ctx);
         } else if (ctx.chat?.type === "private") {
             // Private message - likely transaction parsing
-            await handleTransaction(ctx);
+            await this.transactionHandler(ctx);
         }
     }
 

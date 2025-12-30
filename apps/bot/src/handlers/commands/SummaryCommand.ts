@@ -1,42 +1,49 @@
-import { formatRupiah, Transaction } from "@kodetama/shared";
+import { formatRupiah, Transaction, ITransactionService, IPeriodService, IBudgetService } from "@kodetama/shared";
 import { CommandHandler, CommandExecutionResult, getTargetContext } from "../../core/index.js";
-import { getAllTransactions, getCurrentGroupPeriod, getCurrentPeriod, getBuckets } from "../../services/index.js";
 import { BotContext } from "../../types.js";
 
 export class SummaryCommand extends CommandHandler {
     protected readonly commandName = "summary";
 
+    constructor(
+        private transactionService: ITransactionService,
+        private periodService: IPeriodService,
+        private budgetService: IBudgetService
+    ) {
+        super();
+    }
+
     async execute(ctx: BotContext): Promise<CommandExecutionResult> {
-        const target = await getTargetContext(ctx);
-        const period = target.isGroup
-            ? await getCurrentGroupPeriod(target.targetId)
-            : await getCurrentPeriod(target.targetId);
+        const target = ctx.targetContext || await getTargetContext(ctx);
+        const targetId = target.groupId || target.userId!;
+        const period = ctx.periodContext || await this.periodService.getCurrentPeriod(targetId);
 
         if (!period) {
             await ctx.reply("Duh, budget belum diatur. Setup dulu gih. 🤷");
             return { success: true };
         }
 
-        const transactions = await getAllTransactions(target, period.id);
+        const transactions = await this.transactionService.getAllTransactions(targetId, period.id);
         if (!transactions || transactions.length === 0) {
             await ctx.reply("Belum ada transaksi nih. Kosong. 📭");
             return { success: true };
         }
 
         // Get budget data
-        const budgets = await getBuckets(period.id);
+        const budgetData = await this.budgetService.getBudget(period.id);
+        const buckets = budgetData?.buckets;
 
         // Separate income and expenses
         const expenses = transactions.filter(t => t.type === "expense");
         const incomes = transactions.filter(t => t.type === "income");
 
         // Group by bucket
-        const groupedExpenses = this.groupByBucket(expenses);
-        const groupedIncomes = this.groupByBucket(incomes);
+        const groupedExpenses = this.groupByBucket(expenses as unknown as Transaction[]);
+        const groupedIncomes = this.groupByBucket(incomes as unknown as Transaction[]);
 
         // Calculate totals
-        const totalExpense = this.calculateTotal(expenses);
-        const totalIncome = this.calculateTotal(incomes);
+        const totalExpense = this.calculateTotal(expenses as unknown as Transaction[]);
+        const totalIncome = this.calculateTotal(incomes as unknown as Transaction[]);
         const balance = totalIncome - totalExpense;
 
         // Build response
@@ -64,7 +71,7 @@ export class SummaryCommand extends CommandHandler {
             response += `💸 *Pengeluaran* (${expenses.length})\n`;
             for (const [bucket, items] of Object.entries(groupedExpenses)) {
                 const bucketTotal = this.calculateTotal(items);
-                const budget = budgets?.find(b => b.name === bucket);
+                const budget = buckets?.find((b: any) => b.name === bucket);
 
                 response += `\n*${bucket}* · ${formatRupiah(bucketTotal)}`;
 
@@ -95,7 +102,7 @@ export class SummaryCommand extends CommandHandler {
         response += `\n\n`;
 
         // Insights (Saitama style)
-        response += this.generateInsights(expenses, incomes, budgets, balance);
+        response += this.generateInsights(expenses as unknown as Transaction[], incomes as unknown as Transaction[], buckets, balance);
 
         await ctx.reply(response, { parse_mode: "Markdown" });
         return { success: true };
@@ -117,8 +124,8 @@ export class SummaryCommand extends CommandHandler {
     }
 
     private formatPeriodDates(period: any): string {
-        const start = new Date(period.start_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
-        const end = new Date(period.end_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+        const start = new Date(period.startDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+        const end = new Date(period.endDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
         return `${start} - ${end}`;
     }
 
@@ -132,7 +139,7 @@ export class SummaryCommand extends CommandHandler {
     private generateInsights(
         expenses: Transaction[],
         incomes: Transaction[],
-        budgets: any[] | null,
+        budgets: any[] | undefined,
         balance: number
     ): string {
         let insights = "*Insights:*\n";
@@ -151,7 +158,7 @@ export class SummaryCommand extends CommandHandler {
         if (budgets) {
             const warnings = budgets.filter(b => {
                 const spent = expenses
-                    .filter(e => e.bucket === b.bucket)
+                    .filter(e => e.bucket === b.name)
                     .reduce((sum, e) => sum + Number(e.amount), 0);
                 return (spent / Number(b.amount)) >= 0.8;
             });

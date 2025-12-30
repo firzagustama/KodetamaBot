@@ -65,6 +65,7 @@ export type TransactionInput = z.infer<typeof TransactionInputSchema>;
 export const TransactionSchema = z.object({
     id: z.string().uuid(),
     userId: z.string().uuid(),
+    targetId: z.string().uuid(),
     periodId: z.string().uuid(),
     categoryId: z.string().uuid().nullable(),
     type: z.enum(TX_TYPES),
@@ -125,12 +126,12 @@ export const BudgetSchema = z.object({
     id: z.string().uuid(),
     periodId: z.string().uuid(),
     estimatedIncome: z.string(),
-    needsAmount: z.string(),
-    wantsAmount: z.string(),
-    savingsAmount: z.string(),
-    needsPercentage: z.number(),
-    wantsPercentage: z.number(),
-    savingsPercentage: z.number(),
+    needsAmount: z.string().optional(),
+    wantsAmount: z.string().optional(),
+    savingsAmount: z.string().optional(),
+    needsPercentage: z.number().optional(),
+    wantsPercentage: z.number().optional(),
+    savingsPercentage: z.number().optional(),
 });
 export type Budget = z.infer<typeof BudgetSchema>;
 
@@ -147,12 +148,12 @@ export type DatePeriodInput = z.infer<typeof DatePeriodInputSchema>;
 
 export const DatePeriodSchema = z.object({
     id: z.string().uuid(),
-    userId: z.string().uuid().nullable(),
-    groupId: z.string().uuid().nullable(),
+    targetId: z.string().uuid(),
     name: z.string(),
     startDate: z.date(),
     endDate: z.date(),
     isCurrent: z.boolean(),
+    createdAt: z.date(),
 });
 export type DatePeriod = z.infer<typeof DatePeriodSchema>;
 
@@ -184,8 +185,7 @@ export const PeriodSchema = z.object({
     id: z.string().uuid(),
     name: z.string(),
     createdAt: z.date(),
-    userId: z.string().nullable(),
-    groupId: z.string().nullable(),
+    targetId: z.string().uuid(),
     startDate: z.date(),
     endDate: z.date(),
     isCurrent: z.boolean(),
@@ -198,13 +198,14 @@ export type Period = z.infer<typeof PeriodSchema>;
 // =============================================================================
 
 export const PendingRegistrationSchema = z.object({
-    id: z.string().uuid(),
+    id: z.string().uuid().optional(),
     telegramId: z.number(),
     username: z.string().nullable(),
     firstName: z.string().nullable(),
     requestedTier: z.enum(TIERS),
     status: z.enum(REGISTRATION_STATUS),
-    createdAt: z.date(),
+    adminMessageId: z.number().optional(),
+    createdAt: z.date().optional(),
 });
 export type PendingRegistration = z.infer<typeof PendingRegistrationSchema>;
 

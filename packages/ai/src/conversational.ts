@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { AIConfig } from "./orchestrator.js";
-import { getTargetContextKey, Period, redisManager, TargetContext } from "@kodetama/shared";
+import { getTargetContextKey, Period, redisManager, TargetContext, IConversationAI } from "@kodetama/shared";
 import { contextSummary, transactions, db } from "@kodetama/db";
 import { ChatCompletionMessage, ChatCompletionMessageParam } from "openai/resources.mjs";
 import { CONTEXT_SUMMARY_USER_PROMPT, CONVERSATION_SYSTEM_PROMPT } from "./prompts/index.js";
@@ -20,7 +20,7 @@ import {
     confirmTelegramTool,
 } from "./tools/index.js";
 
-export class ConversationAI {
+export class ConversationAI implements IConversationAI {
     private isDevMode: boolean;
     private client: OpenAI | undefined;
     private clientModel!: string;

@@ -3,7 +3,7 @@
 // =============================================================================
 
 // Import existing entity types from types.ts to avoid conflicts
-import type { User, TelegramAccount, DatePeriod, Budget, Transaction, PendingRegistration } from "./types.js";
+import type { User, TelegramAccount, DatePeriod, Budget, Transaction, PendingRegistration, PeriodBudget, Period, TargetContext, Tier } from "./types.js";
 
 // =============================================================================
 // GROUP DOMAIN ENTITIES
@@ -29,8 +29,7 @@ export interface FamilyMember {
 // Define Category type since it's not exported from types.ts
 export interface Category {
     id: string;
-    userId?: string | null;
-    groupId?: string | null;
+    targetId: string;
     name: string;
     icon?: string | null;
     bucket?: string | null;
@@ -147,33 +146,36 @@ export interface IUserRepository {
 }
 
 export interface IDatePeriodRepository {
-    findById(id: string): Promise<DatePeriod | null>;
-    findCurrentByUserId(userId: string): Promise<DatePeriod | null>;
+    findById(id: string): Promise<Period | null>;
+    findCurrentByTargetId(targetId: string): Promise<Period | null>;
     save(period: Omit<DatePeriod, "id" | "createdAt">): Promise<string>;
-    setCurrent(userId: string, periodId: string): Promise<void>;
-    findByUserDateRange(userId: string, startDate: Date, endDate: Date): Promise<DatePeriod[]>;
+    setCurrent(targetId: string, periodId: string): Promise<void>;
+    findByTargetDateRange(targetId: string, startDate: Date, endDate: Date): Promise<DatePeriod[]>;
 }
 
 export interface IBudgetRepository {
-    findByPeriodId(periodId: string): Promise<Budget | null>;
-    save(budget: Omit<Budget, "id" | "createdAt" | "updatedAt">): Promise<string>;
-    update(budgetId: string, updates: Partial<Pick<Budget, "estimatedIncome" | "needsAmount" | "wantsAmount" | "savingsAmount" | "needsPercentage" | "wantsPercentage" | "savingsPercentage">>): Promise<void>;
+    findByPeriodId(periodId: string): Promise<PeriodBudget | null>;
+    save(budget: Omit<Budget, "id" | "createdAt" | "updatedAt"> & { buckets?: any[] }): Promise<string>;
+    update(budgetId: string, updates: Partial<Budget>): Promise<void>;
+    saveBucket(bucket: any): Promise<string>;
+    updateBucket(bucketId: string, updates: any): Promise<void>;
+    deleteBucket(bucketId: string): Promise<void>;
 }
 
 export interface ITransactionRepository {
     findById(id: string): Promise<TransactionWithCategory | null>;
     findByIds(ids: string[]): Promise<TransactionWithCategory[]>;
-    findByUserAndPeriod(userId: string, periodId: string): Promise<TransactionWithCategory[]>;
+    findByTargetAndPeriod(targetId: string, periodId: string): Promise<TransactionWithCategory[]>;
     save(transaction: Omit<Transaction, "id" | "createdAt">): Promise<string>;
     delete(id: string): Promise<boolean>;
-    getPeriodTotals(userId: string, periodId: string): Promise<PeriodTotals>;
-    getTransactionsSummary(userId: string, periodId: string): Promise<any[]>;
+    getPeriodTotals(targetId: string, periodId: string): Promise<PeriodTotals>;
+    getTransactionsSummary(targetId: string, periodId: string): Promise<any[]>;
 }
 
 export interface ICategoryRepository {
     findById(id: string): Promise<Category | null>;
-    findByUserId(userId: string): Promise<Category[]>;
-    findOrCreate(userId: string | null, groupId: string | null, categoryName: string, bucket?: string): Promise<string>;
+    findByTargetId(targetId: string): Promise<Category[]>;
+    findOrCreate(targetId: string, categoryName: string, bucket?: string): Promise<string>;
     save(category: Omit<Category, "id" | "createdAt">): Promise<string>;
 }
 
@@ -201,6 +203,57 @@ export interface IGroupRepository {
 }
 
 // =============================================================================
+// SERVICE INTERFACES
+// =============================================================================
+
+export interface IPeriodService {
+    ensurePeriodExists(targetId: string, now: Date, incomeDate: number): Promise<string>;
+    resolvePeriodId(targetId: string): Promise<string | null>;
+    getCurrentPeriod(targetId: string): Promise<DatePeriod | null>;
+    upsertPeriodWithBudget(targetId: string, periodData: any): Promise<string>;
+}
+
+export interface IBudgetService {
+    getBudget(periodId: string): Promise<PeriodBudget | null>;
+    getBudgetSummary(targetId: string, periodId: string): Promise<{ budget: PeriodBudget; spending: any[] } | null>;
+    upsertBudget(params: any): Promise<string>;
+    upsertBucket(periodId: string, args: any): Promise<void>;
+    deleteBucket(periodId: string, args: any): Promise<void>;
+}
+
+export interface IFileService {
+    saveFileMetadata(params: {
+        userId: string;
+        periodId?: string;
+        fileName: string;
+        fileType: string;
+        fileSize: number;
+        telegramFileId?: string;
+    }): Promise<string>;
+}
+
+export interface IConversationAI {
+    buildPrompt(target: TargetContext, period: Period): Promise<any[]>;
+    generateResponse(messages: any[]): Promise<any>;
+    setTargetContext(target: TargetContext, messages: any[]): Promise<void>;
+    clearContext(target: TargetContext): Promise<void>;
+}
+
+export interface ITransactionService {
+    saveTransaction(params: any): Promise<string>;
+    getAllTransactions(targetId: string, periodId: string): Promise<TransactionWithCategory[]>;
+    getTransactionsSummary(targetId: string, periodId: string): Promise<any[]>;
+    getPeriodTotals(targetId: string, periodId: string): Promise<PeriodTotals>;
+    getTransactionCount(targetId: string, periodId: string): Promise<number>;
+    recommendSetupBuckets(targetId: string, periodId: string): Promise<boolean>;
+    upsertTransaction(params: any): Promise<string>;
+    getTransactionHistory(targetId: string, periodId: string, limit?: number): Promise<string>;
+    searchTransactionsByKeyword(targetId: string, periodId: string, keyword: string): Promise<TransactionWithCategory[]>;
+    deleteTransaction(id: string): Promise<boolean>;
+    trackAiUsage(params: any): Promise<void>;
+}
+
+// =============================================================================
 // USE CASE INTERFACES
 // =============================================================================
 
@@ -214,6 +267,7 @@ export interface ITransactionUseCase {
 }
 
 export interface IUserService {
+    getUserByTelegramId(telegramId: number): Promise<User | null>;
     getUserForRegistration(telegramId: number): Promise<DomainResult<UserWithTelegram>>;
     registerNewUser(telegramData: {
         telegramId: number;
@@ -223,6 +277,17 @@ export interface IUserService {
         tier: User["tier"];
     }): Promise<DomainResult<string>>;
     updateUserIncomeSettings(userId: string, incomeDate: number, isIncomeUncertain: boolean): Promise<DomainResult>;
+    approveRegistration(telegramId: number, adminTelegramId: number): Promise<DomainResult<string>>;
+    updateRegistrationStatus(telegramId: number, status: string, adminTelegramId: number): Promise<DomainResult>;
+    rejectRegistration(telegramId: number, adminTelegramId: number): Promise<DomainResult>;
+    savePendingRegistration(data: {
+        telegramId: number;
+        username?: string;
+        firstName?: string;
+        requestedTier: Tier;
+        adminMessageId?: number;
+    }): Promise<DomainResult<string>>;
+    getPendingRegistration(telegramId: number): Promise<DomainResult<PendingRegistration>>;
 }
 
 export interface IBudgetCalculationService {
@@ -231,6 +296,8 @@ export interface IBudgetCalculationService {
 }
 
 export interface IGroupService {
+    findGroupByTelegramId(telegramGroupId: number): Promise<Group | null>;
+    groupExists(telegramGroupId: number): Promise<boolean>;
     createGroup(ownerData: {
         telegramGroupId: number;
         name: string;

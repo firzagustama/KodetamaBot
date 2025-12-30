@@ -48,9 +48,7 @@ export async function budgetRoutes(fastify: FastifyInstance): Promise<void> {
         // Find current period for target context
         const currentPeriod = await db.query.datePeriods.findFirst({
             where: and(
-                payload.targetType === "group"
-                    ? eq(datePeriods.groupId, payload.targetId)
-                    : eq(datePeriods.userId, payload.targetId),
+                eq(datePeriods.targetId, payload.targetId),
                 eq(datePeriods.isCurrent, true)
             ),
         });

@@ -3,7 +3,9 @@ import type {
     DomainResult,
     UserWithTelegram,
     IUserRepository,
-    IPendingRegistrationRepository
+    IPendingRegistrationRepository,
+    User,
+    PendingRegistration
 } from "@kodetama/shared";
 
 /**
@@ -16,6 +18,21 @@ export class UserService implements IUserService {
         private userRepository: IUserRepository,
         private registrationRepository: IPendingRegistrationRepository
     ) { }
+
+    /**
+     * Get user by Telegram ID
+     */
+    async getUserByTelegramId(telegramId: number): Promise<User | null> {
+        const user = await this.userRepository.findByTelegramId(telegramId);
+        if (!user) return null;
+
+        // Return user with telegram account info flattened as expected by context
+        return {
+            ...user.telegramAccount,
+            userId: user.telegramAccount.userId,
+            user: user,
+        } as any;
+    }
 
     /**
      * Get user for registration flow
@@ -149,6 +166,72 @@ export class UserService implements IUserService {
                 success: false,
                 error: `Failed to reject registration: ${error instanceof Error ? error.message : 'Unknown error'}`
             };
+        }
+    }
+
+    /**
+     * Update registration status
+     */
+    async updateRegistrationStatus(
+        telegramId: number,
+        status: "approved" | "rejected",
+        adminTelegramId: number
+    ): Promise<DomainResult> {
+        try {
+            await this.registrationRepository.updateStatus(telegramId, status, adminTelegramId);
+            return { success: true }
+        } catch (error) {
+            return {
+                success: false,
+                error: `Failed to update registration status: ${error instanceof Error ? error.message : 'Unknown error'}`
+            }
+        }
+    }
+
+    /**
+     * Save pending registration - direct DB access for now
+     */
+    async savePendingRegistration(data: {
+        telegramId: number;
+        username?: string;
+        firstName?: string;
+        requestedTier: Tier;
+        adminMessageId?: number;
+    }): Promise<DomainResult<string>> {
+        try {
+            const pendingRegistration: PendingRegistration = {
+                telegramId: data.telegramId,
+                username: data.username ?? null,
+                firstName: data.firstName ?? null,
+                requestedTier: data.requestedTier,
+                adminMessageId: data.adminMessageId,
+                status: "pending",
+            };
+            const pendingRegistrationId = await this.registrationRepository.save(pendingRegistration);
+            return { success: true, data: pendingRegistrationId };
+        } catch (error) {
+            return {
+                success: false,
+                error: `Failed to save pending registration: ${error instanceof Error ? error.message : 'Unknown error'}`
+            }
+        }
+    }
+
+    /**
+     * Get pending registration by Telegram ID - direct DB access for now
+     */
+    async getPendingRegistration(telegramId: number): Promise<DomainResult<PendingRegistration>> {
+        try {
+            const result = await this.registrationRepository.findByTelegramId(telegramId);
+            if (!result) {
+                return { success: false, error: "No pending registration found" };
+            }
+            return { success: true, data: result };
+        } catch (error) {
+            return {
+                success: false,
+                error: `Failed to get pending registration: ${error instanceof Error ? error.message : 'Unknown error'}`
+            }
         }
     }
 }
@@ -296,57 +379,6 @@ export async function createUser(data: {
     }
 
     throw new Error(result.error || "Failed to create user");
-}
-
-/**
- * LEGACY: Save pending registration - direct DB access for now
- */
-export async function savePendingRegistration(data: {
-    telegramId: number;
-    username?: string;
-    firstName?: string;
-    requestedTier: Tier;
-    adminMessageId?: number;
-}): Promise<string> {
-    const [registration] = await db.insert(pendingRegistrations).values({
-        telegramId: data.telegramId,
-        username: data.username,
-        firstName: data.firstName,
-        requestedTier: data.requestedTier,
-        adminMessageId: data.adminMessageId,
-        status: "pending",
-    }).returning({ id: pendingRegistrations.id });
-
-    return registration.id;
-}
-
-/**
- * LEGACY: Get pending registration by Telegram ID - direct DB access for now
- */
-export async function getPendingRegistration(telegramId: number) {
-    return await db.query.pendingRegistrations.findFirst({
-        where: and(
-            eq(pendingRegistrations.telegramId, telegramId),
-            eq(pendingRegistrations.status, "pending")
-        ),
-    });
-}
-
-/**
- * LEGACY: Update registration status - direct DB access for now
- */
-export async function updateRegistrationStatus(
-    telegramId: number,
-    status: "approved" | "rejected",
-    adminTelegramId: number
-) {
-    await db.update(pendingRegistrations)
-        .set({
-            status,
-            processedBy: adminTelegramId,
-            processedAt: new Date(),
-        })
-        .where(eq(pendingRegistrations.telegramId, telegramId));
 }
 
 /**

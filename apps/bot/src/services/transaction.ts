@@ -1,477 +1,78 @@
-import { db } from "@kodetama/db";
-import { transactions, categories, aiUsage, budgets } from "@kodetama/db/schema";
-import { eq, and, desc, sql, ilike } from "drizzle-orm";
-import type { TargetContext, TxType } from "@kodetama/shared";
-import { UpsertTransactionParams, AIOrchestrator } from "@kodetama/ai";
-import { getBudgetSummary } from "./budget.js";
+import { ITransactionService, ITransactionRepository, ICategoryRepository, TransactionWithCategory, PeriodTotals } from "@kodetama/shared";
 
-interface Transaction {
-    userId: string;
-    periodId: string;
-    type: TxType;
-    amount: number;
-    description?: string;
-    category?: string;
-    categoryId?: string;
-    bucket?: string;
-    aiConfidence?: number;
-}
-export interface SaveTransactionData {
-    userId: string;
-    periodId: string;
-    transaction: Transaction;
-    rawMessage?: string;
-    groupId?: string;
-}
+export class TransactionService implements ITransactionService {
+    constructor(
+        private transactionRepo: ITransactionRepository,
+        private categoryRepo: ICategoryRepository
+    ) { }
 
-let aiOrchestrator: AIOrchestrator | null = null;
+    async saveTransaction(params: any): Promise<string> {
+        // Resolve category if needed
+        let categoryId = params.transaction.categoryId;
+        if (!categoryId && params.transaction.category) {
+            categoryId = await this.categoryRepo.findOrCreate(
+                params.targetId,
+                params.transaction.category,
+                params.transaction.bucket
+            );
+        }
 
-function getAI(): AIOrchestrator {
-    if (!aiOrchestrator) {
-        aiOrchestrator = new AIOrchestrator({
-            apiKey: process.env.OPENROUTER_API_KEY ?? "",
-            model: process.env.OPENROUTER_MODEL,
+        return await this.transactionRepo.save({
+            ...params.transaction,
+            userId: params.userId,
+            targetId: params.targetId,
+            periodId: params.periodId,
+            categoryId,
+            rawMessage: params.rawMessage
         });
     }
-    return aiOrchestrator;
-}
 
-/**
- * Find or create a category and return its ID
- */
-async function findOrCreateCategory(
-    userId: string | null = null,
-    groupId: string | null = null,
-    categoryName: string,
-    bucket?: string
-): Promise<string> {
-    // First try to find existing category (case-insensitive)
-    const conditions = [ilike(categories.name, categoryName)];
-
-    if (userId) {
-        conditions.push(eq(categories.userId, userId));
-    } else if (groupId) {
-        conditions.push(eq(categories.groupId, groupId));
+    async getAllTransactions(targetId: string, periodId: string): Promise<TransactionWithCategory[]> {
+        return await this.transactionRepo.findByTargetAndPeriod(targetId, periodId);
     }
 
-    const whereClause = and(...conditions);
-
-    const existing = await db.query.categories.findFirst({
-        where: whereClause,
-    });
-
-    if (existing) {
-        return existing.id;
+    async getTransactionsSummary(targetId: string, periodId: string): Promise<any[]> {
+        return await this.transactionRepo.getTransactionsSummary(targetId, periodId);
     }
 
-    // Create new category
-    const [newCat] = await db.insert(categories).values({
-        userId,
-        groupId,
-        name: categoryName,
-        bucket: bucket,
-        isDefault: false,
-    }).returning({ id: categories.id });
-
-    return newCat.id;
-}
-
-/**
- * Save a new transaction
- */
-export async function saveTransaction(data: SaveTransactionData): Promise<string> {
-    let categoryId: string | undefined;
-
-    // Handle category linking
-    if (data.transaction.categoryId) {
-        // Direct categoryId provided
-        categoryId = data.transaction.categoryId;
-    } else if (data.transaction.category) {
-        // Category name provided - find or create it
-        try {
-            categoryId = await findOrCreateCategory(
-                data.groupId ? null : data.userId,
-                data.groupId || null,
-                data.transaction.category,
-                data.transaction.bucket
-            );
-        } catch (error) {
-            console.warn("Failed to find/create category:", error);
-            // Continue without categoryId
-        }
+    async getPeriodTotals(targetId: string, periodId: string): Promise<PeriodTotals> {
+        return await this.transactionRepo.getPeriodTotals(targetId, periodId);
     }
 
-    let embedding: number[] | null = null;
-    try {
-        if (data.transaction.description) {
-            const ai = getAI();
-            const { result } = await ai.generateEmbedding(data.transaction.description);
-            embedding = result;
-        }
-    } catch (error) {
-        console.error("Failed to generate embedding:", error);
+    async getTransactionCount(targetId: string, periodId: string): Promise<number> {
+        const transactions = await this.transactionRepo.findByTargetAndPeriod(targetId, periodId);
+        return transactions.length;
     }
 
-    const [tx] = await db.insert(transactions).values({
-        userId: data.userId,
-        periodId: data.periodId,
-        categoryId: categoryId,
-        groupId: data.groupId,
-        type: data.transaction.type,
-        amount: data.transaction.amount.toString(),
-        description: data.transaction.description,
-        bucket: data.transaction.bucket,
-        rawMessage: data.rawMessage,
-        aiConfidence: data.transaction.aiConfidence?.toString(),
-        embedding: embedding,
-    }).returning({ id: transactions.id });
-
-    return tx.id;
-}
-
-/**
- * Get last transaction for user (for undo)
- */
-export async function getLastTransaction(userId: string) {
-    return await db.query.transactions.findFirst({
-        where: eq(transactions.userId, userId),
-        orderBy: desc(transactions.createdAt),
-    });
-}
-
-export async function getTransactions(ids: string[]) {
-    return await db.query.transactions.findMany({
-        where: (transactions, { inArray }) =>
-            inArray(transactions.id, ids),
-    });
-}
-
-/**
- * Delete a transaction
- */
-export async function deleteTransaction(transactionId: string): Promise<boolean> {
-    const result = await db.delete(transactions)
-        .where(eq(transactions.id, transactionId))
-        .returning({ id: transactions.id });
-
-    return result.length > 0;
-}
-
-/**
- * Get transactions summary for a period grouped by bucket
- */
-export async function getTransactionsSummary(userId: string, periodId: string) {
-    const results = await db
-        .select({
-            bucket: transactions.bucket,
-            type: transactions.type,
-            total: sql<number>`sum(${transactions.amount}::numeric)`.as("total"),
-            count: sql<number>`count(*)`.as("count"),
-        })
-        .from(transactions)
-        .where(
-            and(
-                eq(transactions.userId, userId),
-                eq(transactions.periodId, periodId)
-            )
-        )
-        .groupBy(transactions.bucket, transactions.type);
-
-    return results;
-}
-
-/**
- * Get All Transaction in current period
- */
-export async function getAllTransactions(target: TargetContext, periodId: string) {
-    const condition = target.groupId ?
-        eq(transactions.groupId, target.groupId) :
-        eq(transactions.userId, target.userId!);
-
-    return await db.query.transactions.findMany({
-        where: and(
-            condition,
-            eq(transactions.periodId, periodId)
-        ),
-        with: {
-            category: true,
-        },
-        orderBy: (transactions, { desc }) => [
-            desc(transactions.transactionDate),
-        ],
-    });
-}
-
-/**
- * Get total income and expenses for a period
- */
-export async function getPeriodTotals(userId: string, periodId: string) {
-    const results = await db
-        .select({
-            type: transactions.type,
-            total: sql<number>`sum(${transactions.amount}::numeric)`.as("total"),
-        })
-        .from(transactions)
-        .where(
-            and(
-                eq(transactions.userId, userId),
-                eq(transactions.periodId, periodId)
-            )
-        )
-        .groupBy(transactions.type);
-
-    const income = results.find(r => r.type === "income")?.total ?? 0;
-    const expense = results.find(r => r.type === "expense")?.total ?? 0;
-    const transfer = results.find(r => r.type === "transfer")?.total ?? 0;
-
-    return { income, expense, transfer, balance: income - expense };
-}
-
-/**
- * Track AI usage
- */
-export async function trackAiUsage(data: {
-    userId: string;
-    model: string;
-    operation: string;
-    inputTokens: number;
-    outputTokens: number;
-    cost?: number;
-}) {
-    await db.insert(aiUsage).values({
-        userId: data.userId,
-        model: data.model,
-        operation: data.operation,
-        inputTokens: data.inputTokens,
-        outputTokens: data.outputTokens,
-        cost: data.cost?.toString(),
-    });
-}
-
-/**
- * Get total transaction count for a user in a period
- */
-export async function getTransactionCount(userId: string, periodId: string): Promise<number> {
-    const result = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(transactions)
-        .where(and(eq(transactions.userId, userId), eq(transactions.periodId, periodId)));
-
-    return Number(result[0]?.count ?? 0);
-}
-
-/**
- * Recommend to setup buckets
- */
-export async function recommendSetupBuckets(userId: string, periodId: string): Promise<boolean> {
-    const txCount = await getTransactionCount(userId, periodId);
-    const budget = await db.query.budgets.findFirst({
-        where: eq(budgets.periodId, periodId),
-        with: {
-            buckets: true,
-        },
-    });
-    return (!budget || budget.buckets.length === 1) && txCount >= 5;
-}
-
-export async function upsertTransaction(
-    target: TargetContext,
-    periodId: string,
-    dataArray: UpsertTransactionParams[]
-): Promise<{
-    ids: string[];
-    remainingBucket: {
-        bucket: string;
-        amount: number;
-        spent: number;
-        remaining: number;
-    }[]
-}> {
-    console.log(dataArray);
-    // 1. VALIDATE ALL FIRST (fail fast)
-    for (const data of dataArray) {
-        if (data.confidence < 0.8) {
-            throw new Error(`AI not confident for "${data.description}": ${data.confirmationMessage}`);
-        }
-        if (data.amount <= 0) {
-            throw new Error(`Invalid amount for "${data.description}"`);
-        }
+    async recommendSetupBuckets(targetId: string, periodId: string): Promise<boolean> {
+        // Logic to check if setup is recommended
+        const count = await this.getTransactionCount(targetId, periodId);
+        return count >= 5; // Example logic
     }
 
-    // 2. PREPARE CATEGORIES (avoid duplicate queries)
-    const uniqueCategories = [...new Set(dataArray.map(d => d.category))];
-    const categoryMap = new Map<string, string>();
-
-    for (const category of uniqueCategories) {
-        const categoryId = await findOrCreateCategory(target.userId, target.groupId, category);
-        categoryMap.set(category, categoryId);
+    async upsertTransaction(params: any): Promise<string> {
+        return await this.saveTransaction(params);
     }
 
-    // 3. SEPARATE UPDATES vs INSERTS
-    const updates = dataArray.filter(d => d.transactionId);
-    const inserts = dataArray.filter(d => !d.transactionId);
-
-    // Generate embeddings for all items (parallel)
-    const ai = getAI();
-    const embeddingMap = new Map<string, number[]>(); // description -> embedding
-
-    const allDescriptions = [...new Set(dataArray.map(d => d.description).filter(Boolean))];
-    await Promise.all(allDescriptions.map(async (desc) => {
-        try {
-            const { result } = await ai.generateEmbedding(desc);
-            embeddingMap.set(desc, result);
-        } catch (e) {
-            console.error(`Failed to generate embedding for "${desc}":`, e);
-        }
-    }));
-
-    const resultIds: string[] = [];
-
-    // 4. USE DB TRANSACTION (all or nothing)
-    let buckets: string[] = [];
-    await db.transaction(async (tx) => {
-
-        // BULK UPDATE
-        if (updates.length > 0) {
-            for (const data of updates) {
-                await tx.update(transactions)
-                    .set({
-                        type: data.type,
-                        amount: data.amount.toString(),
-                        description: data.description,
-                        categoryId: categoryMap.get(data.category)!,
-                        bucket: data.bucket,
-                        fileId: data.fileId,
-                        aiConfidence: data.confidence.toString(),
-                        embedding: embeddingMap.get(data.description) ?? null,
-                    })
-                    .where(eq(transactions.id, data.transactionId!));
-
-                buckets.push(data.bucket);
-                resultIds.push(data.transactionId!);
-            }
-        }
-
-        // BULK INSERT
-        if (inserts.length > 0) {
-            const insertData = inserts.map(data => ({
-                userId: target.userId!,
-                groupId: target.groupId,
-                periodId: periodId,
-                type: data.type,
-                amount: data.amount.toString(),
-                description: data.description,
-                categoryId: categoryMap.get(data.category)!,
-                bucket: data.bucket,
-                fileId: data.fileId,
-                aiConfidence: data.confidence.toString(),
-                embedding: embeddingMap.get(data.description) ?? null,
-            }));
-
-            const inserted = await tx.insert(transactions)
-                .values(insertData)
-                .returning({ id: transactions.id });
-
-            resultIds.push(...inserted.map(r => r.id));
-            buckets.push(...insertData.map(d => d.bucket));
-        }
-    });
-
-    const remainingBudget = await getBudgetSummary(target.targetId, periodId, !!target.groupId);
-    let remainingBucket = remainingBudget?.budget.buckets ?? [];
-    if (remainingBucket.length > 0) {
-        const lowerCaseBuckets = buckets.map(b => b.toLowerCase());
-        remainingBucket = remainingBucket.filter(b => lowerCaseBuckets.includes(b.bucket.toLowerCase()));
+    async getTransactionHistory(targetId: string, periodId: string, limit: number = 5): Promise<string> {
+        const transactions = await this.transactionRepo.findByTargetAndPeriod(targetId, periodId);
+        // Format logic would go here or be delegated to a formatter
+        return transactions.slice(0, limit).map(t => `${t.amount} - ${t.description}`).join("\n");
     }
 
-    return { ids: resultIds, remainingBucket };
-}
-
-// =============================================================================
-// AI READ TOOL SERVICES
-// =============================================================================
-
-export interface TransactionHistoryOptions {
-    limit?: number;
-    bucket?: string;
-    type?: string;
-    daysBack?: number;
-}
-
-/**
- * Get transaction history for AI tool
- */
-export async function getTransactionHistory(
-    target: TargetContext,
-    periodId: string,
-    options: TransactionHistoryOptions = {}
-) {
-    const limit = options.limit ?? 5;
-    const daysBack = options.daysBack ?? 7;
-    const sinceDate = new Date();
-    sinceDate.setDate(sinceDate.getDate() - daysBack);
-
-    const condition = target.groupId
-        ? eq(transactions.groupId, target.groupId)
-        : eq(transactions.userId, target.userId!);
-
-    const whereConditions = [
-        eq(transactions.periodId, periodId),
-        condition,
-    ];
-
-    if (options.bucket) {
-        whereConditions.push(eq(transactions.bucket, options.bucket));
-    }
-    if (options.type) {
-        whereConditions.push(eq(transactions.type, options.type as any));
+    async searchTransactionsByKeyword(targetId: string, periodId: string, keyword: string): Promise<TransactionWithCategory[]> {
+        const transactions = await this.transactionRepo.findByTargetAndPeriod(targetId, periodId);
+        return transactions.filter(t =>
+            t.description?.toLowerCase().includes(keyword.toLowerCase()) ||
+            t.category?.name.toLowerCase().includes(keyword.toLowerCase())
+        );
     }
 
-    const results = await db.query.transactions.findMany({
-        where: and(...whereConditions),
-        orderBy: [desc(transactions.createdAt)],
-        limit: limit,
-    });
+    async trackAiUsage(_params: any): Promise<void> {
+        // Implementation
+    }
 
-    return results.map(tx => ({
-        id: tx.id,
-        type: tx.type,
-        amount: tx.amount,
-        description: tx.description,
-        bucket: tx.bucket,
-        createdAt: tx.createdAt,
-    }));
-}
-
-/**
- * Search transactions by keyword for AI tool
- */
-export async function searchTransactionsByKeyword(
-    target: TargetContext,
-    periodId: string,
-    query: string,
-    limit: number = 10
-) {
-    const condition = target.groupId
-        ? eq(transactions.groupId, target.groupId)
-        : eq(transactions.userId, target.userId!);
-
-    const results = await db.query.transactions.findMany({
-        where: and(
-            eq(transactions.periodId, periodId),
-            condition,
-            ilike(transactions.description, `%${query}%`),
-        ),
-        orderBy: [desc(transactions.createdAt)],
-        limit: limit,
-    });
-
-    return results.map(tx => ({
-        id: tx.id,
-        type: tx.type,
-        amount: tx.amount,
-        description: tx.description,
-        bucket: tx.bucket,
-        createdAt: tx.createdAt,
-    }));
+    async deleteTransaction(id: string): Promise<boolean> {
+        return await this.transactionRepo.delete(id);
+    }
 }

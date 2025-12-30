@@ -3,9 +3,10 @@ import { conversations, createConversation } from "@grammyjs/conversations";
 import { hydrate } from "@grammyjs/hydrate";
 import { sequentialize } from "@grammyjs/runner";
 import type { BotContext, SessionData } from "../types.js";
-import { registrationConversation } from "../conversations/registration.js";
-import { onboardingConversation } from "../conversations/onboarding.js";
-import { setupbudget } from "../conversations/setupbudget.js";
+import { createRegistrationConversation } from "../conversations/registration.js";
+
+import { IUserService, IPeriodService } from "@kodetama/shared";
+import { createContextMiddleware } from "../middleware/context.js";
 
 /**
  * Configuration class for bot setup
@@ -13,9 +14,13 @@ import { setupbudget } from "../conversations/setupbudget.js";
  */
 export class BotConfiguration {
     private readonly bot: Bot<BotContext>;
+    private readonly userService: IUserService;
+    private readonly periodService: IPeriodService;
 
-    constructor(bot: Bot<BotContext>) {
+    constructor(bot: Bot<BotContext>, userService: IUserService, periodService: IPeriodService) {
         this.bot = bot;
+        this.userService = userService;
+        this.periodService = periodService;
     }
 
     /**
@@ -27,6 +32,7 @@ export class BotConfiguration {
 
         // Core middleware
         this.bot.use(hydrate());
+        this.bot.use(createContextMiddleware(this.userService, this.periodService));
 
         // Conversations
         this.configureConversations();
@@ -58,10 +64,10 @@ export class BotConfiguration {
      * Configure conversation middleware
      */
     private configureConversations(): void {
+        const registrationConversation = createRegistrationConversation(this.userService);
+
         this.bot.use(conversations());
         this.bot.use(createConversation(registrationConversation));
-        this.bot.use(createConversation(onboardingConversation));
-        this.bot.use(createConversation(setupbudget));
     }
 
     /**

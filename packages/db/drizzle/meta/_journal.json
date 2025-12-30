@@ -64,6 +64,13 @@
       "when": 1766826510829,
       "tag": "0008_black_the_phantom",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1766980270000,
+      "tag": "0009_same_scarlet_witch",
+      "breakpoints": true
     }
   ]
 }

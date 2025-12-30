@@ -10,13 +10,65 @@ import {
     MessageProcessor
 } from "./core/index.js";
 
+// Repositories
+import {
+    UserRepository,
+    GroupRepository,
+    DatePeriodRepository,
+    BudgetRepository,
+    TransactionRepository,
+    CategoryRepository,
+    PendingRegistrationRepository
+} from "./infrastructure/repositories/index.js";
+
+// Services
+import { UserService } from "./services/user.js";
+import { GroupService } from "./services/group.js";
+import { PeriodService } from "./services/period.js";
+import { BudgetService } from "./services/budget.js";
+import { TransactionService } from "./services/transaction.js";
+import { FileService } from "./services/file.js";
+
+// Tool handlers
+import {
+    ToolExecutor,
+    ConfirmTelegramTool,
+    UpsertTransactionTool,
+    DeleteTransactionTool,
+    UpsertBucketTool,
+    DeleteBucketTool,
+    UpsertPeriodTool,
+    GetTransactionHistoryTool,
+    GetBudgetStatusTool,
+    SearchTransactionsTool,
+    GetFinancialSummaryTool
+} from "./handlers/tools/index.js";
+
+// Use Cases
+import { TransactionUseCase } from "./useCases/TransactionUseCase.js";
+
+// AI
+import { AIOrchestrator, ConversationAI } from "@kodetama/ai";
+
 // Command handlers
-import { StartCommand, HelpCommand, BudgetCommand, DashboardCommand, JoinFamilyCommand, LinkFamilyCommand, UndoCommand, SummaryCommand, ExportExcelCommand, CancelCommand } from "./handlers/commands/index.js";
+import {
+    StartCommand,
+    HelpCommand,
+    BudgetCommand,
+    DashboardCommand,
+    JoinFamilyCommand,
+    LinkFamilyCommand,
+    UndoCommand,
+    SummaryCommand,
+    ExportExcelCommand,
+    CancelCommand
+} from "./handlers/commands/index.js";
 
 // Event handlers
-import { handleAdminCallback } from "./handlers/admin.js";
+import { createAdminCallbackHandler } from "./handlers/admin.js";
 import { TransactionCallbackHandler } from "./handlers/callbacks/index.js";
-import { handleTransaction } from "./handlers/transaction.js";
+import { createTransactionHandler } from "./handlers/transaction.js";
+import { createGroupMessageHandler } from "./handlers/group.js";
 import { Scheduler } from "./utils/Scheduler.js";
 
 
@@ -34,42 +86,100 @@ const BOT_TOKEN_STR = BOT_TOKEN as string;
 // =============================================================================
 
 async function createBotApplication() {
-    // 1. Create bot instance
+    // 1. Initialize Repositories
+    const userRepository = new UserRepository();
+    const groupRepository = new GroupRepository();
+    const datePeriodRepository = new DatePeriodRepository();
+    const budgetRepository = new BudgetRepository();
+    const transactionRepository = new TransactionRepository();
+    const categoryRepository = new CategoryRepository();
+    const pendingRegistrationRepository = new PendingRegistrationRepository();
+
+    // 2. Initialize Services
+    const userService = new UserService(userRepository, pendingRegistrationRepository);
+    const groupService = new GroupService(groupRepository);
+    const periodService = new PeriodService(datePeriodRepository, budgetRepository);
+    const budgetService = new BudgetService(budgetRepository, transactionRepository);
+    const transactionService = new TransactionService(
+        transactionRepository,
+        categoryRepository
+    );
+    const fileService = new FileService();
+
+    // 3. Initialize AI Services
+    const aiConfig = {
+        apiKey: process.env.OPENROUTER_API_KEY ?? "",
+        model: process.env.OPENROUTER_MODEL,
+    };
+    const aiOrchestrator = new AIOrchestrator(aiConfig);
+    const conversationAI = new ConversationAI(aiConfig);
+
+    // 4. Initialize Use Cases
+    const transactionUseCase = new TransactionUseCase(
+        aiOrchestrator,
+        transactionService,
+        periodService,
+        budgetService
+    );
+
+    // 5. Create bot instance
     const bot = new Bot<BotContext>(BOT_TOKEN_STR);
 
-    // 2. Configure middleware and error handling
-    const botConfig = new BotConfiguration(bot);
+    // 6. Configure middleware and error handling
+    const botConfig = new BotConfiguration(bot, userService, periodService);
     botConfig.configureMiddleware();
     botConfig.configureErrorHandling();
 
-    // 3. Create command registry and register handlers (Open/Closed Principle)
+    // 7. Create command registry and register handlers
     const commandRegistry = new CommandRegistry();
-    commandRegistry.register(new StartCommand());
+    commandRegistry.register(new StartCommand(userService, groupService, periodService, budgetService));
     commandRegistry.register(new HelpCommand());
-    commandRegistry.register(new BudgetCommand());
-    commandRegistry.register(new DashboardCommand());
-    commandRegistry.register(new JoinFamilyCommand());
-    commandRegistry.register(new LinkFamilyCommand());
-    commandRegistry.register(new UndoCommand());
-    commandRegistry.register(new SummaryCommand());
-    commandRegistry.register(new ExportExcelCommand());
+    commandRegistry.register(new BudgetCommand(periodService, budgetService));
+    commandRegistry.register(new DashboardCommand(periodService));
+    commandRegistry.register(new JoinFamilyCommand(groupService));
+    commandRegistry.register(new LinkFamilyCommand(groupService, userService));
+    commandRegistry.register(new UndoCommand(transactionUseCase));
+    commandRegistry.register(new SummaryCommand(transactionService, periodService, budgetService));
+    commandRegistry.register(new ExportExcelCommand(transactionService, periodService));
     commandRegistry.register(new CancelCommand());
 
-    // 4. Create message processor with command routing
-    const messageProcessor = new MessageProcessor(commandRegistry);
+    // 8. Create transaction callback handler
+    const transactionCallbackHandler = new TransactionCallbackHandler(transactionUseCase);
 
-    // 5. Create transaction callback handler
-    const transactionCallbackHandler = new TransactionCallbackHandler(
-        new (await import("./useCases/TransactionUseCase.js")).TransactionUseCase(
-            new (await import("@kodetama/ai")).AIOrchestrator({
-                apiKey: process.env.OPENROUTER_API_KEY ?? "",
-                model: process.env.OPENROUTER_MODEL,
-            })
-        )
+    // 10. Create and configure ToolExecutor with all tool handlers
+    const toolExecutor = new ToolExecutor();
+    toolExecutor.register(new ConfirmTelegramTool());
+    toolExecutor.register(new UpsertTransactionTool(transactionService));
+    toolExecutor.register(new DeleteTransactionTool(transactionService));
+    toolExecutor.register(new UpsertBucketTool(budgetService));
+    toolExecutor.register(new DeleteBucketTool(budgetService));
+    toolExecutor.register(new UpsertPeriodTool(periodService));
+    toolExecutor.register(new GetTransactionHistoryTool(transactionService));
+    toolExecutor.register(new GetBudgetStatusTool(budgetService));
+    toolExecutor.register(new SearchTransactionsTool(transactionService));
+    toolExecutor.register(new GetFinancialSummaryTool(transactionService));
+
+    // 11. Create transaction handler (factory)
+    const transactionHandler = createTransactionHandler(
+        conversationAI,
+        periodService,
+        budgetService,
+        userService,
+        fileService,
+        toolExecutor
     );
 
-    // 6. Wire up event handlers
-    setupEventHandlers(bot, messageProcessor, transactionCallbackHandler);
+    // 12. Create group message handler (factory)
+    const groupMessageHandler = createGroupMessageHandler(transactionHandler);
+
+    // 13. Create message processor with handlers
+    const messageProcessor = new MessageProcessor(commandRegistry, groupMessageHandler, transactionHandler);
+
+    // 14. Create admin handler
+    const adminHandler = createAdminCallbackHandler(userService, periodService, budgetService);
+
+    // LAST Wire up event handlers
+    setupEventHandlers(bot, messageProcessor, transactionCallbackHandler, transactionHandler, adminHandler);
 
     return { bot, messageProcessor };
 }
@@ -77,7 +187,9 @@ async function createBotApplication() {
 function setupEventHandlers(
     bot: Bot<BotContext>,
     messageProcessor: MessageProcessor,
-    transactionCallbackHandler: TransactionCallbackHandler
+    transactionCallbackHandler: TransactionCallbackHandler,
+    transactionHandler: (ctx: BotContext) => Promise<void>,
+    adminHandler: (ctx: BotContext) => Promise<void>
 ) {
     // Command handling - all commands go through registry
     bot.on("message:text", async (ctx) => {
@@ -100,7 +212,7 @@ function setupEventHandlers(
 
         // Admin approval callbacks
         if (data.startsWith("approve_") || data.startsWith("reject_")) {
-            await handleAdminCallback(ctx);
+            await adminHandler(ctx)
             return;
         }
 
@@ -131,7 +243,7 @@ function setupEventHandlers(
         }
 
         if (data.startsWith("ai_") || data.startsWith("log_invoice_")) {
-            await handleTransaction(ctx);
+            await transactionHandler(ctx);
             return;
         }
 
@@ -148,7 +260,7 @@ function setupEventHandlers(
 
     // Document/photo handler (invoice upload, Pro tier)
     bot.on(["message:document", "message:photo"], async (ctx) => {
-        await handleTransaction(ctx);
+        await transactionHandler(ctx);
     });
 }
 

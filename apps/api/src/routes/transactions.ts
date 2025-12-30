@@ -37,14 +37,12 @@ function getAI(): AIOrchestrator {
 export async function transactionRoutes(fastify: FastifyInstance): Promise<void> {
 
     // Helper function to resolve periodId (handles "default")
-    async function resolvePeriodId(targetId: string, targetType: "user" | "group", periodId?: string): Promise<string | null> {
+    async function resolvePeriodId(targetId: string, periodId?: string): Promise<string | null> {
         if (!periodId) return null;
         if (periodId === "default") {
             const currentPeriod = await db.query.datePeriods.findFirst({
                 where: and(
-                    targetType === "group"
-                        ? eq(datePeriods.groupId, targetId)
-                        : eq(datePeriods.userId, targetId),
+                    eq(datePeriods.targetId, targetId),
                     eq(datePeriods.isCurrent, true)
                 ),
 
@@ -72,7 +70,7 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
         const { periodId: rawPeriodId, page = "1", pageSize = "20" } = request.query;
 
         // Resolve periodId (handles "default")
-        const periodId = await resolvePeriodId(payload.targetId, payload.targetType, rawPeriodId);
+        const periodId = await resolvePeriodId(payload.targetId, rawPeriodId);
         const pageNum = parseInt(page);
         const pageSizeNum = parseInt(pageSize);
         const offset = (pageNum - 1) * pageSizeNum;
@@ -145,8 +143,11 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
             rawMessage?: string;
             transactionDate?: string;
         };
-    }>("/", async (request) => {
+    }>("/", {
+        preHandler: [authenticate, loggingMiddleware]
+    }, async (request) => {
         const { userId, periodId, type, amount, categoryId, bucket, description, rawMessage, transactionDate } = request.body;
+        const payload = request.user as { id: string; targetId: string; targetType: "user" | "group" };
         const clientIP = request.ip || 'unknown';
 
         logger.info("New transaction creation attempt", {
@@ -174,6 +175,7 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
                 .insert(transactions)
                 .values({
                     userId,
+                    targetId: payload.targetId,
                     periodId,
                     type,
                     amount,
@@ -269,7 +271,7 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
         const { periodId: rawPeriodId } = request.query;
 
         // Resolve periodId (handles "default")
-        const periodId = await resolvePeriodId(payload.targetId, payload.targetType, rawPeriodId);
+        const periodId = await resolvePeriodId(payload.targetId, rawPeriodId);
 
         // Return empty data if no periodId
         if (!periodId) {
@@ -389,9 +391,7 @@ export async function transactionRoutes(fastify: FastifyInstance): Promise<void>
         }
 
         try {
-            const condition = payload.targetType === 'group'
-                ? eq(transactions.groupId, payload.targetId)
-                : eq(transactions.userId, payload.targetId);
+            const condition = eq(transactions.targetId, payload.targetId);
 
             const updated = await db
                 .update(transactions)

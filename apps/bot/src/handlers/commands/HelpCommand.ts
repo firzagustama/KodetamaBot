@@ -16,16 +16,18 @@ export class HelpCommand extends CommandHandler {
             "• `makan 20rb`\n" +
             "• `gaji 10jt`\n" +
             "• `buat budget belanja 500rb`\n" +
+            "• `buat periode baru`\n" +
             "• `transfer ke mama 500k`\n\n" +
-            "*Fitur Pro (Gratis selama Beta):*\n" +
+            "*Atau lo juga bisa:*\n" +
             "• Kirim foto struk/invoice\n" +
             "• Kirim voice note\n\n" +
             "*Perintah:*\n" +
             "/start - Mulai/Reset\n" +
             "/help - Bantuan ini\n" +
-            "/budget - Cek budget\n" +
+            "/dashboard - Dashboard\n" +
+            "/budget - Lihat budget bulan ini\n" +
             "/summary - Ringkasan bulan ini\n" +
-            // "/undo - Batalin transaksi terakhir\n" +
+            "`/export_excel` - Export laporan ke excel\n" +
             "/cancel - Batalin percakapan",
             { parse_mode: "Markdown" }
         );
