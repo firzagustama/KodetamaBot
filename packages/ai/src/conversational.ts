@@ -238,7 +238,7 @@ export class ConversationAI implements IConversationAI {
                 .map(b => `${b.id}:${b.name}:${b.description}`)
                 .join("\n");
         }
-        return `Period\n${periodCtx}\n\nSummary: ${summary}\n\nLast Transactions: ${recentTx}\n\nIncome: ${income}\n\nBuckets: ${buckets}`;
+        return `Period\n${periodCtx}\n\nPreferences: ${summary}\n\nLast Transactions: ${recentTx}\n\nIncome: ${income}\n\nBuckets: ${buckets}`;
     }
 
     private async getLastNTransaction(periodId: string, n: number): Promise<string> {

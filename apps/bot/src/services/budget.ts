@@ -28,15 +28,15 @@ export class BudgetService implements IBudgetService {
         const summmary = await this.transactionRepo.getTransactionsSummary(targetId, periodId);
 
         // Calculate total amount and spent for each bucket
-        const sum: Record<string, { bucket: string, amount: number; spent: number }> = {};
+        const sum: Record<string, { bucket: string, amount: number; spent: number; remaining: number }> = {};
         budget.buckets.forEach((bucket: any) => {
             if (!bucket.isSystem) {
-                sum[bucket.name] = { bucket: bucket.name, amount: parseFloat(bucket.amount), spent: 0 };
+                sum[bucket.name] = { bucket: bucket.name, amount: parseFloat(bucket.amount), spent: 0, remaining: 0 };
             }
         });
         summmary.forEach((item: any) => {
             if (!sum[item.bucket]) {
-                sum[item.bucket] = { bucket: item.bucket, amount: 0, spent: 0 };
+                sum[item.bucket] = { bucket: item.bucket, amount: 0, spent: 0, remaining: 0 };
             }
 
             switch (item.type) {
@@ -51,6 +51,9 @@ export class BudgetService implements IBudgetService {
             }
         });
         const spending = Object.values(sum);
+        spending.forEach((item: any) => {
+            item.remaining = item.amount - item.spent;
+        });
         return {
             budget,
             spending
