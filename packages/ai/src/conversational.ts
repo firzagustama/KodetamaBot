@@ -7,17 +7,18 @@ import { CONTEXT_SUMMARY_USER_PROMPT, CONVERSATION_SYSTEM_PROMPT } from "./promp
 import { eq, desc } from "drizzle-orm";
 import {
     // Write tools
-    upsertTransactionTool,
+    insertTransactionTool,
     deleteTransactionTool,
     upsertBucketTool,
     deleteBucketTool,
     upsertPeriodTool,
+    updateTransactionTool,
     // Read tools
     getTransactionHistoryTool,
     getBudgetStatusTool,
     searchTransactionsTool,
     getFinancialSummaryTool,
-    confirmTelegramTool,
+    // confirmTelegramTool,
 } from "./tools/index.js";
 
 export class ConversationAI implements IConversationAI {
@@ -38,13 +39,14 @@ export class ConversationAI implements IConversationAI {
     // All available tools
     private readonly tools = [
         // Confirm tools
-        confirmTelegramTool,
+        // confirmTelegramTool,
         // Write tools
-        upsertTransactionTool,
+        insertTransactionTool,
         deleteTransactionTool,
         upsertBucketTool,
         deleteBucketTool,
         upsertPeriodTool,
+        updateTransactionTool,
         // Read tools
         getTransactionHistoryTool,
         getBudgetStatusTool,
@@ -139,7 +141,6 @@ export class ConversationAI implements IConversationAI {
     }
 
     async setTargetContext(target: TargetContext, messages: ChatCompletionMessageParam[]): Promise<void> {
-        console.log(messages);
         const contextKey = getTargetContextKey(target.targetId);
         const filtered = messages.filter((message) => message.role !== "system");
         await redisManager.set(contextKey, JSON.stringify(filtered), this.CONTEXT_TTL);

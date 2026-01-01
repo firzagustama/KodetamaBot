@@ -1,8 +1,8 @@
 import { IToolHandler, ToolHandlerContext, compactResult } from "./ToolExecutor.js";
 import { IBudgetService, ITransactionService } from "@kodetama/shared";
 
-export class UpsertTransactionTool implements IToolHandler {
-    readonly name = "upsertTransaction";
+export class InsertTransactionTool implements IToolHandler {
+    readonly name = "insertTransaction";
 
     constructor(private transactionService: ITransactionService, private budgetService: IBudgetService) { }
 
@@ -30,9 +30,6 @@ export class UpsertTransactionTool implements IToolHandler {
         // Get remaining buckets
         const summary = await this.budgetService.getBudgetSummary(targetId, period.id);
         const remainingBuckets = summary?.spending.filter(sp => usedBuckets.includes(sp.bucket));
-
-        console.log(usedBuckets)
-        console.log(remainingBuckets);
         return compactResult({ ok: true, ids, remainingBuckets });
     }
 }

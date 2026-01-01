@@ -1,23 +1,11 @@
 import { TX_TYPES } from "@kodetama/shared";
 import { ChatCompletionTool } from "openai/resources.mjs";
 
-export interface UpsertTransactionParams {
-    transactionId?: string;
-    fileId?: string;
-    type: "income" | "expense" | "transfer" | "adjustment";
-    amount: number;
-    category: string;
-    bucket: string;
-    description: string;
-    confidence: number;
-    confirmationMessage?: string;
-}
-
-export const upsertTransactionTool: ChatCompletionTool = {
+export const updateTransactionTool: ChatCompletionTool = {
     type: "function",
     function: {
-        name: "upsertTransaction",
-        description: "Log transactions. rb=1000, jt=1M. Batch supported.",
+        name: "updateTransaction",
+        description: "Update transactions.",
         parameters: {
             type: "object",
             properties: {
@@ -26,8 +14,7 @@ export const upsertTransactionTool: ChatCompletionTool = {
                     items: {
                         type: "object",
                         properties: {
-                            transactionId: { type: "string", description: "MANDATORY if updating existing transaction (optional)" },
-                            fileId: { type: "string", description: "File ID associated with the transaction (optional)" },
+                            transactionId: { type: "string", description: "transaction id from candidate, DONT ASK USER" },
                             type: { type: "string", enum: TX_TYPES },
                             amount: { type: "number", description: "IDR" },
                             category: { type: "string", description: "Indonesian category such as Makanan, Transportasi, Belanja, Kesehatan, etc" },
@@ -36,11 +23,10 @@ export const upsertTransactionTool: ChatCompletionTool = {
                             confidence: { type: "number", description: ">= 0.8 to execute" },
                             confirmationMessage: { type: "string", description: "What is need to be confirmed if confidence < 0.8" },
                         },
-                        required: ["type", "amount", "category", "bucket", "confidence", "description"],
+                        required: ["transactionId", "type", "amount", "category", "bucket", "confidence", "description"],
                     }
                 },
             },
-            required: ["input"],
         },
     },
 }

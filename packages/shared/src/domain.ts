@@ -166,7 +166,9 @@ export interface ITransactionRepository {
     findById(id: string): Promise<TransactionWithCategory | null>;
     findByIds(ids: string[]): Promise<TransactionWithCategory[]>;
     findByTargetAndPeriod(targetId: string, periodId: string): Promise<TransactionWithCategory[]>;
+    findByVector(targetId: string, periodId: string, searchQuery: number[], treshold: number): Promise<TransactionWithCategory[]>;
     save(transaction: Omit<Transaction, "id" | "createdAt">): Promise<string>;
+    update(transaction: Transaction): Promise<string>;
     delete(id: string): Promise<boolean>;
     getPeriodTotals(targetId: string, periodId: string): Promise<PeriodTotals>;
     getTransactionsSummary(targetId: string, periodId: string): Promise<any[]>;
@@ -247,10 +249,12 @@ export interface ITransactionService {
     getTransactionCount(targetId: string, periodId: string): Promise<number>;
     recommendSetupBuckets(targetId: string, periodId: string): Promise<boolean>;
     upsertTransaction(params: any): Promise<string>;
+    updateTransaction(params: any): Promise<string>;
     getTransactionHistory(targetId: string, periodId: string, limit?: number): Promise<string>;
     searchTransactionsByKeyword(targetId: string, periodId: string, keyword: string): Promise<TransactionWithCategory[]>;
     deleteTransaction(id: string): Promise<boolean>;
     trackAiUsage(params: any): Promise<void>;
+    searchTransactionsByVector(targetId: string, periodId: string, searchQuery: number[], treshold: number): Promise<TransactionWithCategory[]>;
 }
 
 // =============================================================================

@@ -170,10 +170,10 @@ export function createTransactionHandler(
 
                 // Handle tool calls
                 if (response.tool_calls && response.tool_calls.length > 0) {
-                    // Inject fileId into upsertTransaction arguments if available
+                    // Inject fileId into insertTransaction arguments if available
                     if (fileId) {
                         for (const toolCall of response.tool_calls) {
-                            if (toolCall.function.name === "upsertTransaction") {
+                            if (toolCall.function.name === "insertTransaction") {
                                 const args = JSON.parse(toolCall.function.arguments);
                                 if (args.input && Array.isArray(args.input)) {
                                     args.input = args.input.map((item: any) => ({ ...item, fileId }));

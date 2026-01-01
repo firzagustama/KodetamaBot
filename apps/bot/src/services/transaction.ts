@@ -54,6 +54,21 @@ export class TransactionService implements ITransactionService {
         return await this.saveTransaction(params);
     }
 
+    async updateTransaction(params: any): Promise<string> {
+        // Resolve category if needed
+        const categoryId = await this.categoryRepo.findOrCreate(
+            params.targetId,
+            params.transaction.category,
+            params.transaction.bucket
+        );
+
+        return await this.transactionRepo.update({
+            ...params.transaction,
+            categoryId,
+            rawMessage: params.rawMessage
+        });
+    }
+
     async getTransactionHistory(targetId: string, periodId: string, limit: number = 5): Promise<string> {
         const transactions = await this.transactionRepo.findByTargetAndPeriod(targetId, periodId);
         // Format logic would go here or be delegated to a formatter
@@ -74,5 +89,9 @@ export class TransactionService implements ITransactionService {
 
     async deleteTransaction(id: string): Promise<boolean> {
         return await this.transactionRepo.delete(id);
+    }
+
+    async searchTransactionsByVector(targetId: string, periodId: string, searchQuery: number[], treshold: number = 0.18): Promise<TransactionWithCategory[]> {
+        return await this.transactionRepo.findByVector(targetId, periodId, searchQuery, treshold);
     }
 }

@@ -63,6 +63,25 @@ export class TransactionRepository implements ITransactionRepository {
         }));
     }
 
+    async findByVector(targetId: string, periodId: string, searchQuery: number[], treshold: number = 0.18): Promise<TransactionWithCategory[]> {
+        const results = await db.query.transactions.findMany({
+            where: and(
+                eq(transactions.targetId, targetId),
+                eq(transactions.periodId, periodId),
+                sql`${transactions.embedding} <=> ${JSON.stringify(searchQuery)}::vector <= ${treshold}`
+            ),
+            with: {
+                category: true,
+            },
+            limit: 5,
+        });
+
+        return results.map(result => ({
+            ...result,
+            category: result.category || null,
+        }));
+    }
+
     async save(transaction: Omit<Transaction, "id" | "createdAt">): Promise<string> {
         const dbType = transaction.type as "income" | "expense" | "transfer" | "adjustment";
 
@@ -71,6 +90,31 @@ export class TransactionRepository implements ITransactionRepository {
             targetId: transaction.targetId,
             type: dbType,
         }).returning({ id: transactions.id });
+
+        return result.id;
+    }
+
+    async update(transaction: any): Promise<string> {
+        const updateId = transaction.transactionId;
+        const data = await db.query.transactions.findFirst({
+            where: eq(transactions.id, updateId),
+        });
+
+        if (!data) {
+            throw new Error("Transaction not found");
+        }
+
+        data.amount = transaction.amount;
+        data.bucket = transaction.bucket;
+        data.description = transaction.description;
+        data.type = transaction.type;
+        data.periodId = transaction.periodId;
+        data.targetId = transaction.targetId;
+        data.categoryId = transaction.categoryId;
+
+        const [result] = await db.update(transactions).set(data)
+            .where(eq(transactions.id, updateId))
+            .returning({ id: transactions.id });
 
         return result.id;
     }

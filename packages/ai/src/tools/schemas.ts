@@ -13,7 +13,7 @@ import { TX_TYPES } from "@kodetama/shared";
 /**
  * Schema for upserting transactions via AI
  */
-export const UpsertTransactionItemSchema = z.object({
+export const TransactionItemSchema = z.object({
     transactionId: z.string().uuid().optional().describe("Transaction ID for update, omit for new"),
     type: z.enum(TX_TYPES).describe("income: gaji, transfer in | expense: beli, makan | transfer: kirim uang | adjustment: koreksi"),
     amount: z.number().positive().describe("Amount in IDR. Parse: rb/ribu/k=×1000, jt/juta=×1000000. Comma=decimal"),
@@ -25,7 +25,7 @@ export const UpsertTransactionItemSchema = z.object({
 });
 
 export const UpsertTransactionSchema = z.object({
-    input: z.array(UpsertTransactionItemSchema).min(1).describe("Array of transactions to upsert"),
+    input: z.array(TransactionItemSchema).min(1).describe("Array of transactions to insert"),
 });
 
 export type UpsertTransactionInput = z.infer<typeof UpsertTransactionSchema>;
