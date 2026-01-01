@@ -82,7 +82,7 @@ export function createTransactionHandler(
 
         // Group confirmation flow
         if ((isPhoto || isDocument) && target.isGroup && !isCallback) {
-            const fileId = ctx.message?.photo ? ctx.message.photo[ctx.message.photo.length - 1].file_id : ctx.message?.document?.file_id;
+            const fileId = ctx.message?.photo ? ctx.message.photo[ctx.message.photo.length - 2].file_id : ctx.message?.document?.file_id;
             if (fileId) {
                 ctx.session.pendingFileId = fileId;
                 const keyboard = new InlineKeyboard()

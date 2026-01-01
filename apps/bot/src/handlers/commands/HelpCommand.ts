@@ -19,15 +19,25 @@ export class HelpCommand extends CommandHandler {
             "• `buat periode baru`\n" +
             "• `transfer ke mama 500k`\n\n" +
             "*Atau lo juga bisa:*\n" +
+            "• Catat bareng temen/keluarga di grup\n" +
             "• Kirim foto struk/invoice\n" +
             "• Kirim voice note\n\n" +
+            "*Pencatatan di grup:*\n" +
+            "1. Buat dan invite bot ini ke grup\n" +
+            "2. Ubah setting grup menjadi 'Semua anggota dapat mengirim pesan'\n" +
+            "3. Jadikan bot sebagai admin\n" +
+            "4. Jalankan perintah /link\\_family\n" +
+            "5. Untuk anggota grup jalankan perintah /join\\_group\n" +
+            "6. Setelah itu lo bisa catat bareng temen/keluarga di grup!\n\n" +
             "*Perintah:*\n" +
             "/start - Mulai/Reset\n" +
             "/help - Bantuan ini\n" +
             "/dashboard - Dashboard\n" +
             "/budget - Lihat budget bulan ini\n" +
             "/summary - Ringkasan bulan ini\n" +
-            "`/export_excel` - Export laporan ke excel\n" +
+            "/export\\_excel - Export laporan ke excel\n" +
+            "/join\\_family - Join keluarga\n" +
+            "/link\\_family - Link grup untuk pencatatan (Owner)\n" +
             "/cancel - Batalin percakapan",
             { parse_mode: "Markdown" }
         );
