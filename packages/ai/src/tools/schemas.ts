@@ -22,6 +22,7 @@ export const TransactionItemSchema = z.object({
     description: z.string().min(1).describe("Brief transaction description"),
     confidence: z.number().min(0).max(1).describe("0.0-1.0. Must be >0.8 to auto-execute"),
     confirmationMessage: z.string().optional().describe("Required if confidence <0.8. Ask user to clarify"),
+    embedding: z.array(z.number()).optional().describe("Embedding for transaction description"),
 });
 
 export const UpsertTransactionSchema = z.object({

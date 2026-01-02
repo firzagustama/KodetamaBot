@@ -5,7 +5,7 @@ export const updateTransactionTool: ChatCompletionTool = {
     type: "function",
     function: {
         name: "updateTransaction",
-        description: "Update transactions.",
+        description: "Update transactions. Batch supported.",
         parameters: {
             type: "object",
             properties: {
@@ -27,6 +27,7 @@ export const updateTransactionTool: ChatCompletionTool = {
                     }
                 },
             },
+            required: ["input"],
         },
     },
 }

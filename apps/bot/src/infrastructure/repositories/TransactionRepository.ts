@@ -111,6 +111,7 @@ export class TransactionRepository implements ITransactionRepository {
         data.periodId = transaction.periodId;
         data.targetId = transaction.targetId;
         data.categoryId = transaction.categoryId;
+        data.embedding = transaction.embedding;
 
         const [result] = await db.update(transactions).set(data)
             .where(eq(transactions.id, updateId))
