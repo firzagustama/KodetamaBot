@@ -1,3 +1,4 @@
+import { UpdateBucketInput } from "@kodetama/ai";
 import { IBudgetService, IBudgetRepository, ITransactionRepository, PeriodBudget } from "@kodetama/shared";
 
 export class BudgetService implements IBudgetService {
@@ -90,35 +91,41 @@ export class BudgetService implements IBudgetService {
     }
 
     /**
-     * AI Tool: Upsert bucket
+     * AI Tool: Update bucket
      */
-    async upsertBucket(periodId: string, args: any): Promise<void> {
+    async updateBucket(periodId: string, args: UpdateBucketInput): Promise<void> {
         const budget = await this.budgetRepo.findByPeriodId(periodId);
         if (!budget) throw new Error("Budget not found for period");
 
         // Find if bucket exists by name
         const existing = budget.buckets.find((b: any) => b.name.toLowerCase() === args.name.toLowerCase());
+        if (!existing) throw new Error("Bucket not found");
 
-        if (existing) {
-            // Update
-            await this.budgetRepo.updateBucket(existing.id, {
-                amount: args.amount?.toString(),
-                description: args.description,
-                icon: args.icon,
-                category: args.category
-            });
-        } else {
-            // Create
-            await this.budgetRepo.saveBucket({
-                budgetId: budget.id,
-                name: args.name,
-                amount: args.amount?.toString() || "0",
-                description: args.description,
-                icon: args.icon,
-                category: args.category,
-                isSystem: false
-            });
-        }
+        await this.budgetRepo.updateBucket(existing.id, {
+            amount: args.amount?.toString(),
+            description: args.description,
+            category: args.category,
+            embedding: args.embedding
+        });
+    }
+
+    /**
+     * AI Tool: Insert bucket
+     */
+    async insertBucket(periodId: string, args: any): Promise<void> {
+        const budget = await this.budgetRepo.findByPeriodId(periodId);
+        if (!budget) throw new Error("Budget not found for period");
+
+        // Create
+        await this.budgetRepo.saveBucket({
+            budgetId: budget.id,
+            name: args.name,
+            amount: args.amount?.toString() || "0",
+            description: args.description,
+            category: args.category,
+            isSystem: false,
+            embedding: args.embedding
+        });
     }
 
     /**

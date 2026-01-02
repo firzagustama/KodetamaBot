@@ -9,7 +9,8 @@ import {
     // Write tools
     insertTransactionTool,
     deleteTransactionTool,
-    upsertBucketTool,
+    insertBucketTool,
+    updateBucketTool,
     deleteBucketTool,
     upsertPeriodTool,
     updateTransactionTool,
@@ -43,10 +44,11 @@ export class ConversationAI implements IConversationAI {
         // Write tools
         insertTransactionTool,
         deleteTransactionTool,
-        upsertBucketTool,
+        insertBucketTool,
         deleteBucketTool,
         upsertPeriodTool,
         updateTransactionTool,
+        updateBucketTool,
         // Read tools
         getTransactionHistoryTool,
         getBudgetStatusTool,

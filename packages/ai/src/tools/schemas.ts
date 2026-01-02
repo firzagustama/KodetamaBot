@@ -43,15 +43,18 @@ export type DeleteTransactionInput = z.infer<typeof DeleteTransactionSchema>;
 /**
  * Schema for upserting a bucket
  */
-export const UpsertBucketSchema = z.object({
-    bucketId: z.string().uuid().optional().describe("Bucket ID for update, omit for new"),
+export const BucketSchema = z.object({
+    bucketId: z.string().uuid().describe("Bucket ID, DONT SHOW TO USER"),
     name: z.string().min(1).describe("Bucket name (e.g., Makan, Transport, Tabungan)"),
-    description: z.string().min(1).describe("Brief description of what this bucket is for"),
-    amount: z.number().positive().describe("Budget allocation in IDR"),
+    description: z.string().min(1).describe("Brief description so LLM can know where to put the transaction"),
+    amount: z.number().positive().describe("Budget allocation amount"),
     category: z.enum(["needs", "wants", "savings"]).describe("needs: essential | wants: non-essential | savings: savings"),
 });
 
-export type UpsertBucketInput = z.infer<typeof UpsertBucketSchema>;
+export const BucketSchemaWithEmbedding = BucketSchema.extend({ embedding: z.array(z.number()).optional() });
+
+export type UpdateBucketInput = z.infer<typeof BucketSchemaWithEmbedding>;
+export type InsertBucketInput = z.infer<Omit<typeof BucketSchemaWithEmbedding, "bucketId">>;
 
 /**
  * Schema for deleting a bucket

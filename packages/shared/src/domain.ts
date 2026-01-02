@@ -219,7 +219,8 @@ export interface IBudgetService {
     getBudget(periodId: string): Promise<PeriodBudget | null>;
     getBudgetSummary(targetId: string, periodId: string): Promise<{ budget: PeriodBudget; spending: any[] } | null>;
     upsertBudget(params: any): Promise<string>;
-    upsertBucket(periodId: string, args: any): Promise<void>;
+    updateBucket(periodId: string, args: any): Promise<void>;
+    insertBucket(periodId: string, args: any): Promise<void>;
     deleteBucket(periodId: string, args: any): Promise<void>;
 }
 

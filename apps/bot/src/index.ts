@@ -34,9 +34,10 @@ import {
     ToolExecutor,
     ConfirmTelegramTool,
     InsertTransactionTool,
-    DeleteTransactionTool,
-    UpsertBucketTool,
     UpdateTransactionTool,
+    DeleteTransactionTool,
+    InsertBucketTool,
+    UpdateBucketTool,
     DeleteBucketTool,
     UpsertPeriodTool,
     GetTransactionHistoryTool,
@@ -151,9 +152,10 @@ async function createBotApplication() {
     const toolExecutor = new ToolExecutor(aiOrchestrator);
     toolExecutor.register(new ConfirmTelegramTool());
     toolExecutor.register(new InsertTransactionTool(transactionService, budgetService));
-    toolExecutor.register(new DeleteTransactionTool(transactionService));
-    toolExecutor.register(new UpsertBucketTool(budgetService));
     toolExecutor.register(new UpdateTransactionTool(transactionService, budgetService));
+    toolExecutor.register(new DeleteTransactionTool(transactionService));
+    toolExecutor.register(new InsertBucketTool(budgetService));
+    toolExecutor.register(new UpdateBucketTool(budgetService));
     toolExecutor.register(new DeleteBucketTool(budgetService));
     toolExecutor.register(new UpsertPeriodTool(periodService));
     toolExecutor.register(new GetTransactionHistoryTool(transactionService));
