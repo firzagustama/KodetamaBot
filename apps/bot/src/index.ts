@@ -148,7 +148,7 @@ async function createBotApplication() {
     const transactionCallbackHandler = new TransactionCallbackHandler(transactionUseCase);
 
     // 10. Create and configure ToolExecutor with all tool handlers
-    const toolExecutor = new ToolExecutor();
+    const toolExecutor = new ToolExecutor(aiOrchestrator);
     toolExecutor.register(new ConfirmTelegramTool());
     toolExecutor.register(new InsertTransactionTool(transactionService, budgetService));
     toolExecutor.register(new DeleteTransactionTool(transactionService));

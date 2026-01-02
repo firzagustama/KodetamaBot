@@ -16,7 +16,7 @@ export class SearchTransactionsTool implements IToolHandler {
         });
         const { result: queryEmbedding } = await ai.generateEmbedding(args.query);
 
-        const treshold = 0.18;
+        const treshold = 0.25;
         const r = await this.transactionService.searchTransactionsByVector(targetId, period.id, queryEmbedding, treshold);
 
         const searchList = r.slice(0, args.limit ?? 10).map((t: any) =>

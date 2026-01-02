@@ -1,10 +1,12 @@
 import { Period, TargetContext } from "@kodetama/shared";
 import { BotContext } from "../../types.js";
+import { AIOrchestrator } from "@kodetama/ai";
 
 export interface ToolHandlerContext {
     target: TargetContext;
     period: Period;
     ctx: BotContext;
+    orchestrator: AIOrchestrator;
 }
 
 export interface IToolHandler {
@@ -25,6 +27,8 @@ export const compactResult = (obj: Record<string, any>): string => {
 export class ToolExecutor {
     private handlers: Map<string, IToolHandler> = new Map();
 
+    constructor(private orchestrator: AIOrchestrator) { }
+
     register(handler: IToolHandler): void {
         this.handlers.set(handler.name, handler);
     }
@@ -36,7 +40,7 @@ export class ToolExecutor {
         ctx: BotContext
     ): Promise<any[]> {
         const results: any[] = [];
-        const context: ToolHandlerContext = { target, period, ctx };
+        const context: ToolHandlerContext = { target, period, ctx, orchestrator: this.orchestrator };
 
         for (const toolCall of toolCallsList) {
             const { id, function: func } = toolCall;
