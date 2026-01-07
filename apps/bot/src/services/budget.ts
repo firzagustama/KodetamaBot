@@ -45,6 +45,7 @@ export class BudgetService implements IBudgetService {
                     if (sum[item.bucket].amount == 0) {
                         sum[item.bucket].amount = parseFloat(item.total);
                     }
+                    sum[item.bucket].spent -= parseFloat(item.total);
                     break;
                 case 'expense':
                     sum[item.bucket].spent += parseFloat(item.total);
