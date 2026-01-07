@@ -8,7 +8,7 @@ export class UpdateTransactionTool implements IToolHandler {
 
     async execute(args: any, { target, period, orchestrator }: ToolHandlerContext): Promise<string> {
         const targetId = target.groupId || target.userId!;
-        const transactions = args.input.items;
+        const transactions = Array.isArray(args.input.items) ? args.input.items : [args.input.items];
         const ids: string[] = [];
         const buckets: string[] = [];
 
