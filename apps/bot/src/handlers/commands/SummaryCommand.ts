@@ -51,6 +51,7 @@ export class SummaryCommand extends CommandHandler {
         response += `${this.formatPeriodDates(period)}\n\n`;
 
         // Income section
+        let incomeBucket: Record<string, number> = {};
         if (incomes.length > 0) {
             response += `💰 *Pemasukan* (${incomes.length})\n`;
             for (const [bucket, items] of Object.entries(groupedIncomes)) {
@@ -62,6 +63,7 @@ export class SummaryCommand extends CommandHandler {
                 if (items.length > 3) {
                     response += `  · _dan ${items.length - 3} lainnya_\n`;
                 }
+                incomeBucket[bucket] = bucketTotal;
             }
             response += `\n*Total Pemasukan:* ${formatRupiah(totalIncome)}\n\n`;
         }
@@ -70,7 +72,7 @@ export class SummaryCommand extends CommandHandler {
         if (expenses.length > 0) {
             response += `💸 *Pengeluaran* (${expenses.length})\n`;
             for (const [bucket, items] of Object.entries(groupedExpenses)) {
-                const bucketTotal = this.calculateTotal(items);
+                const bucketTotal = this.calculateTotal(items) - incomeBucket[bucket] || 0;
                 const budget = buckets?.find((b: any) => b.name === bucket);
 
                 response += `\n*${bucket}* · ${formatRupiah(bucketTotal)}`;
