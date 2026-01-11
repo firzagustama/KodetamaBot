@@ -1,6 +1,3 @@
-// Confirm tools
-export * from "./confirmTelegram.js"
-
 // Write tools
 export * from "./insertTransaction.js"
 export * from "./updateTransaction.js"

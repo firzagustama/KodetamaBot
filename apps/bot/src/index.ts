@@ -32,7 +32,6 @@ import { FileService } from "./services/file.js";
 // Tool handlers
 import {
     ToolExecutor,
-    ConfirmTelegramTool,
     InsertTransactionTool,
     UpdateTransactionTool,
     DeleteTransactionTool,
@@ -150,7 +149,6 @@ async function createBotApplication() {
 
     // 10. Create and configure ToolExecutor with all tool handlers
     const toolExecutor = new ToolExecutor(aiOrchestrator);
-    toolExecutor.register(new ConfirmTelegramTool());
     toolExecutor.register(new InsertTransactionTool(transactionService, budgetService));
     toolExecutor.register(new UpdateTransactionTool(transactionService, budgetService));
     toolExecutor.register(new DeleteTransactionTool(transactionService));

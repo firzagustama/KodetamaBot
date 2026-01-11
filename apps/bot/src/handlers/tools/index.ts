@@ -1,5 +1,4 @@
 export * from "./ToolExecutor.js";
-export * from "./ConfirmTelegramTool.js";
 export * from "./InsertTransactionTool.js";
 export * from "./UpdateTransactionTool.js";
 export * from "./DeleteTransactionTool.js";

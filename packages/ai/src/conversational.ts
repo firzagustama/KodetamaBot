@@ -19,7 +19,6 @@ import {
     getBudgetStatusTool,
     searchTransactionsTool,
     getFinancialSummaryTool,
-    // confirmTelegramTool,
 } from "./tools/index.js";
 
 export class ConversationAI implements IConversationAI {
@@ -28,8 +27,8 @@ export class ConversationAI implements IConversationAI {
     private clientModel!: string;
 
     // Context Limit
-    private CONTEXT_LIMIT = 40;
-    private CONTEXT_LAST_N = 15;
+    private CONTEXT_LIMIT = 30;
+    private CONTEXT_LAST_N = 10;
     private CONTEXT_TTL = 60 * 60; // 1 hour
 
     // Retry configuration
@@ -39,8 +38,6 @@ export class ConversationAI implements IConversationAI {
 
     // All available tools
     private readonly tools = [
-        // Confirm tools
-        // confirmTelegramTool,
         // Write tools
         insertTransactionTool,
         deleteTransactionTool,

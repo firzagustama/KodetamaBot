@@ -193,29 +193,32 @@ export function createTransactionHandler(
                     // Add tool results to messages
                     messages.push(...toolResults);
 
-                    if (response.tool_calls[0].function.name === "confirmTelegram") {
-                        await conversationAI.setTargetContext(target, messages);
-                        break;
+                    // If LLM returned content AND tool calls, send content now
+                    if (response.content) {
+                        await ctx.reply(response.content);
                     }
 
                     // Continue loop to get AI response after tool execution
                     continue;
                 }
 
-                // Final response - send to user
+                // Final response (or text-only response) - send to user
                 if (response.content) {
                     await ctx.reply(response.content);
                     if (isCallback) {
                         await ctx.answerCallbackQuery();
                     }
-                    await conversationAI.setTargetContext(target, messages);
                 }
 
-                break; // Exit loop after sending response
+                // Always save context after successful completion or text response
+                await conversationAI.setTargetContext(target, messages);
+                break; // Exit loop after sending final response
             }
 
             if (iteration >= MAX_ITERATIONS) {
                 await ctx.reply("Waduh, kepikiran terlalu lama. 😑 Coba chat lagi ya.");
+                // Still try to save what we have
+                await conversationAI.setTargetContext(target, messages);
             }
         } catch (error: any) {
             console.error("Error in handleTransaction:", error);
