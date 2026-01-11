@@ -88,7 +88,16 @@ export class StartCommand extends CommandHandler {
             try {
                 // Basic validation to prevent obvious crashes
                 new URL(WEB_APP_URL);
-                keyboard.webApp("Dashboard", WEB_APP_URL);
+
+                if (ctx.chat?.type === "private") {
+                    keyboard.webApp("Dashboard", WEB_APP_URL);
+                } else {
+                    // For groups, use a link to the bot with startapp parameter
+                    // This is the correct way to open Mini App from a group
+                    const botUsername = ctx.me.username;
+                    const targetId = target.groupId || target.userId!;
+                    keyboard.url("Dashboard", `https://t.me/${botUsername}?startapp=${targetId}`);
+                }
                 hasWebApp = true;
             } catch (e) {
                 console.warn(`Invalid WEB_APP_URL: ${WEB_APP_URL}`);

@@ -28,8 +28,10 @@ export class UserService implements IUserService {
 
         // Return user with telegram account info flattened as expected by context
         return {
-            ...user.telegramAccount,
-            userId: user.telegramAccount.userId,
+            ...user, // Includes tier, isActive, etc.
+            ...user.telegramAccount, // Spreads telegramId, username, etc.
+            id: user.id, // Ensure id is the User ID
+            userId: user.id,
             user: user,
         } as any;
     }
@@ -298,8 +300,10 @@ export async function getUserByTelegramId(telegramId: number) {
 
     if (result.success && result.data) {
         return {
+            ...result.data,
             ...result.data.telegramAccount,
-            userId: result.data.telegramAccount.userId,
+            id: result.data.id,
+            userId: result.data.id,
             user: result.data,
         };
     }

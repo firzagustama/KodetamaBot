@@ -22,10 +22,22 @@ export class LinkFamilyCommand extends CommandHandler {
             return { success: true };
         }
 
+        const chatType = ctx.chat.type;
+        if (chatType !== "group" && chatType !== "supergroup") {
+            await ctx.reply("⚠️ Perintah ini hanya bisa digunakan di dalam grup.\n\nSilakan tambahkan saya ke grup keluarga Anda, lalu ketik /link_family di sana.");
+            return { success: true };
+        }
+
         const { id: userId } = ctx.from;
-        const account = await this.userService.getUserByTelegramId(userId);
-        if (!account || account.tier !== "family") {
-            await ctx.reply("Anda belum terdaftar, silahkan daftar terlebih dahulu");
+        const account = ctx.userContext || await this.userService.getUserByTelegramId(userId);
+
+        if (!account) {
+            await ctx.reply("Anda belum terdaftar. Silakan ketik /start untuk mendaftar.");
+            return { success: true };
+        }
+
+        if (account.tier !== "family") {
+            await ctx.reply(`Maaf, fitur ini hanya untuk tier **Family**. Tier Anda saat ini: **${account.tier}**.\n\nJika ini kesalahan, silakan hubungi admin.`);
             return { success: true };
         }
 
