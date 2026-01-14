@@ -156,13 +156,20 @@ export class ConversationAI implements IConversationAI {
             }
         }
 
-        // 3. Ensure we don't end with an assistant message that has tool_calls
-        // Gemini's OpenAI adapter fails if tool_calls are not followed by tool results.
-        // If the last message is an assistant message with tool_calls, remove it.
+        // 3. Clean up incomplete tool call sequences
+        // Remove trailing assistant messages with tool_calls that have no tool results
         while (normalized.length > 0) {
             const last = normalized[normalized.length - 1];
             if (last.role === "assistant" && (last as any).tool_calls && (last as any).tool_calls.length > 0) {
-                normalized.pop();
+                // Check if there are any tool results after this
+                const hasToolResults = normalized.length > 1 && normalized.some((msg, idx) =>
+                    idx > normalized.length - 1 && msg.role === "tool"
+                );
+                if (!hasToolResults) {
+                    normalized.pop();
+                } else {
+                    break;
+                }
             } else {
                 break;
             }
@@ -190,16 +197,42 @@ export class ConversationAI implements IConversationAI {
                 lastError = error as Error;
                 console.error(`AI request failed (attempt ${attempt + 1}/${this.MAX_RETRIES + 1}):`, error);
 
-                // Don't retry on final attempt
-                if (attempt < this.MAX_RETRIES) {
+                // Check if error is retryable (network errors, timeouts, rate limits)
+                const isRetryable = this.isRetryableError(error);
+
+                // Don't retry on final attempt or non-retryable errors
+                if (attempt < this.MAX_RETRIES && isRetryable) {
                     const delay = this.RETRY_DELAYS[attempt] ?? 4000;
                     console.log(`Retrying in ${delay}ms...`);
                     await this.sleep(delay);
+                } else if (!isRetryable) {
+                    console.error('Non-retryable error encountered, failing immediately');
+                    break;
                 }
             }
         }
 
         throw lastError ?? new Error('AI request failed after retries');
+    }
+
+    /**
+     * Determine if an error is worth retrying
+     */
+    private isRetryableError(error: any): boolean {
+        // Network errors, timeouts, and rate limits are retryable
+        if (error?.message?.includes('timeout')) return true;
+        if (error?.message?.includes('ECONNRESET')) return true;
+        if (error?.message?.includes('ETIMEDOUT')) return true;
+        if (error?.code === 'ENOTFOUND') return true;
+        if (error?.status === 429) return true; // Rate limit
+        if (error?.status === 503) return true; // Service unavailable
+        if (error?.status === 502) return true; // Bad gateway
+
+        // 4xx errors (except 429) are not retryable
+        if (error?.status >= 400 && error?.status < 500) return false;
+
+        // Default to retryable for unknown errors
+        return true;
     }
 
     private sleep(ms: number): Promise<void> {
@@ -217,18 +250,35 @@ export class ConversationAI implements IConversationAI {
     async setTargetContext(target: TargetContext, messages: ChatCompletionMessageParam[]): Promise<void> {
         const contextKey = getTargetContextKey(target.targetId);
         const filtered = messages.filter((message) => message.role !== "system");
+
+        // Save to Redis first
         await redisManager.set(contextKey, JSON.stringify(filtered), this.CONTEXT_TTL);
 
+        // Handle summarization if needed
         if (filtered.length > this.CONTEXT_LIMIT) {
-            this.createSummary(target, JSON.stringify(filtered));
-            this.keepLastN(target, this.CONTEXT_LAST_N);
+            try {
+                // CRITICAL: Await these operations and handle errors
+                await this.createSummary(target, JSON.stringify(filtered));
+                await this.keepLastN(target, this.CONTEXT_LAST_N);
+            } catch (error) {
+                console.error('[ERROR] Failed to create summary or trim context:', error);
+                // Don't throw - we've already saved the context, summarization is optimization
+                // Log for monitoring but allow the conversation to continue
+            }
         }
     }
 
     async clearContext(target: TargetContext): Promise<void> {
         const messages = await this.getTargetContext(target);
         const filtered = messages.filter((message) => message.role !== "system");
-        await this.createSummary(target, JSON.stringify(filtered));
+
+        try {
+            await this.createSummary(target, JSON.stringify(filtered));
+        } catch (error) {
+            console.error('[ERROR] Failed to create summary during clearContext:', error);
+            // Continue with clearing even if summary fails
+        }
+
         await redisManager.del(getTargetContextKey(target.targetId));
     }
 
@@ -284,7 +334,7 @@ export class ConversationAI implements IConversationAI {
                 newSummary = response?.choices[0].message.content || "Failed to generate response";
             }
 
-            // Insert new summary to db and clear context
+            // Insert new summary to db
             await db.update(contextSummary).set({
                 summary: newSummary,
             }).where(eq(contextSummary.targetId, target.targetId));
@@ -293,7 +343,8 @@ export class ConversationAI implements IConversationAI {
             if (error && typeof error === 'object') {
                 console.error("[DEBUG] Detailed error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
             }
-            throw error; // Rethrow to let caller handle or reject
+            // Re-throw with more context
+            throw new Error(`Summary creation failed: ${error?.message || 'Unknown error'}`);
         }
     }
 
@@ -302,12 +353,18 @@ export class ConversationAI implements IConversationAI {
         if (!messages) {
             return;
         }
-        await this.createSummary({
-            isGroup: false,
-            targetId: targetId,
-            userId: ""
-        }, messages);
-        await redisManager.del(getTargetContextKey(targetId));
+
+        try {
+            await this.createSummary({
+                isGroup: false,
+                targetId: targetId,
+                userId: ""
+            }, messages);
+            await redisManager.del(getTargetContextKey(targetId));
+        } catch (error) {
+            console.error('[ERROR] createSummaryFromCache failed:', error);
+            // Don't throw - this is a background operation
+        }
     }
 
     private async getContext(target: TargetContext, period: Period): Promise<string> {
