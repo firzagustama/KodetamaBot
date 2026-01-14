@@ -76,14 +76,16 @@ export class ConversationAI implements IConversationAI {
     }
 
     async buildPrompt(target: TargetContext, period: Period): Promise<ChatCompletionMessageParam[]> {
-        const messages = await this.getTargetContext(target);
+        const history = await this.getTargetContext(target);
         const context = await this.getContext(target, period);
-        return [
+
+        const systemMessages: ChatCompletionMessageParam[] = [
             { role: "system", content: CONVERSATION_SYSTEM_PROMPT },
             { role: "system", content: `Current date: ${new Date().toLocaleDateString()}` },
             { role: "system", content: `User context:\n${context}` },
-            ...messages
         ];
+
+        return [...systemMessages, ...history];
     }
 
     async generateResponse(messages: ChatCompletionMessageParam[]): Promise<ChatCompletionMessage | undefined> {
@@ -94,14 +96,79 @@ export class ConversationAI implements IConversationAI {
                 refusal: ""
             }
         }
+
+        const normalizedMessages = this.normalizeMessages(messages);
+
         return this.withRetry(async () => {
             const response = await this.client?.chat.completions.create({
                 model: this.clientModel,
-                messages: messages,
+                messages: normalizedMessages,
                 tools: this.tools,
             });
             return response?.choices[0].message;
         });
+    }
+
+    /**
+     * Normalize messages for Gemini OpenAI-compatible API:
+     * 1. Combine consecutive messages with the same role (essential for group chats).
+     * 2. Combine all system messages at the start into a single system message.
+     * 3. Ensure alternating User/Assistant roles after the system message.
+     */
+    private normalizeMessages(messages: ChatCompletionMessageParam[]): ChatCompletionMessageParam[] {
+        if (messages.length === 0) return [];
+
+        const normalized: ChatCompletionMessageParam[] = [];
+
+        // 1. Combine system messages at the start
+        let systemContent = "";
+        let i = 0;
+        while (i < messages.length && messages[i].role === "system") {
+            const content = messages[i].content;
+            if (typeof content === "string") {
+                systemContent += (systemContent ? "\n\n" : "") + content;
+            }
+            i++;
+        }
+
+        if (systemContent) {
+            normalized.push({ role: "system", content: systemContent });
+        }
+
+        // 2. Process remaining messages and merge consecutive roles
+        for (; i < messages.length; i++) {
+            const current = messages[i];
+            const last = normalized[normalized.length - 1];
+
+            // If roles match and it's not a tool-related sequence, merge them
+            // Note: tool messages MUST stay separate and follow their assistant message
+            if (last && last.role === current.role && current.role !== "tool" && last.role !== "tool") {
+                if (typeof last.content === "string" && typeof current.content === "string") {
+                    last.content += "\n\n" + current.content;
+                } else {
+                    // Handle array content (like image_url)
+                    const lastContentArr = Array.isArray(last.content) ? last.content : [{ type: "text", text: last.content || "" }];
+                    const currentContentArr = Array.isArray(current.content) ? current.content : [{ type: "text", text: current.content || "" }];
+                    last.content = [...(lastContentArr as any), ...(currentContentArr as any)];
+                }
+            } else {
+                normalized.push({ ...current });
+            }
+        }
+
+        // 3. Ensure we don't end with an assistant message that has tool_calls
+        // Gemini's OpenAI adapter fails if tool_calls are not followed by tool results.
+        // If the last message is an assistant message with tool_calls, remove it.
+        while (normalized.length > 0) {
+            const last = normalized[normalized.length - 1];
+            if (last.role === "assistant" && (last as any).tool_calls && (last as any).tool_calls.length > 0) {
+                normalized.pop();
+            } else {
+                break;
+            }
+        }
+
+        return normalized;
     }
 
     /**
@@ -204,12 +271,14 @@ export class ConversationAI implements IConversationAI {
         // Generate new summary
         let newSummary: string = "AI Dev summary";
         if (!this.isDevMode) {
+            const summaryPrompt: ChatCompletionMessageParam[] = [{
+                role: "user",
+                content: CONTEXT_SUMMARY_USER_PROMPT(oldSummary, JSON.stringify(messages))
+            }];
+
             const response = await this.client?.chat.completions.create({
                 model: this.clientModel,
-                messages: [{
-                    role: "user",
-                    content: CONTEXT_SUMMARY_USER_PROMPT(oldSummary, JSON.stringify(messages))
-                }]
+                messages: summaryPrompt,
             });
             newSummary = response?.choices[0].message.content || "Failed to generate response";
         }
