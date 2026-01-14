@@ -17,7 +17,7 @@ import { relations } from "drizzle-orm";
 
 const vector = customType<{ data: number[] }>({
     dataType() {
-        return "vector(1536)";
+        return "vector(768)";
     },
     toDriver(value: number[]) {
         return JSON.stringify(value);

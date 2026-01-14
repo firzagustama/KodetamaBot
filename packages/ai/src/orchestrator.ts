@@ -187,16 +187,23 @@ export class AIOrchestrator {
         const apiKey = config.apiKey;
         this.isDevMode = !apiKey ||
             apiKey === "your_openrouter_api_key_here" ||
-            !apiKey.startsWith("sk-"); // OpenRouter keys start with sk-
+            (!apiKey.startsWith("sk-") && !apiKey.startsWith("AIza")); // OpenRouter starts with sk-, Google starts with AIza
 
         if (!this.isDevMode) {
+            let baseURL = config.baseURL ?? "https://openrouter.ai/api/v1";
+
+            // Support Google AI Studio OpenAI-compatible API
+            if (apiKey.startsWith("AIza") && !config.baseURL) {
+                baseURL = "https://generativelanguage.googleapis.com/v1beta/openai/";
+            }
+
             this.client = new OpenAI({
                 apiKey: config.apiKey,
-                baseURL: config.baseURL ?? "https://openrouter.ai/api/v1",
+                baseURL: baseURL,
             });
         }
-        this.model = config.model ?? "openai/gpt-4-turbo";
-        this.embeddingModel = config.embeddingModel ?? "text-embedding-3-small";
+        this.model = config.model ?? (apiKey.startsWith("AIza") ? "gemini-2.0-flash" : "openai/gpt-4-turbo");
+        this.embeddingModel = config.embeddingModel ?? (apiKey.startsWith("AIza") ? "text-embedding-004" : "text-embedding-3-small");
     }
 
     /**
@@ -396,7 +403,7 @@ export class AIOrchestrator {
         return {
             result: response.data[0].embedding,
             usage: {
-                inputTokens: response.usage.prompt_tokens,
+                inputTokens: response.usage?.prompt_tokens ?? 0,
                 outputTokens: 0,
                 model: this.embeddingModel,
             },

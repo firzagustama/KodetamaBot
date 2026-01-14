@@ -109,8 +109,9 @@ async function createBotApplication() {
 
     // 3. Initialize AI Services
     const aiConfig = {
-        apiKey: process.env.OPENROUTER_API_KEY ?? "",
-        model: process.env.OPENROUTER_MODEL,
+        apiKey: process.env.GOOGLE_AI_API_KEY ?? process.env.OPENROUTER_API_KEY ?? "",
+        model: process.env.GOOGLE_AI_MODEL ?? process.env.OPENROUTER_MODEL,
+        embeddingModel: process.env.GOOGLE_AI_EMBEDDING_MODEL ?? process.env.OPENROUTER_EMBEDDING_MODEL,
     };
     const aiOrchestrator = new AIOrchestrator(aiConfig);
     const conversationAI = new ConversationAI(aiConfig);

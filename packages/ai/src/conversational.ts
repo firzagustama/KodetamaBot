@@ -60,11 +60,19 @@ export class ConversationAI implements IConversationAI {
             return;
         }
 
+        const apiKey = config.apiKey;
+        let baseURL = config.baseURL ?? "https://openrouter.ai/api/v1";
+
+        // Support Google AI Studio OpenAI-compatible API
+        if (apiKey.startsWith("AIza") && !config.baseURL) {
+            baseURL = "https://generativelanguage.googleapis.com/v1beta/openai/";
+        }
+
         this.client = new OpenAI({
             apiKey: config.apiKey,
-            baseURL: config.baseURL ?? "https://openrouter.ai/api/v1",
+            baseURL: baseURL,
         });
-        this.clientModel = config.model ?? "gemini-2.5-flash";
+        this.clientModel = config.model ?? (apiKey.startsWith("AIza") ? "gemini-2.0-flash" : "gemini-2.5-flash");
     }
 
     async buildPrompt(target: TargetContext, period: Period): Promise<ChatCompletionMessageParam[]> {
