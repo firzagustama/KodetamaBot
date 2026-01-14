@@ -76,7 +76,32 @@ export class BotRunner {
         const { createServer } = await import("http");
         const { webhookCallback } = await import("grammy");
 
-        const server = createServer(webhookCallback(this.bot, "http"));
+        // Configure webhook with timeout and async handling
+        const handleWebhook = webhookCallback(this.bot, "http", {
+            timeoutMilliseconds: 10000, // Keep default 10s for quick responses
+            onTimeout: async () => {
+                logger.warn("Webhook timeout reached, responding to Telegram immediately");
+                // Telegram gets a 200 OK, processing continues in background
+            },
+        });
+
+        const server = createServer((req, res) => {
+            // Wrap the webhook handler to respond immediately for long operations
+            handleWebhook(req, res);
+
+            // If response hasn't been sent in 9 seconds, send it anyway
+            const safetyTimeout = setTimeout(() => {
+                if (!res.headersSent) {
+                    logger.warn("Force-responding to webhook to prevent Telegram timeout");
+                    res.writeHead(200);
+                    res.end();
+                }
+            }, 9000); // 9 seconds, slightly before Grammy's timeout
+
+            // Clear safety timeout if response is sent normally
+            res.on('finish', () => clearTimeout(safetyTimeout));
+        });
+
         const PORT = this.port;
 
         server.on("error", (err) => {
