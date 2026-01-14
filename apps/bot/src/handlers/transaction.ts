@@ -155,6 +155,11 @@ export function createTransactionHandler(
         let iteration = 0;
 
         try {
+            // Answer callback query early to prevent timeout
+            if (isCallback) {
+                await ctx.answerCallbackQuery("Diproses ya...");
+            }
+
             while (iteration < MAX_ITERATIONS) {
                 iteration++;
 
@@ -162,6 +167,7 @@ export function createTransactionHandler(
 
                 if (!response) {
                     await ctx.reply("Hmm... sistem lagi sibuk. 🤔 Coba lagi nanti deh.");
+                    await conversationAI.setTargetContext(target, messages);
                     break;
                 }
 
@@ -183,41 +189,54 @@ export function createTransactionHandler(
                         }
                     }
 
-                    const toolResults = await toolExecutor.execute(
-                        response.tool_calls,
-                        target,
-                        period,
-                        ctx
-                    );
+                    try {
+                        const toolResults = await toolExecutor.execute(
+                            response.tool_calls,
+                            target,
+                            period,
+                            ctx
+                        );
 
-                    // Add tool results to messages
-                    messages.push(...toolResults);
+                        // Add tool results to messages
+                        messages.push(...toolResults);
 
-                    // Continue loop to get AI response after tool execution
-                    continue;
+                        // Save context after tool execution
+                        await conversationAI.setTargetContext(target, messages);
+
+                        // Continue loop to get AI response after tool execution
+                        continue;
+                    } catch (toolError) {
+                        console.error("Error executing tools:", toolError);
+                        await ctx.reply("Waduh, ada error waktu eksekusi tools. 🔧 Coba lagi ya.");
+                        await conversationAI.setTargetContext(target, messages);
+                        break;
+                    }
                 }
 
                 // Final response (or text-only response) - send to user
                 if (response.content) {
                     await ctx.reply(response.content);
-                    if (isCallback) {
-                        await ctx.answerCallbackQuery();
-                    }
                 }
 
-                // Always save context after successful completion or text response
+                // Save context after successful completion
                 await conversationAI.setTargetContext(target, messages);
                 break; // Exit loop after sending final response
             }
 
+            // Check if we hit max iterations (loop exited naturally without break)
             if (iteration >= MAX_ITERATIONS) {
                 await ctx.reply("Waduh, kepikiran terlalu lama. 😑 Coba chat lagi ya.");
-                // Still try to save what we have
                 await conversationAI.setTargetContext(target, messages);
             }
         } catch (error: any) {
             console.error("Error in handleTransaction:", error);
             await ctx.reply("Anjir sistem lagi sibuk. 💥 Coba lagi nanti ya.");
+            // Try to save context even on unexpected errors
+            try {
+                await conversationAI.setTargetContext(target, messages);
+            } catch (saveError) {
+                console.error("Failed to save context after error:", saveError);
+            }
         }
     };
 }
