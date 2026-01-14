@@ -266,27 +266,35 @@ export class ConversationAI implements IConversationAI {
     }
 
     private async createSummary(target: TargetContext, messages: string): Promise<void> {
-        const oldSummary: string = await this.getSummary(target);
+        try {
+            const oldSummary: string = await this.getSummary(target);
 
-        // Generate new summary
-        let newSummary: string = "AI Dev summary";
-        if (!this.isDevMode) {
-            const summaryPrompt: ChatCompletionMessageParam[] = [{
-                role: "user",
-                content: CONTEXT_SUMMARY_USER_PROMPT(oldSummary, JSON.stringify(messages))
-            }];
+            // Generate new summary
+            let newSummary: string = "AI Dev summary";
+            if (!this.isDevMode) {
+                const summaryPrompt: ChatCompletionMessageParam[] = [{
+                    role: "user",
+                    content: CONTEXT_SUMMARY_USER_PROMPT(oldSummary, JSON.stringify(messages))
+                }];
 
-            const response = await this.client?.chat.completions.create({
-                model: this.clientModel,
-                messages: summaryPrompt,
-            });
-            newSummary = response?.choices[0].message.content || "Failed to generate response";
+                const response = await this.client?.chat.completions.create({
+                    model: this.clientModel,
+                    messages: summaryPrompt,
+                });
+                newSummary = response?.choices[0].message.content || "Failed to generate response";
+            }
+
+            // Insert new summary to db and clear context
+            await db.update(contextSummary).set({
+                summary: newSummary,
+            }).where(eq(contextSummary.targetId, target.targetId));
+        } catch (error: any) {
+            console.error(`[ERROR] createSummary failed for target ${target.targetId}:`, error);
+            if (error && typeof error === 'object') {
+                console.error("[DEBUG] Detailed error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+            }
+            throw error; // Rethrow to let caller handle or reject
         }
-
-        // Insert new summary to db and clear context
-        await db.update(contextSummary).set({
-            summary: newSummary,
-        }).where(eq(contextSummary.targetId, target.targetId));
     }
 
     async createSummaryFromCache(targetId: string) {

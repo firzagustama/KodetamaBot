@@ -19,18 +19,25 @@ export class Scheduler {
     init() {
         // run every minutes
         cron.schedule("* * * * *", async () => {
-            // Init AI
-            const ai = getConversationAI();
+            try {
+                // Init AI
+                const ai = getConversationAI();
 
-            // Find all redis with key target:context:* that will be expired
-            const client = await redisManager.getClient();
-            const keys = await client.keys("target:context:*");
-            for (const key of keys) {
-                const ttl = await client.ttl(key);
-                // Nearly expired
-                if (ttl < 120) {
-                    const targetId = key.split(":")[2];
-                    await ai.createSummaryFromCache(targetId);
+                // Find all redis with key target:context:* that will be expired
+                const client = await redisManager.getClient();
+                const keys = await client.keys("target:context:*");
+                for (const key of keys) {
+                    const ttl = await client.ttl(key);
+                    // Nearly expired
+                    if (ttl < 120) {
+                        const targetId = key.split(":")[2];
+                        await ai.createSummaryFromCache(targetId);
+                    }
+                }
+            } catch (error: any) {
+                console.error("[CRITICAL] Scheduler error:", error);
+                if (error && typeof error === 'object') {
+                    console.error("[DEBUG] Full error object:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
                 }
             }
         });

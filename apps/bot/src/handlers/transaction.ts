@@ -162,6 +162,7 @@ export function createTransactionHandler(
 
             while (iteration < MAX_ITERATIONS) {
                 iteration++;
+                console.log(`[DEBUG] AI iteration ${iteration} for update ${ctx.update.update_id}`);
 
                 const response = await conversationAI.generateResponse(messages);
 

@@ -1,34 +1,43 @@
-import { createClient, RedisClientType } from "redis";
+import { createClient } from "redis";
 
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 
 class RedisManager {
-    private client: RedisClientType | null = null;
+    private client: any = null;
+    private connectionPromise: Promise<any> | null = null;
 
-    async getClient(): Promise<RedisClientType> {
-        if (!this.client) {
-            this.client = createClient({ url: REDIS_URL });
+    async getClient(): Promise<any> {
+        if (this.connectionPromise) {
+            return this.connectionPromise;
+        }
 
-            this.client.on("error", (err: any) => {
+        this.connectionPromise = (async () => {
+            const client = createClient({ url: REDIS_URL });
+
+            client.on("error", (err: any) => {
                 console.error("Redis Client Error", err);
             });
 
-            this.client.on("connect", () => {
+            client.on("connect", () => {
                 console.log("Redis Client Connected");
             });
 
-            this.client.on("ready", () => {
+            client.on("ready", () => {
                 console.log("Redis Client Ready");
             });
 
-            this.client.on("end", () => {
+            client.on("end", () => {
                 console.log("Redis Client Disconnected");
+                this.client = null;
+                this.connectionPromise = null;
             });
 
-            await this.client.connect();
-        }
+            await client.connect();
+            this.client = client;
+            return client;
+        })();
 
-        return this.client;
+        return this.connectionPromise;
     }
 
     async get(key: string): Promise<string | null> {

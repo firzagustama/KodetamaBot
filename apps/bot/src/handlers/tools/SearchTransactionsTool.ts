@@ -1,4 +1,3 @@
-import { AIOrchestrator } from "@kodetama/ai";
 import { IToolHandler, ToolHandlerContext, compactResult } from "./ToolExecutor.js";
 import { ITransactionService } from "@kodetama/shared";
 
@@ -7,14 +6,10 @@ export class SearchTransactionsTool implements IToolHandler {
 
     constructor(private transactionService: ITransactionService) { }
 
-    async execute(args: any, { target, period }: ToolHandlerContext): Promise<string> {
+    async execute(args: any, { target, period, orchestrator }: ToolHandlerContext): Promise<string> {
         const targetId = target.groupId || target.userId!;
 
-        const ai = new AIOrchestrator({
-            apiKey: process.env.OPENROUTER_API_KEY ?? "",
-            model: process.env.OPENROUTER_MODEL,
-        });
-        const { result: queryEmbedding } = await ai.generateEmbedding(args.query);
+        const { result: queryEmbedding } = await orchestrator.generateEmbedding(args.query);
 
         const treshold = 0.25;
         const r = await this.transactionService.searchTransactionsByVector(targetId, period.id, queryEmbedding, treshold);

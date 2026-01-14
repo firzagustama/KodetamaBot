@@ -95,22 +95,37 @@ export class BotRunner {
             }
         });
 
-        // Graceful shutdown
-        const stop = (signal: string) => {
-            logger.info(`Stopping bot (received ${signal})...`);
-            server.close();
-            process.exit(0);
-        };
-        process.once("SIGINT", () => stop("SIGINT"));
-        process.once("SIGTERM", () => stop("SIGTERM"));
 
         // Global error handlers
         process.on("uncaughtException", (err) => {
             logger.error("Uncaught Exception:", err);
         });
         process.on("unhandledRejection", (reason) => {
-            logger.error("Unhandled Rejection:", reason);
+            logger.error("Unhandled Rejection:", reason instanceof Error ? reason.stack : reason);
+            if (reason && typeof reason === 'object' && Object.keys(reason).length === 0) {
+                logger.error("Opaque rejection detected. Inspecting object:", JSON.stringify(reason, Object.getOwnPropertyNames(reason)));
+            }
         });
+    }
+
+    /**
+     * Set up graceful shutdown
+     */
+    private setupGracefulShutdown(): void {
+        const stop = async (signal: string) => {
+            logger.info(`Stopping bot (received ${signal})...`);
+            try {
+                // Ensure bot stops polling or disconnects webhook
+                await this.bot.stop();
+                logger.info("Bot stopped successfully");
+            } catch (err) {
+                logger.error("Error stopping bot:", err);
+            }
+            process.exit(0);
+        };
+
+        process.once("SIGINT", () => stop("SIGINT"));
+        process.once("SIGTERM", () => stop("SIGTERM"));
     }
 
     /**
@@ -118,6 +133,7 @@ export class BotRunner {
      */
     async run(): Promise<void> {
         this.validateConfig();
+        this.setupGracefulShutdown();
 
         logger.info(`Starting Kodetama Bot in ${this.mode} mode...`);
 
