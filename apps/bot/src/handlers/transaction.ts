@@ -193,11 +193,6 @@ export function createTransactionHandler(
                     // Add tool results to messages
                     messages.push(...toolResults);
 
-                    // If LLM returned content AND tool calls, send content now
-                    if (response.content) {
-                        await ctx.reply(response.content);
-                    }
-
                     // Continue loop to get AI response after tool execution
                     continue;
                 }
