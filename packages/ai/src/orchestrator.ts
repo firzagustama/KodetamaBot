@@ -397,6 +397,7 @@ export class AIOrchestrator {
 
         const response = await this.client.embeddings.create({
             model: this.embeddingModel,
+            dimensions: 768,
             input: text,
         });
 
