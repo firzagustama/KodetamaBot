@@ -151,6 +151,8 @@ export interface IDatePeriodRepository {
     save(period: Omit<DatePeriod, "id" | "createdAt">): Promise<string>;
     setCurrent(targetId: string, periodId: string): Promise<void>;
     findByTargetDateRange(targetId: string, startDate: Date, endDate: Date): Promise<DatePeriod[]>;
+    /** Find the most recent period before the given period ID */
+    findPreviousByTargetId(targetId: string, beforePeriodId: string): Promise<Period | null>;
 }
 
 export interface IBudgetRepository {

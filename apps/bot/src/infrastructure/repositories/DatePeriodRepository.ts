@@ -1,6 +1,6 @@
 import { db } from "@kodetama/db";
 import { datePeriods } from "@kodetama/db/schema";
-import { eq, and, desc, gte, lte } from "drizzle-orm";
+import { eq, and, desc, gte, lte, lt, ne } from "drizzle-orm";
 import type { IDatePeriodRepository, DatePeriod, Period } from "@kodetama/shared";
 
 export class DatePeriodRepository implements IDatePeriodRepository {
@@ -72,5 +72,31 @@ export class DatePeriodRepository implements IDatePeriodRepository {
             )
         });
         return result || null;
+    }
+
+    async findPreviousByTargetId(targetId: string, beforePeriodId: string): Promise<Period | null> {
+        // Find the current period's startDate first
+        const currentPeriod = await db.query.datePeriods.findFirst({
+            where: eq(datePeriods.id, beforePeriodId)
+        });
+        if (!currentPeriod) return null;
+
+        // Find the most recent period before currentPeriod's startDate
+        const result = await db.query.datePeriods.findFirst({
+            where: and(
+                eq(datePeriods.targetId, targetId),
+                ne(datePeriods.id, beforePeriodId),
+                lt(datePeriods.startDate, currentPeriod.startDate)
+            ),
+            orderBy: [desc(datePeriods.startDate)],
+            with: {
+                budget: {
+                    with: {
+                        buckets: true
+                    }
+                }
+            }
+        });
+        return (result as Period) || null;
     }
 }

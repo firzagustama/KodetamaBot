@@ -121,7 +121,10 @@ export function createTransactionHandler(
                     });
 
                     ctx.session.pendingFileId = undefined; // Clear after use
-                    message = "Tolong catat transaksi dari invoice ini.";
+
+                    // Use caption from the image if provided, otherwise fall back to default prompt
+                    const caption = ctx.message?.caption;
+                    message = caption || "Tolong catat transaksi dari invoice ini.";
                 } catch (error) {
                     console.error("Error processing file:", error);
                     await ctx.reply("Waduh, gagal proses filenya. Coba lagi deh.");
@@ -129,6 +132,7 @@ export function createTransactionHandler(
                 }
             }
         }
+
 
         if (!message && !imageBase64) return;
 

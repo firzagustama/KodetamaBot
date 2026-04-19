@@ -110,33 +110,49 @@ export class PeriodService implements IPeriodService {
             return periodId;
         }
 
-        // If copyFromPrevious, find the previous period's budget
-        if (copyFromPrevious) {
-            // Logic to find previous period is complex with generic repo.
-            // We need to find the last closed period.
-            // Let's assume we can fetch all and sort.
-            // Or add `findPrevious` to repo.
-            // For now, let's skip the copy logic complexity or implement a simplified version.
-            // The original code did a specific query.
-            // I'll leave a TODO or implement a basic version.
+        // Always include the Unallocated system bucket
+        const systemBucket = {
+            name: "Unallocated",
+            description: "Dana belum dialokasikan",
+            icon: "Wallet",
+            amount: "0",
+            category: null,
+            isSystem: true,
+            type: "expense"
+        };
 
-            // Simplified: just create default for now to satisfy interface.
-            // Real implementation would require expanding IDatePeriodRepository.
+        // If copyFromPrevious, find the previous period's budget and clone its non-system buckets
+        if (copyFromPrevious) {
+            const previousPeriod = await this.periodRepo.findPreviousByTargetId(targetId, periodId);
+
+            if (previousPeriod?.budget?.buckets && previousPeriod.budget.buckets.length > 0) {
+                const copiedBuckets = previousPeriod.budget.buckets
+                    .filter((b: any) => !b.isSystem)
+                    .map((b: any) => ({
+                        name: b.name,
+                        description: b.description,
+                        icon: b.icon,
+                        amount: b.amount, // carry over the allocated amount
+                        category: b.category,
+                        isSystem: false,
+                        type: b.type,
+                    }));
+
+                await this.budgetRepo.save({
+                    periodId,
+                    estimatedIncome: previousPeriod.budget.estimatedIncome,
+                    buckets: [systemBucket, ...copiedBuckets],
+                });
+
+                return periodId;
+            }
         }
 
-        // Create budget and unallocated bucket
+        // Default: create budget with only the Unallocated bucket
         await this.budgetRepo.save({
-            periodId: periodId,
+            periodId,
             estimatedIncome: "0",
-            buckets: [{
-                name: "Unallocated",
-                description: "Dana belum dialokasikan",
-                icon: "Wallet",
-                amount: "0",
-                category: null,
-                isSystem: true,
-                type: "expense"
-            }]
+            buckets: [systemBucket],
         });
 
         return periodId;
